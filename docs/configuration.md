@@ -318,6 +318,10 @@ The following environment variables are required/optional for bot operation:
 - `ALPHAPY_SERVICE_KEY`: Service key for authenticating with the Core API (`X-API-Key`), including premium verify, Discord link session, and bot profile endpoints.
 - `CORE_DISCORD_LINK_SESSION_PATH`: Optional override for the POST path used to start a Discord link session (default: `/integrations/discord/link-session`).
 - `CORE_DISCORD_BOT_PROFILE_PATH`: Optional override for the GET path used to fetch a profile for a Discord user (default: `/integrations/discord/bot-profile`).
+- `HERMIT_CONTEXT_ENABLED`: Enable Core-mediated Hermit strategic context injection in GPT system prompts (`false` by default; recommended to enable only for pilot users first).
+- `HERMIT_CONTEXT_TTL_SECONDS`: In-memory cache TTL for Hermit context fetches (default: `1800`).
+- `HERMIT_CONTEXT_TIMEOUT_SECONDS`: Request timeout (seconds) for Core Hermit context calls (default: `2.0`).
+- `CORE_HERMIT_CONTEXT_PATH`: Optional override for the Core endpoint path (default: `/integrations/hermit/strategic-context`).
 
 ### Optional - Innersync identity (Discord link webhook)
 - `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.
