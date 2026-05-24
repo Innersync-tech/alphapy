@@ -64,6 +64,11 @@ TELEMETRY_INGEST_INTERVAL = int(os.getenv("TELEMETRY_INGEST_INTERVAL", "45"))  #
 # Use the Core API origin (e.g. https://core.innersync.tech), not a Next.js site such as api.innersync.tech.
 CORE_API_URL = (os.getenv("CORE_API_URL") or "").rstrip("/")
 ALPHAPY_SERVICE_KEY = os.getenv("ALPHAPY_SERVICE_KEY")
+# Core-mediated Hermit strategic context
+HERMIT_CONTEXT_ENABLED = os.getenv("HERMIT_CONTEXT_ENABLED", "false").strip().lower() == "true"
+HERMIT_CONTEXT_TTL_SECONDS = int(os.getenv("HERMIT_CONTEXT_TTL_SECONDS", "1800"))
+HERMIT_CONTEXT_TIMEOUT_SECONDS = float(os.getenv("HERMIT_CONTEXT_TIMEOUT_SECONDS", "2.0"))
+CORE_HERMIT_CONTEXT_PATH = (os.getenv("CORE_HERMIT_CONTEXT_PATH") or "/integrations/hermit/strategic-context").strip()
 # Core → Alphapy: confirm Discord ↔ Innersync link (HMAC via X-Webhook-Signature)
 DISCORD_LINK_WEBHOOK_SECRET = os.getenv("DISCORD_LINK_WEBHOOK_SECRET")
 # Optional path overrides for Core integration (defaults match planned Core routes)

@@ -26,6 +26,7 @@ from cogs.reminders import (
     update_reminder,
 )
 from utils import core_ingress as core_ingress_module
+from utils.hermit_context import get_hermit_context_stats
 from utils.logger import get_gpt_status_logs, logger
 from utils.operational_logs import EventType, get_operational_events, log_operational_event
 from utils.runtime_metrics import get_bot_snapshot, serialize_snapshot
@@ -556,6 +557,7 @@ def get_observability() -> dict[str, Any]:
                 "p99": round(_percentile(list(_webhook_latencies_ms), 0.99), 2),
             },
         },
+        "hermit_context": get_hermit_context_stats(),
     }
 
 

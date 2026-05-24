@@ -273,6 +273,7 @@ class TestApiObservability:
             data = api_module.get_observability()
         assert "api" in data
         assert "webhooks" in data
+        assert "hermit_context" in data
         assert data["api"]["requests"] == 10
         assert data["api"]["success_rate"] == 0.9
         assert "p95" in data["api"]["latency_ms"]
