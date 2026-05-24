@@ -4,7 +4,7 @@ Complete reference for all database tables used by the Alphapy Discord Bot.
 
 ## Overview
 
-The bot uses PostgreSQL for persistent storage. Schema is managed via [Alembic migrations](migrations.md). All tables support multi-guild architecture via `guild_id` columns.
+The bot uses PostgreSQL for persistent storage. Schema is primarily managed via [Alembic migrations](migrations.md), with some legacy cogs still running idempotent `CREATE TABLE IF NOT EXISTS` safeguards at startup for backward compatibility. All tables support multi-guild architecture via `guild_id` columns where applicable.
 
 ## Tables
 
@@ -332,6 +332,8 @@ AI-assisted verification ticket metadata for payment/checkout verification.
 - `idx_verification_tickets_guild_status` on `(guild_id, status)`
 - `idx_verification_tickets_channel_id` on `channel_id`
 
+**Runtime note:** `cogs/verification.py` still includes idempotent startup DDL guards (`CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ... IF NOT EXISTS`) to keep older deployments resilient.
+
 ### `ticket_summaries`
 
 AI-generated summaries of closed tickets (Grok).
@@ -345,6 +347,7 @@ AI-generated summaries of closed tickets (Grok).
 
 **Notes:**
 - Used for FAQ proposal generation when 3+ similar summaries appear
+- Legacy startup guards in `cogs/ticketbot.py` still ensure table/index presence on boot.
 
 ---
 
@@ -360,6 +363,8 @@ Ticket statistics snapshots.
 - `average_cycle_time` (BIGINT): Average ticket lifecycle in seconds
 - `triggered_by` (BIGINT): User ID who triggered the snapshot
 - `created_at` (TIMESTAMPTZ): Snapshot timestamp
+
+**Runtime note:** Historically created/extended by idempotent startup DDL in `cogs/ticketbot.py`; Alembic migration coverage should remain the source of truth for new changes.
 
 ---
 
@@ -507,7 +512,7 @@ All pools include:
 
 All schema changes are managed via Alembic migrations. See [migrations.md](migrations.md) for migration workflow.
 
-**Current Migration:** `001_initial` (baseline)
+**Current Migration Head:** `023_alphapy_discord_links`
 
 To view current schema state:
 ```bash

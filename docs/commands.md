@@ -818,6 +818,15 @@ Export FAQ entries as CSV (admins only).
 
 ---
 
+### `/delete_my_data`
+Permanently delete your personal data stored in Alphapy's Railway database.
+
+**Behavior:** Shows a confirmation flow before deleting user-scoped records (GDPR self-service). This action cannot be undone.
+
+**Permissions:** Public (self-service)
+
+---
+
 ### `/inviteleaderboard`
 Show invite leaderboard.
 

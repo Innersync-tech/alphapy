@@ -13,7 +13,7 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 - **Dashboard Configuration**: Web dashboard endpoints for managing settings, onboarding, auto-moderation (requires Supabase JWT)
 - **Auto-Moderation**: Complete auto-moderation rule management with analytics (`/api/dashboard/{guild_id}/automod/*`)
 - **Onboarding Management**: Questions, rules, and flow configuration (`/api/dashboard/{guild_id}/onboarding/*`)
-- **Reminder Management**: User-facing reminder CRUD operations (requires API key + user ID)
+- **Reminder Management**: User-facing reminder CRUD operations (requires Supabase JWT subject match)
 - **Exports**: CSV export endpoints for tickets and FAQ
 - **Webhooks**: Incoming webhooks from Core-API and GitHub Actions; validated via `X-Webhook-Signature` (includes app-reflections, discord-link, premium-invalidate, founder, legal-update)
 
@@ -26,8 +26,8 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 ## Authentication
 
 Most endpoints require authentication via:
-- **Supabase JWT**: `Authorization: Bearer <token>` (preferred)
-- **API Key**: `X-API-Key` (fallback when JWT is not present/invalid and `API_KEY` is configured)
+- **Supabase JWT**: `Authorization: Bearer <token>` (required for user-scoped and dashboard endpoints)
+- **API Key**: `X-API-Key` (used for internal service endpoints such as `/api/observability`)
 
 Important:
 - User identity is derived from verified JWT claims (`sub`) only.
@@ -777,7 +777,7 @@ Mind and other clients authenticate with a **Supabase JWT**. The `user_id` path 
 
 List reminders for a specific user.
 
-**Authentication:** Required (Supabase JWT or API key, plus user match against authenticated JWT subject)
+**Authentication:** Required (Supabase JWT; `user_id` must match authenticated JWT `sub`)
 
 **Path Parameters:**
 - `user_id` (required): Must equal the authenticated JWT `sub` (Innersync UUID). Reminders are loaded using the linked Discord id.
@@ -804,7 +804,7 @@ List reminders for a specific user.
 
 Create a new reminder.
 
-**Authentication:** Required (Supabase JWT or API key, plus user match against authenticated JWT subject)
+**Authentication:** Required (Supabase JWT; `user_id` in payload must match authenticated JWT `sub`)
 
 Supports optional `Idempotency-Key` header for safe retries (duplicate requests with the same key return the cached success response instead of creating duplicate writes).
 
@@ -824,7 +824,7 @@ Supports optional `Idempotency-Key` header for safe retries (duplicate requests 
 
 Update an existing reminder.
 
-**Authentication:** Required (Supabase JWT or API key, plus user match against authenticated JWT subject)
+**Authentication:** Required (Supabase JWT; `user_id` in payload must match authenticated JWT `sub`)
 
 Supports optional `Idempotency-Key` header for safe retries.
 
@@ -834,7 +834,7 @@ Supports optional `Idempotency-Key` header for safe retries.
 
 Delete a reminder.
 
-**Authentication:** Required (Supabase JWT or API key, plus user match against authenticated JWT subject)
+**Authentication:** Required (Supabase JWT; `created_by` must match authenticated JWT `sub`)
 
 Supports optional `Idempotency-Key` header for safe retries.
 
@@ -884,6 +884,33 @@ Deletes a previously stored reflection when the user revokes consent in the App.
 ```
 
 **Response:** `200` with `{"status": "deleted", "count": 1}` (or `count: 0` if no row matched).
+
+### `POST /webhooks/reflections`
+
+Receives `reflection.created` lifecycle events from App/Core integrations.
+
+**Headers:** `X-Webhook-Signature` (validated when a reflections webhook secret is configured)
+
+**Request body (example):**
+```json
+{
+  "event": "reflection.created",
+  "user_id": "uuid",
+  "reflection_id": "uuid",
+  "date": "YYYY-MM-DD",
+  "timestamp": "ISO8601"
+}
+```
+
+**Response:** `200` with `{"status": "ok"}` for accepted events.
+
+### `POST /webhooks/supabase/auth`
+
+Supabase Auth lifecycle webhook used for profile sync and GDPR-style cleanup workflows.
+
+**Headers:** `X-Webhook-Signature` (optional if no webhook secret configured)
+
+**Response:** `200` with acknowledgment status when processed.
 
 ### `POST /webhooks/legal-update`
 
