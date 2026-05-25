@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
-import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -75,7 +76,7 @@ async def emit_hermit_event(
         "event_type": event_type,
         "user_id": str(user_id),
         "payload": payload or {},
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "occurred_at": datetime.now(UTC).isoformat(),
     }
     if guild_id is not None:
         body["guild_id"] = str(guild_id)
@@ -87,9 +88,6 @@ async def emit_hermit_event(
     }
     secret = _events_secret()
     if secret:
-        import hashlib
-        import hmac
-
         signature = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
         headers["X-Hermit-Signature"] = signature
 

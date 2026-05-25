@@ -10,6 +10,7 @@ from discord.ext import commands
 
 from gpt.helpers import ask_gpt, log_gpt_error
 from utils.db_helpers import acquire_safe, get_bot_db_pool
+from utils.hermit_events import emit_hermit_event
 from utils.sanitizer import safe_embed_text
 from utils.supabase_client import (
     SupabaseConfigurationError,
@@ -227,9 +228,6 @@ Keep your response under 250 words. End with a complete sentence.
                             await interaction.followup.send(tip_message, ephemeral=True)
                 except Exception as tip_error:
                     logger.debug("Failed to check bot sharing status (non-critical): %s", tip_error)
-
-            import asyncio
-            from utils.hermit_events import emit_hermit_event
 
             asyncio.create_task(
                 emit_hermit_event(
