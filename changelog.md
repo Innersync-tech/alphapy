@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Premium Core verify 404** — `premium_guard` now calls `POST /api/premium/verify` (was `/premium/verify`; Core only registers the `/api/...` route).
 
+### Removed
+- Hermit pilot startup `print` for `HERMIT_CONTEXT_ENABLED` (verified on Railway dev).
+
 ## [3.8.0] - 2026-05-25
 
 ### Added
