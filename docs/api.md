@@ -1024,7 +1024,7 @@ In-memory IP-based sliding window limits:
 
 ## Versioning
 
-Current API version: **3.7.0** (Enterprise Ready)
+Current API version: **3.8.0** (Enterprise Ready)
 
 Version information is included in health check responses and can be queried via `/api/health`.
 
