@@ -7,6 +7,10 @@ import uvicorn
 from discord.ext import commands
 
 import config
+
+# TEMP(pilot): remove after Hermit context rollout verified on Railway
+print("HERMIT_CONTEXT_ENABLED =", getattr(config, "HERMIT_CONTEXT_ENABLED", "NOT SET"))
+
 from gpt.helpers import set_bot_instance
 from utils.logger import logger
 from utils.operational_logs import EventType, log_operational_event
