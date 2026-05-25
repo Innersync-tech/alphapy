@@ -1,4 +1,4 @@
-# 🧬 Innersync • Alphapy Roadmap v3.7.0 "Enterprise Ready"
+# 🧬 Innersync • Alphapy Roadmap v3.8.0 "Enterprise Ready"
 
 **Release v3.7.0 Complete!** ⚡ API observability endpoint, request tracing, reminder idempotency keys, migration-driven startup hardening, and CI quality gates.
 

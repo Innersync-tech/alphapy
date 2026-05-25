@@ -5,29 +5,38 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Innersync Identity (`/link`)** – Discord ↔ Innersync user mapping via Core link-session; Railway table `alphapy_discord_links`; webhook `POST /webhooks/discord-link` on completion. Commands: `/link`, `/unlink`, `/profile`.
+- (No changes yet)
 
 ### Fixed
-- **Discord `/link` URL from Core** – `extract_link_url()` normalizes malformed URLs from Core (e.g. `https:/` → `https://`) before sending the Discord link button; avoids `400 Invalid Form Body` when `INNERSYNC_APP_URL` on Core has a typo.
+- (No changes yet)
+
+## [3.8.0] - 2026-05-25
 
 ### Added
+- **Innersync Identity (`/link`)** – Discord ↔ Innersync user mapping via Core link-session; Railway table `alphapy_discord_links` (migration `023`); webhook `POST /webhooks/discord-link` on completion. Commands: `/link`, `/unlink`, `/profile`; Mind/API flows resolve JWT `sub` → Discord via link table with Supabase `profiles` fallback.
+- **Hermit strategic context** – Consumes Core-mediated Hermit context for richer Grok prompts where configured (`gpt/context_loader`, Core integration).
 - **Auto-mod command UX** (`cogs/configuration.py`, `cogs/configuration_automod.py`):
-  - Added explicit slash-command action choices (`delete`, `warn`, `mute`, `timeout`, `ban`) for auto-mod add/edit/logs commands.
-  - Added `rule_id` autocomplete for `/automod delete_rule`, `/automod set_rule_enabled`, `/automod edit_rule`, `/automod set_severity`, and `/automod logs`.
+  - Explicit slash-command action choices (`delete`, `warn`, `mute`, `timeout`, `ban`) for auto-mod add/edit/logs commands.
+  - `rule_id` autocomplete for `/automod delete_rule`, `/automod set_rule_enabled`, `/automod edit_rule`, `/automod set_severity`, and `/automod logs`.
 - **Cache observability expansion** (`api.py`):
-  - `cache_metrics` now includes AutoMod rule cache counters and Engagement cache counters.
-  - `premium_metrics` now includes guild-level premium cache size/hit/miss counters.
+  - `cache_metrics` includes AutoMod rule cache and Engagement cache counters.
+  - `premium_metrics` includes guild-level premium cache size/hit/miss counters.
+
+### Changed
+- **Documentation** – `docs/commands.md`, `docs/api.md`, and `docs/database-schema.md` aligned with current commands and schema; Starlight frontmatter added for [docs.innersync.tech](https://docs.innersync.tech) sync workflow.
+- **Weekly awards embeds** – Structured announcement body (period + category blocks) matching configured category order.
+- **Next.js** (dashboard tooling) – `15.5.15` → `15.5.18` security patch.
 
 ### Fixed
+- **Discord `/link` URL from Core** – `extract_link_url()` normalizes malformed URLs from Core (e.g. `https:/` → `https://`) before the link button; avoids `400 Invalid Form Body` when `INNERSYNC_APP_URL` on Core has a typo.
+- **`/link` button** – Uses Discord link button component for the App link-session URL.
 - **Engagement settings reads and hot-path caching** (`cogs/engagement.py`):
   - Fixed `SettingsService.get` usage in engagement helpers (`scope/key/guild_id` order + sync call).
-  - Added TTL caches for engagement feature flags and weekly food-channel IDs.
-  - Added settings-listener invalidation for engagement caches on `engagement.*` updates.
-- **Auto-mod cache invalidation correctness** (`utils/automod_rules.py`):
-  - `create_rule()` now invalidates both rules cache data and cache timestamps, preventing stale/empty reads after rule creation.
-  - Added TTL-backed cache reuse for `list_rules()` to reduce DB load during autocomplete-heavy command usage.
-- **Guild premium check load reduction** (`utils/premium_guard.py`):
-  - Added TTL cache for `guild_has_premium(guild_id)` with invalidation integrated into `invalidate_premium_cache(...)`.
+  - TTL caches for engagement feature flags and weekly food-channel IDs; invalidation on `engagement.*` setting updates.
+- **Auto-mod cache invalidation** (`utils/automod_rules.py`):
+  - `create_rule()` invalidates rules cache data and timestamps; TTL-backed `list_rules()` for autocomplete-heavy usage.
+- **Guild premium check load** (`utils/premium_guard.py`):
+  - TTL cache for `guild_has_premium(guild_id)` with invalidation via `invalidate_premium_cache(...)`.
 
 ## [3.7.0] - 2026-04-25
 

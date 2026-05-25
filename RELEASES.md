@@ -4,6 +4,25 @@ All notable releases of Alphapy will be documented in this file.
 
 ---
 
+## [3.8.0] - 2026-05-25 - "Enterprise Ready"
+
+### Minor Release: Innersync Identity, Hermit Context, and Hot-Path Caching
+
+This release ships Discord ↔ Innersync account linking (`/link`), Core webhook completion, Hermit strategic context in Grok flows, and caching/observability improvements across engagement, auto-mod, and premium guards.
+
+#### What's New
+- **Innersync Identity**: `/link`, `/unlink`, `/profile`; Railway `alphapy_discord_links`; `POST /webhooks/discord-link`; API/Mind JWT → Discord resolution with profile fallback
+- **Hermit context**: Core-mediated strategic context consumed in Alphapy GPT flows where configured
+- **Auto-mod UX**: Action choices on slash commands; `rule_id` autocomplete on edit/delete/logs commands
+- **Cache metrics**: AutoMod, Engagement, and guild premium cache counters on internal observability paths
+
+#### Reliability & Fixes
+- **Link URL normalization**: Malformed Core `INNERSYNC_APP_URL` values no longer break Discord link buttons
+- **Engagement / auto-mod / premium**: TTL caches, correct settings reads, and invalidation on configuration changes
+- **Docs**: Commands, API, and database schema docs synced; Starlight frontmatter for docs.innersync.tech
+
+---
+
 ## [3.7.0] - 2026-04-25 - "Enterprise Ready"
 
 ### Minor Release: API Observability, CI Quality Gates, and Engagement Stability

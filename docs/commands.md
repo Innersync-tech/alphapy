@@ -712,7 +712,7 @@ Check the status of the Grok/LLM API.
 ### `/version`
 Show bot version and codename.
 
-**Response:** Current version (e.g., "3.7.0 - Enterprise Ready")
+**Response:** Current version (e.g., "3.8.0 - Enterprise Ready")
 
 ---
 
