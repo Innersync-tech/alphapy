@@ -75,7 +75,7 @@ async def test_api_performance():
 
         endpoints = [
             ("Health check", f"{core_url}/health", "GET"),
-            ("Premium verify", f"{core_url}/premium/verify", "POST", {"user_id": 123, "guild_id": 456}),
+            ("Premium verify", f"{core_url}/api/premium/verify", "POST", {"user_id": 123, "guild_id": 456}),
         ]
 
         async with httpx.AsyncClient(timeout=10.0) as client:

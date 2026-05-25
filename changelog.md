@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Docs** — Updated security and setup guides; removed `docs/RAILWAY_SECRET_MANAGER_SETUP.md`.
 
 ### Fixed
-- (No changes yet)
+- **Premium Core verify 404** — `premium_guard` now calls `POST /api/premium/verify` (was `/premium/verify`; Core only registers the `/api/...` route).
 
 ## [3.8.0] - 2026-05-25
 

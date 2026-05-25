@@ -29,7 +29,7 @@ Payment and webhooks (Stripe/Lemon Squeezy) are out of scope for the initial rel
 |----------|-------------|
 | `PREMIUM_CHECKOUT_URL` | Checkout page URL for the "Get Premium" button. If unset, the button shows "Coming soon" (disabled). |
 | `PREMIUM_CACHE_TTL_SECONDS` | TTL in seconds for the in-memory premium cache (default: 300). |
-| `CORE_API_URL` | When set, the guard calls `POST {CORE_API_URL}/premium/verify` first (see below). |
+| `CORE_API_URL` | When set, the guard calls `POST {CORE_API_URL}/api/premium/verify` first (see below). |
 | `ALPHAPY_SERVICE_KEY` | API key for Core-API premium verify. |
 | `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Optional. Secret for `POST /webhooks/premium-invalidate` (Core notifies on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`. |
 | `FOUNDER_WEBHOOK_SECRET` | Optional. Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`. |
@@ -37,7 +37,7 @@ Payment and webhooks (Stripe/Lemon Squeezy) are out of scope for the initial rel
 ## Guard behaviour
 
 1. **Cache** – In-memory cache keyed by `(user_id, guild_id)` with configurable TTL. Cache hit returns immediately.
-2. **Core-API** – If `CORE_API_URL` and `ALPHAPY_SERVICE_KEY` are set, the guard sends `POST {CORE_API_URL}/premium/verify` with body `{"user_id": int, "guild_id": int}` and header `X-API-Key: ALPHAPY_SERVICE_KEY`. Response is expected as `{"premium": true|false, "tier": "monthly"|"yearly"|"lifetime"|null}`. On 2xx and `premium: true`, the user is treated as premium.
+2. **Core-API** – If `CORE_API_URL` and `ALPHAPY_SERVICE_KEY` are set, the guard sends `POST {CORE_API_URL}/api/premium/verify` with body `{"user_id": int, "guild_id": int}` and header `X-API-Key: ALPHAPY_SERVICE_KEY`. Response is expected as `{"premium": true|false, "tier": "monthly"|"yearly"|"lifetime"|null}`. On 2xx and `premium: true`, the user is treated as premium.
 3. **Local fallback** – If Core is not configured or the request fails, the guard queries the local `premium_subs` table: `status = 'active'` and (`expires_at IS NULL` OR `expires_at > NOW()`).
 4. **Fail closed** – On any error (timeout, DB failure), the guard returns `False`.
 
@@ -54,7 +54,7 @@ Base URL is your Alphapy API (e.g. `https://alphapy.innersync.tech`). If the API
 
 ## Core-API contract (for later implementation)
 
-- **Endpoint**: `POST {CORE_API_URL}/premium/verify`
+- **Endpoint**: `POST {CORE_API_URL}/api/premium/verify`
 - **Headers**: `Content-Type: application/json`, `X-API-Key: ALPHAPY_SERVICE_KEY`
 - **Body**: `{"user_id": <discord user id>, "guild_id": <discord guild id>}`
 - **Response**: `{"premium": true|false, "tier": "monthly"|"yearly"|"lifetime"|null}`
