@@ -1,7 +1,7 @@
 """
 Premium tier guard: check if a user has premium in a guild.
 
-Uses Core-API /premium/verify when configured, with local premium_subs table
+Uses Core-API POST /api/premium/verify when configured, with local premium_subs table
 as fallback. In-memory cache with TTL to reduce load.
 Fail closed: on error returns False.
 """
@@ -171,7 +171,7 @@ async def _check_core_api(user_id: int, guild_id: int) -> bool | None:
     key = getattr(config, "ALPHAPY_SERVICE_KEY", None)
     if not url or not key:
         return None
-    endpoint = f"{url}/premium/verify"
+    endpoint = f"{url}/api/premium/verify"
     headers = {"X-API-Key": key, "Content-Type": "application/json"}
     payload = {"user_id": user_id, "guild_id": guild_id}
     try:

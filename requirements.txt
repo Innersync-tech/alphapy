@@ -16,7 +16,6 @@ sqlalchemy>=2.0.0
 greenlet>=3.0.0
 PyJWT[crypto]
 httpx
-google-cloud-secret-manager>=2.16.0
 ruff>=0.12.0
 mypy>=1.11.0
 # Security: pin transitive deps that had known CVEs

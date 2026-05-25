@@ -43,7 +43,7 @@ alphapy/
 ├── api.py              # FastAPI (health, metrics, reminders API)
 ├── config.py
 ├── cogs/               # Slash commands & features (growth, learn, ticketbot, reminders, …)
-├── utils/              # DB, metrics, timezone, gcp_secrets, drive_sync, …
+├── utils/              # DB, metrics, timezone, drive_sync, …
 ├── gpt/                # Grok/LLM helpers, dataset_loader (learn_topic)
 ├── tests/
 ├── alembic/            # Migrations
@@ -58,11 +58,11 @@ alphapy/
 | Required | Optional |
 |----------|----------|
 | `BOT_TOKEN` | `GROK_API_KEY` / `OPENAI_API_KEY` |
-| `DATABASE_URL` | `GOOGLE_PROJECT_ID`, `GOOGLE_CREDENTIALS_JSON` (Drive) |
+| `DATABASE_URL` | `GOOGLE_CREDENTIALS_JSON` (Drive, optional) |
 | | `API_KEY` (API auth), Supabase vars, ticket/reminder config |
 
 Full list and multi-guild setup: [docs/configuration.md](docs/configuration.md).  
-Google/Secret Manager: [docs/SECURITY.md](docs/SECURITY.md), [docs/GOOGLE_CREDENTIALS_SETUP.md](docs/GOOGLE_CREDENTIALS_SETUP.md).
+Google Drive credentials: [docs/GOOGLE_CREDENTIALS_SETUP.md](docs/GOOGLE_CREDENTIALS_SETUP.md), [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 

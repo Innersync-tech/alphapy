@@ -31,8 +31,8 @@
 - See `docs/database-schema.md` for full tables
 
 ## Secrets & Infrastructure
-- GCP Secret Manager (`utils/gcp_secrets.py`) with cache + env fallback
-- All credentials via environment variables or Secret Manager, zero hard-coded values
+- Google Drive: `GOOGLE_CREDENTIALS_JSON` env var (`utils/drive_sync.py`)
+- All other secrets via environment variables (Railway / `.env`), zero hard-coded values
 
 ## Control flow
 1. Startup → `StartupManager` (phased: DB → settings → cogs → sync → background tasks)

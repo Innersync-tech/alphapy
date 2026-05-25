@@ -297,11 +297,7 @@ The following environment variables are required/optional for bot operation:
 - `USE_TEST_BOT`: Set to `1` (or any non-empty value) to run the bot with `BOT_TOKEN_TEST` instead of `BOT_TOKEN`. Use this for local testing without touching the production bot.
 
 ### Optional - Google Cloud (for Drive integration)
-- `GOOGLE_PROJECT_ID`: GCP project ID for Secret Manager (production)
-- `GOOGLE_SECRET_NAME`: Secret name in Secret Manager (default: "alphapy-google-credentials")
-- `GOOGLE_CREDENTIALS_JSON`: Service account credentials JSON string (local dev fallback)
-
-**Note**: In production, use Secret Manager (`GOOGLE_PROJECT_ID`). For local development, `GOOGLE_CREDENTIALS_JSON` can be used as fallback. See [docs/SECURITY.md](SECURITY.md) for security best practices.
+- `GOOGLE_CREDENTIALS_JSON`: Google service account key as a JSON string (Railway env var or `.env`). Required for Drive PDF features (`/learn_topic`, etc.). See [GOOGLE_CREDENTIALS_SETUP.md](GOOGLE_CREDENTIALS_SETUP.md).
 
 ### Optional - API & Authentication
 - `API_KEY`: Internal API key for API endpoints

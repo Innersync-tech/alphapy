@@ -247,7 +247,7 @@ class StartupManager:
         """Phase 5: Start background tasks."""
         logger.info("🔄 Phase 5: Background Tasks...")
         
-        # Optional: Verify Google Drive/Secret Manager configuration
+        # Optional: Verify Google Drive configuration
         await self._verify_drive_config()
         
         # Initialize command tracker with database pool in bot's event loop
@@ -311,22 +311,20 @@ class StartupManager:
         logger.info("✅ Phase 5 complete: Background tasks started")
     
     async def _verify_drive_config(self) -> None:
-        """Optional: Verify Google Drive/Secret Manager configuration during startup."""
+        """Optional: Verify Google Drive configuration during startup."""
         try:
             import config
             from utils.drive_sync import _ensure_drive
-            
-            # Only check if Google credentials are configured (either Secret Manager or env var)
-            if config.GOOGLE_PROJECT_ID or config.GOOGLE_CREDENTIALS_JSON:
+
+            if config.GOOGLE_CREDENTIALS_JSON:
                 logger.info("🔍 Verifying Google Drive configuration...")
-                # Run in thread to avoid blocking event loop (get_secret may call gRPC synchronously)
                 drive_client = await asyncio.to_thread(_ensure_drive)
                 if drive_client:
                     logger.info("✅ Google Drive configuration verified and ready")
                 else:
                     logger.warning("⚠️ Google Drive configuration found but initialization failed (check logs above)")
             else:
-                logger.debug("ℹ️ Google Drive not configured (GOOGLE_PROJECT_ID and GOOGLE_CREDENTIALS_JSON not set)")
+                logger.debug("ℹ️ Google Drive not configured (GOOGLE_CREDENTIALS_JSON not set)")
         except Exception as e:
             logger.debug(f"ℹ️ Google Drive verification skipped: {e}")
     

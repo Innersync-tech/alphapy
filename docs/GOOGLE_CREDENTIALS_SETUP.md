@@ -121,38 +121,21 @@ If you want the service account to read all Drive files:
 GOOGLE_CREDENTIALS_JSON={"type":"service_account","project_id":"drive-integration-456012","private_key_id":"abc123","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"alphapy-drive-reader@drive-integration-456012.iam.gserviceaccount.com","client_id":"123456789","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/alphapy-drive-reader%40drive-integration-456012.iam.gserviceaccount.com"}
 ```
 
-### For production (Secret Manager)
+### For production (Railway)
 
-If you use Secret Manager:
-
-1. **Create secret in Secret Manager:**
-   ```bash
-   # Via gcloud CLI
-   cat your-service-account-key.json | \
-     gcloud secrets create alphapy-google-credentials \
-     --data-file=- \
-     --project=YOUR_PROJECT_ID
-   ```
-
-2. **Or via Google Cloud Console:**
-   - Go to **"Security" > "Secret Manager"**
-   - Click **"+ CREATE SECRET"**
-   - **Name**: `alphapy-google-credentials`
-   - **Secret value**: Paste the full JSON content
-   - Click **"CREATE SECRET"**
-
-3. **Grant Railway/service access:**
-   - See [docs/RAILWAY_SECRET_MANAGER_SETUP.md](RAILWAY_SECRET_MANAGER_SETUP.md)
+1. Open your Alphapy service on [Railway](https://railway.app/) → **Variables**.
+2. Add or update **`GOOGLE_CREDENTIALS_JSON`** with the full service account JSON on **one line** (same format as local `.env`).
+3. Remove unused legacy variables if they are still set: `GOOGLE_PROJECT_ID`, `GOOGLE_SECRET_NAME`.
+4. Redeploy the service after changing variables.
 
 ## Step 8: Test the configuration
 
 1. Restart your bot
 2. Check the logs for:
    ```
-   🔍 Verifying Google Drive configuration...
-   🔐 Loading Google Service Account credentials from environment variable
-   ✅ Google Drive service account authentication successful
-   ✅ Google Drive configuration verified and ready
+   Loading Google Service Account credentials from GOOGLE_CREDENTIALS_JSON
+   Google Drive service account authentication successful
+   Google Drive configuration verified and ready
    ```
 
 3. Test with `/learn_topic` command:
@@ -181,7 +164,7 @@ If you use Secret Manager:
 ## Security best practices
 
 1. **Rotate keys regularly** (every 90 days recommended)
-2. **Use Secret Manager in production** (not environment variables)
+2. **Store the JSON only in Railway variables or local `.env`** — never in git
 3. **Grant minimal permissions** (only "Viewer" on specific folders)
 4. **Monitor access** via Cloud Audit Logs
 5. **Delete old keys** when creating new ones
@@ -193,7 +176,7 @@ If you use Secret Manager:
 - [ ] Service Account created
 - [ ] JSON key downloaded
 - [ ] Drive folder/file shared with service account email
-- [ ] JSON added to `.env` (local) or Secret Manager (production)
+- [ ] `GOOGLE_CREDENTIALS_JSON` set in `.env` (local) or Railway (production)
 - [ ] Bot restarted and logs checked
 - [ ] Tested with `/learn_topic` command
 

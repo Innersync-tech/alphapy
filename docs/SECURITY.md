@@ -94,65 +94,19 @@ Internal exceptions must not be forwarded to Discord users or API clients. Log t
 
 ---
 
-# Google Cloud Security Best Practices
+## Google Cloud (Drive API)
 
-This document describes security best practices for Google Cloud credentials and API keys within the Alphapy project, in line with Google Cloud Security recommendations.
+Alphapy uses a **Google service account** for read-only Drive access (`/learn_topic`, PDF loading).
 
-## Overview
+### Credential storage
 
-Alphapy uses Google Cloud services for:
-- **Google Drive API**: Reading PDF documents via service account credentials
+- **Never** commit keys to git (`.env` and `credentials/` are gitignored).
+- **Runtime**: `GOOGLE_CREDENTIALS_JSON` — full service account JSON as one env var (local `.env` or Railway).
+- **Code**: `utils/drive_sync.py` parses `GOOGLE_CREDENTIALS_JSON` at startup; no GCP Secret Manager integration.
 
-All credentials are managed via **Google Cloud Secret Manager** in production, with fallback to environment variables for local development.
+See [GOOGLE_CREDENTIALS_SETUP.md](GOOGLE_CREDENTIALS_SETUP.md) for creating the service account and setting Railway variables.
 
-## Credential lifecycle management
-
-### 1. Zero-code storage ✅
-
-**Status**: Implemented
-
-- ✅ Credentials are **never** committed to source code or version control
-- ✅ `.gitignore` excludes `.env` and `credentials/`
-- ✅ Production uses **Google Cloud Secret Manager** for credential storage
-- ✅ Local development uses environment variables (fallback)
-
-**Implementation**:
-- `utils/gcp_secrets.py`: Helper for Secret Manager access with caching
-- `utils/drive_sync.py`: Loads credentials from Secret Manager or environment variable
-- Configuration via `GOOGLE_PROJECT_ID` and `GOOGLE_SECRET_NAME` environment variables
-
-### 2. Secret Manager setup
-
-**For production deployments**:
-
-1. **Create secret in Secret Manager**:
-   ```bash
-   # Via gcloud CLI
-   echo -n '{"type":"service_account",...}' | \
-     gcloud secrets create alphapy-google-credentials \
-     --data-file=- \
-     --project=YOUR_PROJECT_ID
-   ```
-
-2. **Configure environment variables**:
-   ```bash
-   GOOGLE_PROJECT_ID=your-gcp-project-id
-   GOOGLE_SECRET_NAME=alphapy-google-credentials  # Optional, default uses this name
-   ```
-
-3. **Grant access to service account**:
-   ```bash
-   gcloud secrets add-iam-policy-binding alphapy-google-credentials \
-     --member="serviceAccount:YOUR_SERVICE_ACCOUNT@PROJECT_ID.iam.gserviceaccount.com" \
-     --role="roles/secretmanager.secretAccessor" \
-     --project=YOUR_PROJECT_ID
-   ```
-
-**For local development**:
-- Use `GOOGLE_CREDENTIALS_JSON` environment variable
-- Secret Manager is skipped when `GOOGLE_PROJECT_ID` is not set
-
-### 3. Disable dormant keys
+### Disable dormant keys
 
 **Manual action required in GCP Console**:
 
@@ -169,7 +123,7 @@ All credentials are managed via **Google Cloud Secret Manager** in production, w
 - Review Cloud Audit Logs for key usage patterns
 - Document all deactivated keys in project changelog
 
-### 4. Enforce API restrictions
+### Enforce API restrictions
 
 **Manual configuration in GCP Console**:
 
@@ -195,7 +149,7 @@ For **service account keys**:
 - ✅ Service account uses only `https://www.googleapis.com/auth/drive.readonly` scope
 - ⚠️ **TODO**: Configure API key restrictions in GCP Console if API keys are used
 
-### 5. Apply least privilege
+### Apply least privilege
 
 **Service account permissions**:
 
@@ -219,15 +173,11 @@ For **service account keys**:
    - Review assigned roles
    - Remove unused roles
 
-3. **Minimum roles for Secret Manager**:
-   - `roles/secretmanager.secretAccessor` — Read secrets only
-   - No `roles/secretmanager.admin` or `roles/secretmanager.secretAccessor` on project-level
-
 **Current implementation**:
 - ✅ Service account uses minimum scope (`drive.readonly`)
 - ⚠️ **TODO**: Review IAM roles via IAM Recommender and remove unused permissions
 
-### 6. Mandatory rotation
+### Key rotation
 
 **Organization policies** (must be configured by GCP admin):
 
@@ -266,16 +216,11 @@ For **service account keys**:
 - ⚠️ **TODO**: Configure `iam.serviceAccountKeyExpiryHours` policy (recommended: 90 days)
 - Service account keys are used, so disable policy does not apply
 
-**Rotation procedure** (when key expires):
-1. Generate new service account key in GCP Console
-2. Update secret in Secret Manager:
-   ```bash
-   echo -n 'NEW_CREDENTIALS_JSON' | \
-     gcloud secrets versions add alphapy-google-credentials \
-     --data-file=-
-   ```
-3. Cache is automatically invalidated after TTL (1 hour)
-4. Old key version can be removed after verification
+**Rotation procedure**:
+1. Create a new JSON key for the service account in GCP Console.
+2. Update `GOOGLE_CREDENTIALS_JSON` in Railway (or local `.env`).
+3. Redeploy / restart the bot.
+4. Delete the old key in GCP after Drive access is verified.
 
 ## Operational safeguards
 
@@ -321,10 +266,8 @@ For **service account keys**:
 ### Code-level (implemented) ✅
 
 - [x] Credentials not committed in source code
-- [x] Secret Manager integration with caching
-- [x] Fallback to environment variables for local dev
-- [x] Error handling for Secret Manager failures
-- [x] Logging for security events (which method is used)
+- [x] Drive credentials loaded from `GOOGLE_CREDENTIALS_JSON` only
+- [x] Clear logging when Drive is configured or missing
 - [x] Minimum scopes (`drive.readonly`)
 
 ### Infrastructure-level (manual configuration) ⚠️
@@ -338,33 +281,18 @@ For **service account keys**:
 - [ ] Anomaly detection enabled
 - [ ] Dormant keys audit performed (30+ days inactive)
 
-## Monitoring and alerting
+## Monitoring
 
-### Secret Manager access logs
-
-Monitor Secret Manager access via Cloud Audit Logs:
-
-```bash
-# View Secret Manager access logs
-gcloud logging read "resource.type=secretmanager.googleapis.com/Secret" \
-  --project=YOUR_PROJECT_ID \
-  --limit=50
-```
-
-### Anomaly detection
-
-- Monitor for unexpected Secret Manager access patterns
-- Alert on failed authentication attempts
-- Review logs monthly for security events
+- Review GCP **Cloud Audit Logs** for service account and Drive API usage.
+- Watch Alphapy logs for Drive auth failures after deploys or key rotation.
 
 ## Incident response
 
 If credentials are compromised:
 
 1. **Immediate actions**:
-   - Disable the compromised key in GCP Console
-   - Rotate secret in Secret Manager
-   - Clear cache in application (restart or `clear_cache()` call)
+   - Disable or delete the compromised key in GCP Console
+   - Update `GOOGLE_CREDENTIALS_JSON` with a new key and redeploy
 
 2. **Investigation**:
    - Review Cloud Audit Logs for unauthorized access
@@ -378,7 +306,6 @@ If credentials are compromised:
 
 ## References
 
-- [Google Cloud Secret Manager Documentation](https://cloud.google.com/secret-manager/docs)
 - [Google Cloud Security Best Practices](https://cloud.google.com/security/best-practices)
 - [IAM Recommender](https://cloud.google.com/iam/docs/recommender-overview)
 - [Service Account Key Management](https://cloud.google.com/iam/docs/service-accounts)
