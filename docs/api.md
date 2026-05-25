@@ -1,3 +1,8 @@
+---
+title: API Reference
+description: HTTP API endpoints for Alphapy dashboard and integrations.
+---
+
 # API Reference
 
 Complete API documentation for the Alphapy Discord Bot FastAPI server.

@@ -1,3 +1,8 @@
+---
+title: Command Reference
+description: Discord slash commands for the Alphapy bot.
+---
+
 # Command Reference
 
 Complete reference for all Discord slash commands available in the Alphapy bot.

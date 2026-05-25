@@ -1,3 +1,8 @@
+---
+title: Operational Playbook
+description: Post-setup verification checklist for Alphapy in a new Discord server.
+---
+
 # Operational Playbook
 
 Quick checklist and verification steps after adding the bot to a new server.

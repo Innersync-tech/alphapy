@@ -1,3 +1,8 @@
+---
+title: Database Schema
+description: PostgreSQL table reference for Alphapy on Railway.
+---
+
 # Database Schema Reference
 
 Complete reference for all database tables used by the Alphapy Discord Bot.

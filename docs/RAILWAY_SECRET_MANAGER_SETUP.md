@@ -1,3 +1,8 @@
+---
+title: Railway Secret Manager Setup
+description: Configure Google credentials via Railway Secret Manager for Alphapy.
+---
+
 # Railway Secret Manager Setup Guide
 
 Step-by-step guide for configuring Google Cloud Secret Manager on Railway.

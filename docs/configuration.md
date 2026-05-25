@@ -1,3 +1,8 @@
+---
+title: Configuration
+description: Multi-guild setup and settings for Alphapy.
+---
+
 # Multi-Guild Configuration Guide
 
 This document explains how to configure the Innersync • Alphapy bot for each Discord server (guild) where it's added.

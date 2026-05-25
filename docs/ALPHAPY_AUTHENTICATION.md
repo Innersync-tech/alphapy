@@ -1,4 +1,7 @@
-# Alphapy API Authentication Guide
+---
+title: Alphapy API Authentication
+description: How Alphapy API authentication works for Mind and service integrations.
+---
 
 ## Overview
 

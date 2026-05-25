@@ -37,12 +37,22 @@ jobs:
       - name: Sync docs folder to docs-repo/src/content/docs/alphapy
         run: |
           rsync -av --delete docs/ docs-repo/src/content/docs/alphapy/ \
+            --exclude=index.md \
             --exclude=terms-of-service.md \
             --exclude=privacy-policy.md \
             --exclude=pricing.md \
             --exclude=legal.md \
             --exclude=_config.yml \
-            --exclude=CNAME
+            --exclude=CNAME \
+            --exclude=premium-local-insert.md \
+            --exclude=hermit-core-rollout.md \
+            --exclude=testers-plan.md \
+            --exclude=CONTRIBUTOR.md \
+            --exclude=premium-layer-plan.md
+
+      - name: Verify publication safety
+        working-directory: docs-repo
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-publication-safe.sh" src/content/docs/alphapy
 
       - name: Commit and push when changed
         working-directory: docs-repo

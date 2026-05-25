@@ -1,3 +1,8 @@
+---
+title: Database Migrations
+description: Alembic migration workflow for Alphapy.
+---
+
 # Database Migrations Guide
 
 This project uses [Alembic](https://alembic.sqlalchemy.org/) for database schema migrations.

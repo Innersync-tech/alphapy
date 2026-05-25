@@ -1,3 +1,8 @@
+---
+title: Security
+description: Security practices for Alphapy configuration, webhooks, and operations.
+---
+
 # Security Reference
 
 ---

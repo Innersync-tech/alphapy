@@ -1,3 +1,8 @@
+---
+title: Premium
+description: Premium tiers, webhooks, and related environment variables.
+---
+
 # Premium Tier
 
 The Alphapy bot supports a Premium tier for mature users. Premium features are gated via `utils/premium_guard.is_premium(user_id, guild_id)`.
