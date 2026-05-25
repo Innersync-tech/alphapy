@@ -21,7 +21,8 @@ alembic upgrade head   # or: alembic stamp head if DB already has schema
 # Run the bot
 python bot.py
 
-# Run all tests
+# Run all tests (repo root on PYTHONPATH — see pytest.ini pythonpath = .)
+# Equivalent: PYTHONPATH=. pytest tests/ -v  (matches CI)
 pytest tests/ -v
 
 # Run a single test file
