@@ -6,12 +6,14 @@ Stores the mapping in `alphapy_discord_links` and optionally notifies the user b
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import upsert_discord_link
 from utils.logger import logger
 from webhooks.common import get_discord_link_webhook_secret, validate_webhook_signature
@@ -129,6 +131,13 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
             discord_user_id,
             "Your Innersync account is now linked to this Discord account. "
             "Use `/profile` to see your central profile.",
+        )
+        asyncio.create_task(
+            emit_hermit_event(
+                "link_completed",
+                discord_user_id,
+                payload={"source": "discord_link_webhook"},
+            )
         )
 
     logger.info(

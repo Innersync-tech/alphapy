@@ -327,6 +327,9 @@ The following environment variables are required/optional for bot operation:
 - `HERMIT_CONTEXT_TTL_SECONDS`: In-memory cache TTL for Hermit context fetches (default: `1800`).
 - `HERMIT_CONTEXT_TIMEOUT_SECONDS`: Request timeout (seconds) for Core Hermit context calls (default: `2.0`).
 - `CORE_HERMIT_CONTEXT_PATH`: Optional override for the Core endpoint path (default: `/integrations/hermit/strategic-context`).
+- `HERMIT_STRATEGY_PACKET_ENABLED`: When `true`, inject structured `strategy_packet` JSON from Core into GPT system prompts (pilot; requires Core + Hermit push).
+- `HERMIT_EVENTS_ENABLED`: When `true` (default), emit lightweight events to Core `POST /integrations/hermit/events` (e.g. after `/growthcheckin`, Discord link complete).
+- `HERMIT_EVENTS_WEBHOOK_SECRET`: Optional HMAC secret for event ingest (defaults to shared webhook secret if unset).
 
 ### Optional - Innersync identity (Discord link webhook)
 - `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.

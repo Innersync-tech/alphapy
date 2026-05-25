@@ -83,16 +83,40 @@ def _get_cache(user_id: int) -> dict[str, Any] | None:
         return dict(entry)
 
 
-def _set_cache(user_id: int, context_text: str, updated_at: str, staleness_minutes: int) -> None:
+def _set_cache(
+    user_id: int,
+    context_text: str,
+    updated_at: str,
+    staleness_minutes: int,
+    strategy_packet: dict[str, Any] | None = None,
+) -> None:
     expires_at = time.monotonic() + _ttl_seconds()
     with _cache_lock:
         _cache[user_id] = {
             "context_text": context_text,
+            "strategy_packet": strategy_packet,
             "updated_at": updated_at,
             "staleness_minutes": staleness_minutes,
             "cached_at": time.time(),
             "expires_at": expires_at,
         }
+
+
+def _strategy_packet_enabled() -> bool:
+    return bool(getattr(config, "HERMIT_STRATEGY_PACKET_ENABLED", False))
+
+
+def get_cached_strategy_packet(user_id: int) -> dict[str, Any] | None:
+    entry = _get_cache(user_id)
+    if not entry:
+        return None
+    packet = entry.get("strategy_packet")
+    return packet if isinstance(packet, dict) else None
+
+
+def invalidate_hermit_cache(user_id: int) -> None:
+    with _cache_lock:
+        _cache.pop(user_id, None)
 
 
 def record_prompt_usage(applied: bool) -> None:
@@ -196,12 +220,16 @@ async def fetch_hermit_context(user_id: int | None) -> str | None:
 
         updated_at = str(payload.get("updated_at") or "")
         staleness_minutes = int(payload.get("staleness_minutes") or 0)
+        strategy_packet = payload.get("strategy_packet")
+        if not isinstance(strategy_packet, dict):
+            strategy_packet = None
 
         _set_cache(
             user_id=user_id,
             context_text=normalized_context,
             updated_at=updated_at,
             staleness_minutes=staleness_minutes,
+            strategy_packet=strategy_packet,
         )
 
         with _cache_lock:
