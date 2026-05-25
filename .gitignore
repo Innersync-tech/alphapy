@@ -19,6 +19,11 @@ platform_context.md
 # Compiled Python files
 __pycache__/
 *.pyc
+
+# pytest / coverage (local only)
+.coverage
+.coverage.*
+htmlcov/
 .vscode/
 
 # macOS
