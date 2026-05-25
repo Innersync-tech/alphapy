@@ -7,7 +7,6 @@ import uvicorn
 from discord.ext import commands
 
 import config
-
 from gpt.helpers import set_bot_instance
 from utils.logger import logger
 from utils.operational_logs import EventType, log_operational_event
