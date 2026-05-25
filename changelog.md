@@ -7,6 +7,10 @@ All notable changes to this project will be documented in this file.
 ### Added
 - (No changes yet)
 
+### Changed
+- **Google Drive credentials** — Load only from `GOOGLE_CREDENTIALS_JSON` (Railway / `.env`). Removed GCP Secret Manager path (`utils/gcp_secrets.py`, `GOOGLE_PROJECT_ID`, `GOOGLE_SECRET_NAME`, `google-cloud-secret-manager` dependency).
+- **Docs** — Updated security and setup guides; removed `docs/RAILWAY_SECRET_MANAGER_SETUP.md`.
+
 ### Fixed
 - (No changes yet)
 

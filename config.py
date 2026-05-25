@@ -51,10 +51,8 @@ SUPABASE_WEBHOOK_SECRET = os.getenv("SUPABASE_WEBHOOK_SECRET")
 # App reflections webhook (Core-API → Alphapy). Optional; falls back to WEBHOOK_SECRET / SUPABASE_WEBHOOK_SECRET
 APP_REFLECTIONS_WEBHOOK_SECRET = os.getenv("APP_REFLECTIONS_WEBHOOK_SECRET")
 
-# Google Cloud Secret Manager configuration
-GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
-GOOGLE_SECRET_NAME = os.getenv("GOOGLE_SECRET_NAME", "alphapy-google-credentials")
-GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")  # Fallback for local development
+# Google Drive service account JSON (full key file as one-line/minified JSON string)
+GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
 # Telemetry ingest configuration
 TELEMETRY_INGEST_INTERVAL = int(os.getenv("TELEMETRY_INGEST_INTERVAL", "45"))  # seconds
