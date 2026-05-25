@@ -130,6 +130,16 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
             "Your Innersync account is now linked to this Discord account. "
             "Use `/profile` to see your central profile.",
         )
+        import asyncio
+        from utils.hermit_events import emit_hermit_event
+
+        asyncio.create_task(
+            emit_hermit_event(
+                "link_completed",
+                discord_user_id,
+                payload={"source": "discord_link_webhook"},
+            )
+        )
 
     logger.info(
         "discord-link webhook: status=%s discord_user_id=%s innersync_user_id=%s",

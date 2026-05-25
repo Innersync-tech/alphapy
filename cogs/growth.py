@@ -228,6 +228,18 @@ Keep your response under 250 words. End with a complete sentence.
                 except Exception as tip_error:
                     logger.debug("Failed to check bot sharing status (non-critical): %s", tip_error)
 
+            import asyncio
+            from utils.hermit_events import emit_hermit_event
+
+            asyncio.create_task(
+                emit_hermit_event(
+                    "gpt_command",
+                    interaction.user.id,
+                    guild_id=guild_id,
+                    payload={"command": "growthcheckin"},
+                )
+            )
+
             async def _store_reflection() -> None:
                 reflection_text = (
                     f"Goal: {self.goal.value}\n"

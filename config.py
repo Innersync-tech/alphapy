@@ -69,6 +69,9 @@ HERMIT_CONTEXT_ENABLED = os.getenv("HERMIT_CONTEXT_ENABLED", "false").strip().lo
 HERMIT_CONTEXT_TTL_SECONDS = int(os.getenv("HERMIT_CONTEXT_TTL_SECONDS", "1800"))
 HERMIT_CONTEXT_TIMEOUT_SECONDS = float(os.getenv("HERMIT_CONTEXT_TIMEOUT_SECONDS", "2.0"))
 CORE_HERMIT_CONTEXT_PATH = (os.getenv("CORE_HERMIT_CONTEXT_PATH") or "/integrations/hermit/strategic-context").strip()
+HERMIT_STRATEGY_PACKET_ENABLED = os.getenv("HERMIT_STRATEGY_PACKET_ENABLED", "false").strip().lower() == "true"
+HERMIT_EVENTS_ENABLED = os.getenv("HERMIT_EVENTS_ENABLED", "true").strip().lower() == "true"
+HERMIT_EVENTS_WEBHOOK_SECRET = os.getenv("HERMIT_EVENTS_WEBHOOK_SECRET", "").strip()
 # Core → Alphapy: confirm Discord ↔ Innersync link (HMAC via X-Webhook-Signature)
 DISCORD_LINK_WEBHOOK_SECRET = os.getenv("DISCORD_LINK_WEBHOOK_SECRET")
 # Optional path overrides for Core integration (defaults match planned Core routes)
