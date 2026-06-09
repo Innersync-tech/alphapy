@@ -60,7 +60,9 @@ async def test_get_discord_fallback_supabase() -> None:
         "utils.supabase_client.get_discord_id_for_user",
         new=AsyncMock(return_value="888001"),
     ):
-        out = await ii.get_discord_id_for_innersync(None, iu)
+        out = await ii.get_discord_id_for_innersync(
+            None, iu, allow_profile_fallback=True
+        )
     assert out == 888001
 
 

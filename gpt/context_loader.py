@@ -14,8 +14,9 @@ import logging
 import asyncpg
 
 from utils.db_helpers import PoolT
+from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_prompt
-from utils.supabase_client import _supabase_get, get_user_id_for_discord
+from utils.supabase_client import _supabase_get
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,15 @@ async def _get_app_reflections_pool() -> PoolT | None:
         logger.debug("Failed to create app_reflections pool: %s", e)
         _app_reflections_pool = None
         return None
+
+
+async def _resolve_innersync_user_id(discord_id: int | str) -> str | None:
+    pool = await _get_app_reflections_pool()
+    return await get_innersync_id_for_discord(
+        pool,
+        int(discord_id),
+        allow_profile_fallback=False,
+    )
 
 
 async def _load_app_reflections(discord_id: int | str, limit: int = 5) -> tuple[str, int]:
@@ -160,7 +170,7 @@ async def load_user_reflections(
         return ""
     try:
         # Supabase: get user_id and check bot_sharing_enabled
-        user_id = await get_user_id_for_discord(discord_id)
+        user_id = await _resolve_innersync_user_id(discord_id)
         if not user_id:
             logger.debug(
                 "No Supabase profile linked to discord_id=%s - skipping Supabase reflection context",
@@ -255,7 +265,7 @@ async def load_user_reflections(
     if loaded_count < limit:
         try:
             if not user_id:
-                user_id = await get_user_id_for_discord(discord_id)
+                user_id = await _resolve_innersync_user_id(discord_id)
             if user_id:
                 remaining = limit - loaded_count
                 discord_reflection_rows = await _supabase_get(

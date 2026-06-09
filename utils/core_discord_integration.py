@@ -43,6 +43,11 @@ def _bot_profile_path() -> str:
     return p if p.startswith("/") else f"/{p}"
 
 
+def _unlink_path() -> str:
+    p = getattr(config, "CORE_DISCORD_UNLINK_PATH", None) or "/integrations/discord/unlink"
+    return p if p.startswith("/") else f"/{p}"
+
+
 async def request_discord_link_session(discord_user_id: int) -> dict[str, Any] | None:
     """
     Ask Core to start a link session for this Discord user.
@@ -137,3 +142,38 @@ async def fetch_innersync_profile_for_discord(discord_user_id: int) -> dict[str,
     except Exception as e:
         logger.debug("Core bot-profile request failed: %s", e)
         return None
+
+
+async def request_discord_unlink(discord_user_id: int) -> bool:
+    """
+    Ask Core to unlink this Discord user (Supabase + webhook back to Alphapy).
+
+    Returns True when Core reports unlinked, False on error or noop.
+    """
+    base = _base_url()
+    key = _service_key()
+    if not base or not key:
+        logger.debug("Core unlink: CORE_API_URL or ALPHAPY_SERVICE_KEY not set")
+        return False
+    url = f"{base}{_unlink_path()}"
+    headers = {"X-API-Key": key, "Content-Type": "application/json"}
+    payload = {"discord_user_id": discord_user_id}
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            response = await client.post(url, json=payload, headers=headers)
+        if response.status_code == 404:
+            return False
+        if not response.is_success:
+            logger.warning(
+                "Core unlink non-2xx: status=%s body=%s",
+                response.status_code,
+                response.text[:300],
+            )
+            return False
+        data = response.json()
+        if isinstance(data, dict) and data.get("status") == "unlinked":
+            return True
+        return False
+    except Exception as e:
+        logger.warning("Core unlink request failed: %s", e)
+        return False
