@@ -961,24 +961,35 @@ Clears the premium cache for a user so the next check refetches from Core-API/DB
 
 ### `POST /webhooks/discord-link`
 
-Confirms a completed Discord ↔ Innersync link from Core after the user finishes the browser/App flow. Upserts into `alphapy_discord_links` and may send the user a confirmation DM.
+Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or deletes `alphapy_discord_links` and may send the user a confirmation DM.
 
 **Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `DISCORD_LINK_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
 
-**Request body:**
+**Link request body:**
 ```json
 {
+  "event": "link",
   "innersync_user_id": "550e8400-e29b-41d4-a716-446655440000",
   "discord_user_id": 123456789012345678,
-  "link_source": "magic_link"
+  "link_source": "app_link"
 }
 ```
 
-- `link_source` is optional (stored for auditing).
+**Unlink request body:**
+```json
+{
+  "event": "unlink",
+  "innersync_user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "discord_user_id": 123456789012345678
+}
+```
+
+- `event` defaults to link when omitted (legacy payloads).
+- `link_source` is optional on link (stored for auditing).
 
 **Responses:**
 - `200` with `{"status": "ok"|"noop", "discord_user_id": "<snowflake>"}`
-- `409` if the Discord user or Innersync user is already linked to a different account
+- `409` on link if the Discord user or Innersync user is already linked to a different account
 
 ---
 

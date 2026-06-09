@@ -1,7 +1,7 @@
 """
-Webhook: Core confirms a Discord user completed Innersync linking.
+Webhook: Core confirms a Discord user completed Innersync linking or unlinked.
 
-Stores the mapping in `alphapy_discord_links` and optionally notifies the user by DM.
+Stores or removes the mapping in `alphapy_discord_links` and optionally notifies the user by DM.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, status
 
 from utils.hermit_events import emit_hermit_event
-from utils.innersync_identity import upsert_discord_link
+from utils.innersync_identity import delete_discord_link_for_discord_user, upsert_discord_link
 from utils.logger import logger
 from webhooks.common import get_discord_link_webhook_secret, validate_webhook_signature
 
@@ -35,13 +35,32 @@ async def _try_dm_user(discord_user_id: int, body: str) -> None:
         logger.debug("discord-link webhook: could not DM user %s: %s", discord_user_id, exc)
 
 
+async def _handle_unlink(pool: Any, discord_user_id: int) -> dict[str, str]:
+    deleted = await delete_discord_link_for_discord_user(pool, discord_user_id)
+    status_str = "ok" if deleted else "noop"
+    if status_str == "ok":
+        await _try_dm_user(
+            discord_user_id,
+            "Your Innersync account is no longer linked to this Discord account. "
+            "You can run `/link` again anytime.",
+        )
+    logger.info(
+        "discord-link webhook unlink: status=%s discord_user_id=%s",
+        status_str,
+        discord_user_id,
+    )
+    return {"status": status_str, "discord_user_id": str(discord_user_id)}
+
+
 @router.post("")
 async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
     """
-    Confirm link between Innersync user id (UUID) and Discord snowflake.
+    Confirm link or unlink between Innersync user id (UUID) and Discord snowflake.
 
-    Expected JSON:
-        {"innersync_user_id": "<uuid>", "discord_user_id": <int>, "link_source": "magic_link"}
+    Link JSON:
+        {"event": "link", "innersync_user_id": "<uuid>", "discord_user_id": <int>, "link_source": "app_link"}
+    Unlink JSON:
+        {"event": "unlink", "innersync_user_id": "<uuid>", "discord_user_id": <int>}
     """
     raw = await request.body()
     signature = (
@@ -72,9 +91,34 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
             detail="Invalid JSON payload.",
         ) from exc
 
-    iu_raw = payload.get("innersync_user_id")
     du_raw = payload.get("discord_user_id")
-    if iu_raw is None or du_raw is None:
+    if du_raw is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required field: discord_user_id.",
+        )
+
+    try:
+        discord_user_id = int(du_raw)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="discord_user_id must be an integer.",
+        ) from exc
+
+    pool = getattr(request.app.state, "db_pool", None)
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database pool not available.",
+        )
+
+    event = payload.get("event")
+    if event == "unlink":
+        return await _handle_unlink(pool, discord_user_id)
+
+    iu_raw = payload.get("innersync_user_id")
+    if iu_raw is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing required fields: innersync_user_id, discord_user_id.",
@@ -88,24 +132,9 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
             detail="innersync_user_id must be a UUID string.",
         ) from exc
 
-    try:
-        discord_user_id = int(du_raw)
-    except (TypeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="discord_user_id must be an integer.",
-        ) from exc
-
     link_source = payload.get("link_source")
     if link_source is not None and not isinstance(link_source, str):
         link_source = str(link_source)
-
-    pool = getattr(request.app.state, "db_pool", None)
-    if pool is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database pool not available.",
-        )
 
     status_str, err = await upsert_discord_link(
         pool,

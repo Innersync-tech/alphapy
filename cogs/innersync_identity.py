@@ -16,6 +16,7 @@ from utils.core_discord_integration import (
     extract_link_url,
     fetch_innersync_profile_for_discord,
     request_discord_link_session,
+    request_discord_unlink,
 )
 from utils.db_helpers import get_bot_db_pool
 from utils.embed_builder import EmbedBuilder
@@ -127,22 +128,31 @@ async def unlink_slash(interaction: discord.Interaction) -> None:
 
     await interaction.response.defer(ephemeral=True)
 
-    deleted = False
+    unlinked = False
     try:
-        deleted = await delete_discord_link_for_discord_user(pool, interaction.user.id)
+        unlinked = await request_discord_unlink(interaction.user.id)
     except Exception as e:
-        logger.warning("unlink: delete failed: %s", e)
-        await interaction.followup.send(
-            "Could not remove the link. Please try again later.",
-            ephemeral=True,
-        )
-        return
+        logger.warning("unlink: Core request failed: %s", e)
 
-    if deleted:
+    if not unlinked:
+        try:
+            unlinked = await delete_discord_link_for_discord_user(pool, interaction.user.id)
+        except Exception as e:
+            logger.warning("unlink: local delete failed: %s", e)
+            await interaction.followup.send(
+                "Could not remove the link. Please try again later.",
+                ephemeral=True,
+            )
+            return
+
+    if unlinked:
         await interaction.followup.send(
             embed=EmbedBuilder.info(
                 title="Unlinked",
-                description="Your Discord account is no longer linked to Innersync in Alphapy. You can run `/link` again anytime.",
+                description=(
+                    "Your Discord account is no longer linked to Innersync. "
+                    "You can run `/link` again anytime."
+                ),
             ),
             ephemeral=True,
         )
@@ -152,11 +162,11 @@ async def unlink_slash(interaction: discord.Interaction) -> None:
         )
         if legacy_profile:
             desc = (
-                "There is no formal Alphapy link row yet, but your App profile still has a "
-                "Discord id on file. Run `/link` to complete the Innersync identity flow."
+                "No active link was found. If you still see a linked profile, "
+                "open App → Settings → Integrations and disconnect, or run `/link` to refresh."
             )
         else:
-            desc = "There was no Alphapy link stored for this Discord account."
+            desc = "There was no link stored for this Discord account."
         await interaction.followup.send(
             embed=EmbedBuilder.info(
                 title="Nothing to unlink",

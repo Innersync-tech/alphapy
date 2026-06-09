@@ -84,6 +84,8 @@ def _cache_set_by_discord(discord_user_id: int, innersync_user_id: str) -> None:
 async def get_discord_id_for_innersync(
     pool: asyncpg.Pool | None,
     innersync_user_id: str,
+    *,
+    allow_profile_fallback: bool = False,
 ) -> int | None:
     """Return Discord snowflake for a Supabase Auth user id, or None."""
     try:
@@ -96,7 +98,9 @@ async def get_discord_id_for_innersync(
         return cached
 
     if pool is None:
-        return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+        if allow_profile_fallback:
+            return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+        return None
 
     try:
         async with acquire_safe(pool) as conn:
@@ -111,14 +115,18 @@ async def get_discord_id_for_innersync(
             )
     except Exception as e:
         logger.warning("alphapy_discord_links lookup by innersync id failed: %s", e)
-        return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+        if allow_profile_fallback:
+            return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+        return None
 
     if row and row["discord_user_id"] is not None:
         did = int(row["discord_user_id"])
         _cache_set_by_innersync(innersync_user_id, did)
         return did
 
-    return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+    if allow_profile_fallback:
+        return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+    return None
 
 
 async def get_innersync_id_for_discord(
@@ -195,9 +203,15 @@ async def _fallback_innersync_from_supabase_profiles(discord_user_id: int) -> st
 async def resolve_innersync_jwt_sub_to_discord_int(
     pool: asyncpg.Pool | None,
     innersync_user_id: str,
+    *,
+    allow_profile_fallback: bool = False,
 ) -> int | None:
     """Resolve JWT `sub` (UUID) to Discord id for Railway tables and automod."""
-    return await get_discord_id_for_innersync(pool, innersync_user_id)
+    return await get_discord_id_for_innersync(
+        pool,
+        innersync_user_id,
+        allow_profile_fallback=allow_profile_fallback,
+    )
 
 
 async def upsert_discord_link(

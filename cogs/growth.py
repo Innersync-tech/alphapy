@@ -12,11 +12,11 @@ from gpt.helpers import ask_gpt, log_gpt_error
 from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.sanitizer import safe_embed_text
+from utils.innersync_identity import get_innersync_id_for_discord
 from utils.supabase_client import (
     SupabaseConfigurationError,
     _supabase_delete,
     _supabase_get,
-    get_user_id_for_discord,
     insert_reflection_for_discord,
 )
 
@@ -209,7 +209,10 @@ Keep your response under 250 words. End with a complete sentence.
 
                 # Tip: show bot sharing prompt only when no growth channel is configured
                 try:
-                    user_id = await get_user_id_for_discord(interaction.user.id)
+                    pool = get_bot_db_pool(interaction.client)
+                    user_id = await get_innersync_id_for_discord(
+                        pool, interaction.user.id, allow_profile_fallback=False
+                    )
                     if user_id:
                         profile_rows = await _supabase_get(
                             "profiles",
@@ -533,7 +536,10 @@ class GrowthCheckin(commands.Cog):
     async def growthhistory(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            user_id = await get_user_id_for_discord(interaction.user.id)
+            pool = get_bot_db_pool(interaction.client)
+            user_id = await get_innersync_id_for_discord(
+                pool, interaction.user.id, allow_profile_fallback=False
+            )
             if not user_id:
                 await interaction.followup.send(
                     "No Innersync profile linked to your account. Complete a `/growthcheckin` first.",

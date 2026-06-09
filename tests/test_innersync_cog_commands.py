@@ -104,7 +104,10 @@ async def test_unlink_slash_deleted_and_not_deleted() -> None:
         pool = MagicMock()
         with (
             patch.object(cog, "get_bot_db_pool", return_value=pool),
-            patch.object(cog, "delete_discord_link_for_discord_user", new=AsyncMock(return_value=deleted)),
+            patch.object(cog, "request_discord_unlink", new=AsyncMock(return_value=deleted)),
+            patch.object(
+                cog, "delete_discord_link_for_discord_user", new=AsyncMock(return_value=False)
+            ),
             patch.object(cog, "get_innersync_id_for_discord", new=AsyncMock(return_value=None)),
         ):
             await cog.unlink_slash.callback(interaction)
@@ -121,6 +124,7 @@ async def test_unlink_slash_not_deleted_legacy_profile_hint() -> None:
     pool = MagicMock()
     with (
         patch.object(cog, "get_bot_db_pool", return_value=pool),
+        patch.object(cog, "request_discord_unlink", new=AsyncMock(return_value=False)),
         patch.object(cog, "delete_discord_link_for_discord_user", new=AsyncMock(return_value=False)),
         patch.object(
             cog,
@@ -132,7 +136,7 @@ async def test_unlink_slash_not_deleted_legacy_profile_hint() -> None:
     interaction.followup.send.assert_awaited_once()
     embed = interaction.followup.send.await_args.kwargs.get("embed")
     assert embed is not None
-    assert "formal Alphapy link row" in embed.description
+    assert "No active link was found" in embed.description
 
 
 @pytest.mark.asyncio
@@ -156,7 +160,12 @@ async def test_unlink_slash_delete_raises() -> None:
     pool = MagicMock()
     with (
         patch.object(cog, "get_bot_db_pool", return_value=pool),
-        patch.object(cog, "delete_discord_link_for_discord_user", new=AsyncMock(side_effect=RuntimeError("db"))),
+        patch.object(cog, "request_discord_unlink", new=AsyncMock(return_value=False)),
+        patch.object(
+            cog,
+            "delete_discord_link_for_discord_user",
+            new=AsyncMock(side_effect=RuntimeError("db")),
+        ),
     ):
         await cog.unlink_slash.callback(interaction)
     interaction.followup.send.assert_awaited_once()
