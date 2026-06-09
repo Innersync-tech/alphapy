@@ -11,8 +11,8 @@ from discord.ext import commands
 from gpt.helpers import ask_gpt, log_gpt_error
 from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
-from utils.sanitizer import safe_embed_text
 from utils.innersync_identity import get_innersync_id_for_discord
+from utils.sanitizer import safe_embed_text
 from utils.supabase_client import (
     SupabaseConfigurationError,
     _supabase_delete,

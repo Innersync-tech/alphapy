@@ -14,8 +14,8 @@ import logging
 import asyncpg
 
 from utils.db_helpers import PoolT
-from utils.sanitizer import safe_prompt
 from utils.innersync_identity import get_innersync_id_for_discord
+from utils.sanitizer import safe_prompt
 from utils.supabase_client import _supabase_get
 
 logger = logging.getLogger(__name__)
