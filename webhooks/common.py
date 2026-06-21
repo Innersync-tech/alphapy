@@ -8,6 +8,7 @@ webhooks (app-reflections, revoke-reflection, reflections, supabase).
 import hashlib
 import hmac
 import logging
+import os
 
 from fastapi import HTTPException, status
 
@@ -35,9 +36,16 @@ def validate_webhook_signature(
         HTTPException: 401 if secret is set and signature is missing or invalid.
     """
     if not secret:
+        app_env = os.environ.get("APP_ENV", "development")
+        strict = os.environ.get("STRICT_SECURITY_MODE", "0")
+        if app_env == "production" or strict == "1":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Webhook secret not configured. Set the required *_WEBHOOK_SECRET environment variable.",
+            )
         if log_name:
-            logger.debug(
-                "No %s webhook secret configured - skipping signature validation",
+            logger.warning(
+                "No %s webhook secret configured - skipping signature validation (non-production only)",
                 log_name,
             )
         return

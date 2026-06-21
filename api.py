@@ -236,6 +236,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning("⚠️  FOUNDER_WEBHOOK_SECRET is not set — founder DM webhook is unauthenticated.")
     if not getattr(config, "LEGAL_UPDATE_WEBHOOK_SECRET", None):
         logger.warning("⚠️  LEGAL_UPDATE_WEBHOOK_SECRET is not set — legal update webhook is unauthenticated.")
+    if not getattr(config, "DISCORD_LINK_WEBHOOK_SECRET", None):
+        logger.warning("⚠️  DISCORD_LINK_WEBHOOK_SECRET is not set — Discord/Innersync link webhook is unauthenticated.")
 
     strict_security_mode = os.getenv("STRICT_SECURITY_MODE", "0") == "1"
     is_production = os.getenv("APP_ENV", "development").lower() in {"prod", "production"}
@@ -249,6 +251,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "APP_REFLECTIONS_WEBHOOK_SECRET",
             "FOUNDER_WEBHOOK_SECRET",
             "LEGAL_UPDATE_WEBHOOK_SECRET",
+            "DISCORD_LINK_WEBHOOK_SECRET",
         ):
             if not getattr(config, key, None):
                 missing.append(key)
