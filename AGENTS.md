@@ -264,6 +264,21 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 
 ---
 
+## Security: webhook secrets in production
+
+Every inbound webhook endpoint uses HMAC-SHA256 validation. When `APP_ENV=production` or `STRICT_SECURITY_MODE=1`, a missing `*_WEBHOOK_SECRET` causes the endpoint to return `HTTP 503` immediately — it does not execute. All of the following are **required in production** (not optional):
+
+| Env var | Webhook |
+|---|---|
+| `SUPABASE_WEBHOOK_SECRET` | GDPR erasure / Supabase auth events |
+| `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Premium invalidation |
+| `APP_REFLECTIONS_WEBHOOK_SECRET` | Reflection sync |
+| `DISCORD_LINK_WEBHOOK_SECRET` | Discord identity link/unlink |
+| `FOUNDER_WEBHOOK_SECRET` | Founder welcome DM |
+| `LEGAL_UPDATE_WEBHOOK_SECRET` | Legal document change notifications |
+
+See `docs/SECURITY.md § Webhook HMAC validation` for details.
+
 ## Shared References
 - **Embed styling**: see `EMBEDS.md`
 - **Database pools, command tracking & infra**: see `ARCHITECTURE.md`

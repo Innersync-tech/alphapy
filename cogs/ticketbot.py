@@ -566,13 +566,14 @@ class TicketBot(AlphaCog):
             )
 
         # Create success embed (always shown, even if channel_id update failed) using EmbedBuilder
+        from utils.sanitizer import safe_embed_text
         ch_embed = EmbedBuilder.success(
             title="🎟️ Ticket created",
             description=(
                 f"Ticket ID: `{ticket_id}`\n"
                 f"User: {user.mention}\n"
                 f"Status: **open**\n\n"
-                f"Description:\n{description or '—'}"
+                f"Description:\n{safe_embed_text(description or '—', 3800)}"
             )
         )
         ch_embed.timestamp = created_at

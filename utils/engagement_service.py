@@ -25,6 +25,7 @@ import discord
 
 from utils.embed_builder import EmbedBuilder
 from utils.logger import logger
+from utils.sanitizer import safe_embed_text
 
 # ---------------------------------------------------------------------------
 # Streak helpers (nickname logic, no DB)
@@ -753,7 +754,7 @@ async def finalize_and_announce_challenge(
             winner_member = guild.get_member(winner_id)
         mention = winner_member.mention if winner_member else f"<@{winner_id}>"
         embed = EmbedBuilder.success(
-            title=f"🏆 {title}",
+            title=f"🏆 {safe_embed_text(title, 250)}",
             description=f"Congratulations {mention}! 🎉\nWon with **{winner_count} messages**!",
         )
         target = channel if isinstance(channel, discord.TextChannel) else None
@@ -1056,8 +1057,8 @@ async def compute_weekly_awards(
                 for entry in results:
                     uid = int(entry["user_id"])
                     metric = int(entry["metric"])
-                    label: str = entry.get("label", entry["key"].title())
-                    subtitle: str = entry.get("subtitle", "")
+                    label: str = safe_embed_text(entry.get("label", entry["key"].title()), 256)
+                    subtitle: str = safe_embed_text(entry.get("subtitle", ""), 256)
                     lines = [f"**{label}**", f"<@{uid}>", f"Score: **{metric}**"]
                     if subtitle:
                         lines.append(subtitle)

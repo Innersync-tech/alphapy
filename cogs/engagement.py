@@ -71,6 +71,7 @@ from utils.engagement_service import (
     weekly_index_message,
 )
 from utils.logger import logger
+from utils.sanitizer import safe_embed_text
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -380,7 +381,7 @@ class ChallengeGroup(app_commands.Group):
                 description=f"Status: Active\nMode: {mode}\nParticipants: {participants_count}",
             )
             if title:
-                embed.add_field(name="Title", value=title, inline=False)
+                embed.add_field(name="Title", value=safe_embed_text(title, 1024), inline=False)
             embed.add_field(name="Channel", value=f"<#{channel_id}>", inline=False)
             if end_dt_str:
                 embed.add_field(name="End time", value=end_dt_str, inline=False)
@@ -644,9 +645,9 @@ class BadgeGroup(app_commands.Group):
             badges = await get_user_badges(pool, interaction.guild.id, target.id)
 
         embed = EmbedBuilder.info(
-            title=f"🎖 Badges — {target.display_name}",
+            title=f"🎖 Badges — {safe_embed_text(target.display_name, 256)}",
         )
-        embed.description = "\n".join(f"• {b}" for b in badges) if badges else "No badges yet."
+        embed.description = "\n".join(f"• {safe_embed_text(b, 256)}" for b in badges) if badges else "No badges yet."
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

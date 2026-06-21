@@ -15,6 +15,31 @@ permissions:
   contents: read
 
 jobs:
+  dependency-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Run pip-audit
+        # pipx is pre-installed on ubuntu-latest runners; avoids adding pip-audit to requirements.txt.
+        # Fails on any known CVE (pip-audit has no --severity flag; all reported vulns are actionable).
+        # Scope: production dependencies only (requirements.txt). Dev/CI tools are excluded.
+        run: pipx run pip-audit -r requirements.txt --format=json --output pip-audit-report.json
+
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
   test:
     runs-on: ubuntu-latest
 
