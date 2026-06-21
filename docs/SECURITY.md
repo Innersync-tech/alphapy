@@ -28,14 +28,22 @@ With strict mode enabled, API startup fails fast if critical auth/webhook secret
 
 ### Webhook HMAC validation (`webhooks/common.py`)
 
-All inbound webhooks (Supabase auth, premium invalidation, GDPR erasure, reflections, founder, legal-update) are verified with `HMAC-SHA256`. The shared utility `validate_webhook_signature()` uses `hmac.compare_digest` to prevent timing attacks.
+All inbound webhooks (Supabase auth, premium invalidation, GDPR erasure, reflections, founder, legal-update, Discord link) are verified with `HMAC-SHA256`. The shared utility `validate_webhook_signature()` uses `hmac.compare_digest` to prevent timing attacks.
 
-If the secret for a webhook is not configured, validation is skipped and a debug log is emitted. For production:
-- `SUPABASE_WEBHOOK_SECRET` — required for GDPR erasure and Supabase auth events
-- `PREMIUM_INVALIDATE_WEBHOOK_SECRET` — required for premium invalidation
-- `APP_REFLECTIONS_WEBHOOK_SECRET` — required for reflection sync
+**Fail-closed behavior (2026-06-21):** When `APP_ENV=production` or `STRICT_SECURITY_MODE=1` is set, any webhook whose `*_WEBHOOK_SECRET` env var is absent returns `HTTP 503 Service Unavailable` immediately — the endpoint does not execute. Previously, missing secrets caused validation to be silently skipped. In non-production environments, missing secrets still emit a debug log and skip validation (development convenience only).
 
-Leaving these unset in production means those endpoints are publicly triggerable.
+All of the following secrets are **required in production**:
+
+| Secret | Protects |
+|---|---|
+| `SUPABASE_WEBHOOK_SECRET` | GDPR erasure + Supabase auth events |
+| `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Premium subscription invalidation |
+| `APP_REFLECTIONS_WEBHOOK_SECRET` | Reflection sync from Core-API |
+| `DISCORD_LINK_WEBHOOK_SECRET` | Discord ↔ Innersync identity link/unlink |
+| `FOUNDER_WEBHOOK_SECRET` | Founder welcome DM trigger |
+| `LEGAL_UPDATE_WEBHOOK_SECRET` | ToS / Privacy Policy change notifications |
+
+Leaving any of these unset in production means the corresponding endpoint is either unaccessible (503) or publicly triggerable — configure all of them before deploying.
 
 ### Rate limiting (`api.py` — `RateLimitMiddleware`)
 
@@ -62,7 +70,16 @@ This endpoint is intended for operational monitoring and troubleshooting.
 
 ### Input sanitization (`utils/sanitizer.py`)
 
-- `safe_embed_text()` — strips mentions, filters dangerous URL protocols, escapes Discord markdown. Must be used for all user-supplied content placed in embeds.
+- `safe_embed_text(text, limit)` — strips mentions, filters dangerous URL protocols, escapes Discord markdown, and truncates to `limit` characters. **Must be used for all user-supplied content placed in embeds.** As of 2026-06-21 this is enforced across the codebase with the following limits:
+
+  | Context | Limit |
+  |---|---|
+  | Automod violation — message content | 200 chars |
+  | Engagement challenge titles | 1 024 chars |
+  | Discord display names (embed fields / author) | 256 chars |
+  | Ticket descriptions | 3 800 chars |
+  | General embed fields (default) | 1 024 chars |
+
 - `safe_prompt()` — detects jailbreak patterns and neutralizes them before passing to LLM APIs.
 - `safe_log_message()` — removes control characters and truncates before logging.
 
@@ -80,7 +97,11 @@ pyopenssl>=26.0.0
 requests>=2.33.0
 ```
 
-Run `pip-audit -r requirements.txt` regularly to catch new CVEs. Dependabot or Renovate can automate this.
+**CI scanning (2026-06-21):** `pip-audit` runs as a parallel CI job on every push to any branch. The job fails the build on any known CVE — vulnerabilities block merging without an explicit override. Run the same check locally before pushing:
+
+```bash
+pip-audit -r requirements.txt
+```
 
 ### Privileged Discord commands
 
@@ -269,6 +290,10 @@ For **service account keys**:
 - [x] Drive credentials loaded from `GOOGLE_CREDENTIALS_JSON` only
 - [x] Clear logging when Drive is configured or missing
 - [x] Minimum scopes (`drive.readonly`)
+- [x] Webhook endpoints fail-closed (HTTP 503) when secrets are missing in production
+- [x] `DISCORD_LINK_WEBHOOK_SECRET` enforced by startup strict mode check
+- [x] `safe_embed_text()` applied to all user-supplied embed content with per-context limits
+- [x] `pip-audit` runs in CI on every push; fails on any known CVE
 
 ### Infrastructure-level (manual configuration) ⚠️
 
