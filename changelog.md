@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+- **Webhook signature enforcement (fail-closed)** – `webhooks/common.py` now rejects requests with missing or invalid HMAC signatures in `APP_ENV=production` or `STRICT_SECURITY_MODE=1` (previously logged a warning and continued processing). `DISCORD_LINK_WEBHOOK_SECRET` added to startup warning and strict mode enforcement.
+- **Embed injection hardening** – `safe_embed_text()` applied to user-controlled content that was previously rendered unsanitised: auto-mod log message field (`utils/automod_logging.py`), engagement challenge titles, display names, and badge keys (`cogs/engagement.py`, `utils/engagement_service.py`), and ticket description in staff channel embed (`cogs/ticketbot.py`).
+- **Dependency audit in CI** – `pip-audit` job added to `.github/workflows/bot.yml` to catch known-vulnerable packages on every push.
+
 ### Added
 - (No changes yet)
 
