@@ -14,6 +14,7 @@ import discord
 from discord.ext import commands
 
 from utils.db_helpers import acquire_safe, get_bot_db_pool
+from utils.sanitizer import safe_embed_text
 
 log = logging.getLogger(__name__)
 
@@ -116,8 +117,7 @@ class AutoModLogger:
             embed.add_field(name="Channel", value=channel_mention, inline=True)
             
             if message_content:
-                # Truncate long messages
-                content = message_content[:200] + "..." if len(message_content) > 200 else message_content
+                content = safe_embed_text(message_content, 200)
                 embed.add_field(name="Message Content", value=f"```{content}```", inline=False)
                 
             embed.set_footer(text=f"Guild ID: {guild_id}")
