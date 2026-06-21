@@ -31,7 +31,6 @@ from discord.ext import commands
 
 from utils.db_helpers import get_bot_db_pool
 from utils.embed_builder import EmbedBuilder
-from utils.sanitizer import safe_embed_text
 from utils.engagement_service import (
     _active_challenges,
     _challenge_lock,
@@ -72,6 +71,7 @@ from utils.engagement_service import (
     weekly_index_message,
 )
 from utils.logger import logger
+from utils.sanitizer import safe_embed_text
 
 # ---------------------------------------------------------------------------
 # Helpers
