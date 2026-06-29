@@ -69,6 +69,18 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 
 ---
 
+## 🤖 Agent: AlphapyAgents (multi-user closed loop)
+- **Path**: `agents/`, `cogs/agents.py`, `docs/alphapy-agents-architecture.md`
+- **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal Hermes on OpenClaw
+- **Commands**: `/agent list`, `/agent start`, `/agent status`
+- **Agents**: `reflection` (journal sync), `trade` (demo trade insight), `full` (both)
+- **Skills**: `journal_sync`, `trade_insight` (extensible via `agents/registry.py`)
+- **Memory**: Supabase `agent_sessions` + `agent_memory` (service role); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
+- **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
+- **Events**: `emit_hermit_event(gpt_command)` after each session for closed-loop Hermit integration
+
+---
+
 ## ⚡ Agent: Premium
 - **Path**: `cogs/premium.py`, `utils/premium_guard.py`, `utils/premium_tiers.py`, `webhooks/premium_invalidate.py`, `webhooks/founder.py`
 - **Purpose**: Tier UX and access control (used by reminders, growth, embed watcher, onboarding)

@@ -153,6 +153,7 @@ class StartupManager:
             "cogs.custom_commands",
             "cogs.retention_cleanup",
             "cogs.engagement",
+            "cogs.agents",
         ]
         
         loaded: list[str] = []
