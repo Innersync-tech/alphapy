@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file.
 - **`reflection_alphapy_consent` schema drift** — `_fetch_active_consent_reflection_ids()` retries without `revoked_at` filter when column missing (pre-migration 0021).
 - **Agent memory privacy** — durable `agent_memory` no longer stores journal plaintext previews; consent revoke + bot-sharing toggle purge agent memory for the user.
 
+### Changed
+- **Agent Phase 4 docs** — `docs/alphapy-agents-architecture.md`, `docs/SECURITY.md`, `docs/agents-safety-guidelines.md`, `AGENTS.md`: GDPR erasure paths, `agent_session_usage` tier caps, quota abuse handling.
+
 ## [3.10.0] - 2026-06-30
 
 ### Added

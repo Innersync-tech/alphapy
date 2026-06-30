@@ -57,6 +57,23 @@ In-memory, IP-based sliding-window rate limiter applied to all endpoints:
 
 The in-memory store is cleaned every 10 minutes. Note: this is a single-instance limiter — it does not share state across multiple API replicas.
 
+### Agent session quotas (Discord `/agent`)
+
+Separate from API IP rate limits. Enforced in `start_agent_session()` via `check_and_increment_agent_session_quota()` (`utils/premium_guard.py`).
+
+| Tier | Daily `/agent start` cap |
+|------|--------------------------|
+| free | 10 |
+| monthly | 25 |
+| yearly / lifetime | unlimited |
+
+- Storage: Railway table `agent_session_usage` (Alembic migration `024`)
+- `/agent continue` and `/agent end` do not consume quota
+- Fails open on DB error (same policy as GPT quota)
+- Counters purged on GDPR erasure (`webhooks/supabase.py`, `/delete_my_data`)
+
+Tier constants: `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`. See `docs/alphapy-agents-architecture.md` §6.
+
 ### Request tracing and API observability (`api.py`)
 
 - `RequestObservabilityMiddleware` attaches/propagates `X-Request-ID` on every response.

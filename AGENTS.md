@@ -79,6 +79,8 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Skills**: `journal_sync` (`trade_insight` skill file kept dormant for later)
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
+- **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`
+- **GDPR**: `purge_agent_user_data()` on Supabase `USER_DELETED` and `/delete_my_data`; see `agents/memory.py`
 - **Events**: `emit_hermit_event(gpt_command)` on `/agent end` (one per completed multi-turn session)
 
 ---
@@ -87,7 +89,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Path**: `cogs/premium.py`, `utils/premium_guard.py`, `utils/premium_tiers.py`, `webhooks/premium_invalidate.py`, `webhooks/founder.py`
 - **Purpose**: Tier UX and access control (used by reminders, growth, embed watcher, onboarding)
 - **Model**: One active subscription per user, applied to one guild, transferable via `/premium_transfer`
-- **Tiers**: `free` (0) → `monthly` (1) → `yearly` (2) → `lifetime` (3). Constants in `utils/premium_tiers.py`: `TIER_RANK`, `GPT_DAILY_LIMIT` (free: 5, monthly: 25, yearly/lifetime: unlimited), `REMINDER_LIMIT` (free: 10, others: unlimited)
+- **Tiers**: `free` (0) → `monthly` (1) → `yearly` (2) → `lifetime` (3). Constants in `utils/premium_tiers.py`: `TIER_RANK`, `GPT_DAILY_LIMIT` (free: 5, monthly: 25, yearly/lifetime: unlimited), `REMINDER_LIMIT` (free: 10, others: unlimited), `AGENT_DAILY_SESSION_LIMIT` (free: 10 `/agent start`/day, monthly: 25, yearly/lifetime: unlimited)
 - **Commands**: `/premium`, `/premium_check`, `/my_premium`, `/premium_transfer`
 - **Guard**: `is_premium()` with Core-API fallback + local cache + TTL; `invalidate_premium_cache(user_id, guild_id?)` for webhook-driven invalidation. New helpers: `get_user_tier()`, `user_has_tier()`, `check_and_increment_gpt_quota()` (tracks daily GPT calls in `gpt_usage` table, fails open on DB error), `check_and_increment_agent_session_quota()` (daily `/agent start` cap in `agent_session_usage`, fails open on DB error)
 - **Guild-level cache**: `guild_has_premium(guild_id)` now uses its own TTL cache (guild-scoped) with invalidation wired into `invalidate_premium_cache(...)` and observability counters (`premium_guild_cache_*`)
