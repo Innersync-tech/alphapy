@@ -27,10 +27,12 @@ logger = logging.getLogger("alphapy.agents.memory")
 
 _MEMORY_TABLE = "agent_memory"
 _SESSIONS_TABLE = "agent_sessions"
+_MESSAGES_TABLE = "agent_session_messages"
 
 # In-memory fallback for tests and when Supabase is not configured.
 _local_sessions: dict[str, dict[str, Any]] = {}
 _local_memory: dict[str, dict[str, Any]] = {}
+_local_session_messages: dict[str, list[dict[str, Any]]] = {}
 
 
 # Keys that may contain journal/reflection plaintext — never persist or inject.
@@ -285,7 +287,97 @@ async def get_active_session(
     return rows[0] if rows else None
 
 
+async def get_session_messages(session_id: str) -> list[dict[str, Any]]:
+    """Load ordered turn messages for an active session."""
+    if not _use_supabase():
+        rows = list(_local_session_messages.get(session_id, []))
+        rows.sort(key=lambda r: (int(r.get("turn_index", 0)), r.get("role", "")))
+        return rows
+
+    rows = await _supabase_get(
+        _MESSAGES_TABLE,
+        {
+            "select": "turn_index,role,content,created_at",
+            "session_id": f"eq.{session_id}",
+            "order": "turn_index.asc,role.asc",
+        },
+    )
+    return rows
+
+
+async def append_session_messages(
+    session_id: str,
+    *,
+    turn_index: int,
+    user_content: str,
+    assistant_content: str,
+) -> None:
+    """Persist one user/assistant pair for a session turn."""
+    now = _now_iso()
+    user_row = {
+        "session_id": session_id,
+        "turn_index": turn_index,
+        "role": "user",
+        "content": user_content[:8000],
+        "created_at": now,
+    }
+    assistant_row = {
+        "session_id": session_id,
+        "turn_index": turn_index,
+        "role": "assistant",
+        "content": assistant_content[:8000],
+        "created_at": now,
+    }
+
+    if not _use_supabase():
+        bucket = _local_session_messages.setdefault(session_id, [])
+        bucket.append(user_row)
+        bucket.append(assistant_row)
+        return
+
+    await _supabase_post(_MESSAGES_TABLE, [user_row, assistant_row], upsert=False)
+
+
+async def delete_session_messages(session_id: str) -> None:
+    """Remove ephemeral messages when a session ends."""
+    if not _use_supabase():
+        _local_session_messages.pop(session_id, None)
+        return
+
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_MESSAGES_TABLE}"
+    params = {"session_id": f"eq.{session_id}"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.delete(
+            url,
+            headers=_headers(prefer=["return=minimal"]),
+            params=params,
+        )
+        response.raise_for_status()
+
+
+async def touch_session(session_id: str) -> None:
+    """Bump updated_at on an active session."""
+    payload = {"updated_at": _now_iso()}
+    if not _use_supabase():
+        row = _local_sessions.get(session_id)
+        if row:
+            row.update(payload)
+        return
+
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_SESSIONS_TABLE}"
+    params = {"id": f"eq.{session_id}"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.patch(
+            url,
+            json=payload,
+            headers=_headers(prefer=["return=minimal"], method="PATCH"),
+            params=params,
+        )
+        response.raise_for_status()
+
+
 def clear_local_store() -> None:
     """Test helper."""
     _local_sessions.clear()
     _local_memory.clear()
+    _local_session_messages.clear()

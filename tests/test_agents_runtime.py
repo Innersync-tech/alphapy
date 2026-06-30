@@ -179,3 +179,71 @@ async def test_run_agent_session_clears_stale_memory_without_consent(monkeypatch
     assert "last_summary_preview" not in stored
     assert stored.get("session_count") == 4
     assert "last_session_at" in stored
+
+
+@pytest.mark.asyncio
+async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
+    import config
+    from agents.memory import clear_local_store, get_active_session, get_user_memory
+    from agents.runtime import (
+        ActiveAgentSessionError,
+        continue_agent_session,
+        end_agent_session,
+        start_agent_session,
+    )
+
+    monkeypatch.setattr(config, "ALPHAPY_AGENTS_MEMORY_BACKEND", "memory")
+    clear_local_store()
+
+    user_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    responses = iter(["First reply.", "Second reply."])
+
+    async def _fake_load_reflections(discord_id, limit=5):
+        return ""
+
+    async def _fake_ask_gpt(messages, user_id=None, **kwargs):
+        return next(responses)
+
+    monkeypatch.setattr("agents.skills.journal_sync.load_agent_reflection_context", _fake_load_reflections)
+    monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
+
+    first = await start_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=42,
+        guild_id=1,
+        agent_name="reflection",
+        user_message="Hello",
+    )
+    assert first.summary == "First reply."
+    assert first.turn_count == 1
+    assert await get_active_session(user_id, "reflection") is not None
+
+    with pytest.raises(ActiveAgentSessionError):
+        await start_agent_session(
+            innersync_user_id=user_id,
+            discord_user_id=42,
+            guild_id=1,
+            agent_name="reflection",
+        )
+
+    second = await continue_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=42,
+        guild_id=1,
+        agent_name="reflection",
+        user_message="Follow up",
+    )
+    assert second.summary == "Second reply."
+    assert second.turn_count == 2
+
+    ended = await end_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=42,
+        guild_id=1,
+        agent_name="reflection",
+    )
+    assert ended.turn_count == 2
+    assert await get_active_session(user_id, "reflection") is None
+
+    stored = await get_user_memory(user_id, "reflection")
+    assert stored.get("session_count") == 1

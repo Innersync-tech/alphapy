@@ -13,9 +13,15 @@ except ImportError:
     import config  # type: ignore
 
 from agents.base import AgentResult
-from agents.memory import get_active_session
+from agents.memory import get_active_session, get_session_messages
 from agents.registry import list_agents, resolve_agent
-from agents.runtime import run_agent_session
+from agents.runtime import (
+    ActiveAgentSessionError,
+    NoActiveAgentSessionError,
+    continue_agent_session,
+    end_agent_session,
+    start_agent_session,
+)
 from utils.cog_base import AlphaCog
 from utils.db_helpers import get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
@@ -36,6 +42,8 @@ def _agent_response_embed(result: AgentResult) -> discord.Embed:
         title = safe_embed_text(agent_name.replace("_", " ").title(), 256)
 
     footer_parts = [f"Agent: {agent_name}", f"Session {result.session_id[:8]}…"]
+    if result.turn_count > 1:
+        footer_parts.append(f"turn {result.turn_count}")
     if result.skill_blocks:
         skills_used = ", ".join(result.skill_blocks.keys())
         footer_parts.append(f"skills: {skills_used}")
@@ -54,7 +62,7 @@ def _agents_globally_enabled() -> bool:
 
 
 class AgentGroup(app_commands.Group):
-    """Slash command group: /agent list|start|status"""
+    """Slash command group: /agent list|start|continue|end|status"""
 
     def __init__(self, cog: AgentsCog) -> None:
         super().__init__(name="agent", description="Run personal Alphapy agents")
@@ -121,7 +129,7 @@ class AgentGroup(app_commands.Group):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
-            result = await run_agent_session(
+            result = await start_agent_session(
                 innersync_user_id=innersync_id,
                 discord_user_id=discord_user_id,
                 guild_id=guild_id,
@@ -129,10 +137,133 @@ class AgentGroup(app_commands.Group):
                 user_message=message,
                 metadata={"source": "discord_slash"},
             )
+        except ActiveAgentSessionError:
+            await interaction.followup.send(
+                "You already have an active session. Use `/agent continue` to add a turn "
+                "or `/agent end` to finish.",
+                ephemeral=True,
+            )
+            return
         except Exception as exc:
             logger.exception("Agent session failed: %s", exc)
             await interaction.followup.send(
                 "Something went wrong running the agent.", ephemeral=True
+            )
+            return
+
+        await interaction.followup.send(
+            embed=_agent_response_embed(result), ephemeral=True
+        )
+
+    @app_commands.command(name="continue", description="Continue your active agent session")
+    @app_commands.describe(
+        message="Your follow-up message for the agent",
+    )
+    async def continue_cmd(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+    ) -> None:
+        cog = self.cog
+        agent_name = "reflection"
+        if not _agents_globally_enabled():
+            await interaction.response.send_message(
+                "Agents are not enabled on this deployment. "
+                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
+                ephemeral=True,
+            )
+            return
+
+        guild_id = interaction.guild_id
+        if guild_id is not None and not cog._guild_agents_enabled(guild_id):
+            await interaction.response.send_message(
+                "Agents are disabled in this server. Ask an admin to run `/config agents toggle`.",
+                ephemeral=True,
+            )
+            return
+
+        resolved = await cog._resolve_user(interaction)
+        if resolved is None:
+            return
+        innersync_id, discord_user_id = resolved
+
+        if not message.strip():
+            await interaction.response.send_message(
+                "Please provide a message for the agent.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        try:
+            result = await continue_agent_session(
+                innersync_user_id=innersync_id,
+                discord_user_id=discord_user_id,
+                guild_id=guild_id,
+                agent_name=agent_name,
+                user_message=message.strip(),
+                metadata={"source": "discord_slash"},
+            )
+        except NoActiveAgentSessionError:
+            await interaction.followup.send(
+                "No active session. Start one with `/agent start` first.", ephemeral=True
+            )
+            return
+        except Exception as exc:
+            logger.exception("Agent continue failed: %s", exc)
+            await interaction.followup.send(
+                "Something went wrong continuing the session.", ephemeral=True
+            )
+            return
+
+        await interaction.followup.send(
+            embed=_agent_response_embed(result), ephemeral=True
+        )
+
+    @app_commands.command(name="end", description="End your active agent session")
+    async def end_cmd(self, interaction: discord.Interaction) -> None:
+        cog = self.cog
+        agent_name = "reflection"
+        if not _agents_globally_enabled():
+            await interaction.response.send_message(
+                "Agents are not enabled on this deployment. "
+                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
+                ephemeral=True,
+            )
+            return
+
+        guild_id = interaction.guild_id
+        if guild_id is not None and not cog._guild_agents_enabled(guild_id):
+            await interaction.response.send_message(
+                "Agents are disabled in this server. Ask an admin to run `/config agents toggle`.",
+                ephemeral=True,
+            )
+            return
+
+        resolved = await cog._resolve_user(interaction)
+        if resolved is None:
+            return
+        innersync_id, discord_user_id = resolved
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        try:
+            result = await end_agent_session(
+                innersync_user_id=innersync_id,
+                discord_user_id=discord_user_id,
+                guild_id=guild_id,
+                agent_name=agent_name,
+                metadata={"source": "discord_slash"},
+            )
+        except NoActiveAgentSessionError:
+            await interaction.followup.send(
+                "No active session to end. Use `/agent start` first.", ephemeral=True
+            )
+            return
+        except Exception as exc:
+            logger.exception("Agent end failed: %s", exc)
+            await interaction.followup.send(
+                "Something went wrong ending the session.", ephemeral=True
             )
             return
 
@@ -143,9 +274,9 @@ class AgentGroup(app_commands.Group):
             payload={"agent": agent_name, "session_id": result.session_id},
         )
 
-        await interaction.followup.send(
-            embed=_agent_response_embed(result), ephemeral=True
-        )
+        embed = _agent_response_embed(result)
+        embed.set_footer(text=embed.footer.text + " · ended")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="status", description="Show your active reflection agent session")
     async def status_cmd(self, interaction: discord.Interaction) -> None:
@@ -170,9 +301,19 @@ class AgentGroup(app_commands.Group):
             )
             return
 
+        session_id = str(row.get("id", ""))
+        messages = await get_session_messages(session_id) if session_id else []
+        turn_count = max((int(m.get("turn_index", 0)) for m in messages), default=-1) + 1
+        if turn_count <= 0:
+            turn_count = 1
+
         embed = discord.Embed(
             title="Active session: reflection",
-            description=f"Started: {row.get('started_at', 'unknown')}",
+            description=(
+                f"Started: {row.get('started_at', 'unknown')}\n"
+                f"Turns: {turn_count}\n"
+                "Use `/agent continue` or `/agent end`."
+            ),
             color=_AGENT_COLOR,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
