@@ -9,7 +9,7 @@ from utils.supabase_client import _supabase_get
 
 logger = logging.getLogger("alphapy.agents.profile")
 
-TIER1_FIELDS = frozenset({"display_name", "persona", "default_focus", "language_pref"})
+TIER1_FIELDS = frozenset({"display_name", "persona", "default_focus", "language_pref", "inner_voice"})
 TIER1_BOOL_FIELDS = frozenset({"learn_from_shared"})
 TIER3_FIELDS = frozenset({"session_count", "last_session_at", "last_session_id", "last_agent"})
 
@@ -35,7 +35,12 @@ def normalize_agent_prefs(raw: Any) -> dict[str, str | bool]:
             continue
         text = str(value).strip()
         if text:
-            out[key] = text[:500] if key == "default_focus" else text[:120]
+            if key == "default_focus":
+                out[key] = text[:500]
+            elif key == "inner_voice":
+                out[key] = text[:400]
+            else:
+                out[key] = text[:120]
     persona = out.get("persona", "")
     if isinstance(persona, str) and persona.lower() and persona.lower() not in PERSONA_DESCRIPTIONS:
         out["persona"] = "calm"
