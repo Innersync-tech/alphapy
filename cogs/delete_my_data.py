@@ -100,6 +100,7 @@ async def _purge_user_data(pool: asyncpg.Pool, user_id: int) -> None:
         ("terms_acceptance", "user_id"),
         ("gdpr_acceptance", "user_id"),
         ("gpt_usage", "user_id"),
+        ("agent_session_usage", "user_id"),
         ("automod_logs", "user_id"),
         ("automod_user_history", "user_id"),
         ("app_reflections", "user_id"),
@@ -192,6 +193,7 @@ class DeleteMyDataCog(commands.Cog):
                 "• Command audit logs\n"
                 "• Growth check-in reflections\n"
                 "• AI usage records and quota counters\n"
+                "• Agent session daily counters\n"
                 "• Agent session history and agent memory (Supabase)\n"
                 "• Automod logs\n"
                 "• Terms acceptance records\n\n"

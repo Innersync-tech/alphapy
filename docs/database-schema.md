@@ -139,6 +139,28 @@ Per-user, per-guild daily GPT call tracking for quota enforcement. Added in migr
 
 ---
 
+### `agent_session_usage`
+
+Per-user daily `/agent start` tracking for tier-based session caps. Added in migration 024.
+
+**Columns:**
+- `user_id` (BIGINT, NOT NULL): Discord user ID
+- `usage_date` (DATE, NOT NULL, DEFAULT CURRENT_DATE): The UTC date of usage
+- `session_count` (INTEGER, NOT NULL, DEFAULT 0): Number of agent sessions started on this date
+
+**Primary key:** `(user_id, usage_date)`
+
+**Indexes:**
+- `idx_agent_session_usage_date` on `usage_date`
+
+**Notes:**
+- `check_and_increment_agent_session_quota()` in `utils/premium_guard.py` — atomic upsert, same pattern as `gpt_usage`
+- Limits per tier: free = 10/day, monthly = 25/day, yearly/lifetime = unlimited
+- Counts `/agent start` only; `/agent continue` and `/agent end` do not consume quota
+- Deleted on GDPR erasure (`webhooks/supabase.py`, `/delete_my_data`)
+
+---
+
 ### `terms_acceptance`
 
 Tracks user acceptance of the Terms of Service and Privacy Policy for GDPR compliance.

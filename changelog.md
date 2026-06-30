@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Agent session rate limits** — `agent_session_usage` table (migration 024); `check_and_increment_agent_session_quota()` enforces tier caps on `/agent start` (free: 10/day, monthly: 25/day, yearly/lifetime: unlimited).
+
 ### Fixed
 - **GDPR agent purge** — `purge_agent_user_data()` removes Supabase `agent_sessions`, `agent_session_messages` (cascade), and `agent_memory` on Supabase `USER_DELETED` webhook and `/delete_my_data` (Phase 4).
 - **Consent-gated agent context** — `load_agent_reflection_context()` (used by `/agent` + `journal_sync`) only loads `app_reflections` / `reflections_shared` rows with active `reflection_alphapy_consent`; no bulk vault sync.
