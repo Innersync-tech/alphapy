@@ -5,11 +5,20 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from utils.supabase_client import _supabase_get
+from utils.supabase_client import _supabase_get, _supabase_post
 
 logger = logging.getLogger("alphapy.agents.profile")
 
-TIER1_FIELDS = frozenset({"display_name", "persona", "default_focus", "language_pref", "inner_voice"})
+TIER1_FIELDS = frozenset({
+    "display_name",
+    "persona",
+    "default_focus",
+    "language_pref",
+    "inner_voice",
+    "energy_level",
+    "fatigue_note",
+    "fatigue_reported_at",
+})
 TIER1_BOOL_FIELDS = frozenset({"learn_from_shared"})
 TIER3_FIELDS = frozenset({"session_count", "last_session_at", "last_session_id", "last_agent"})
 
@@ -26,6 +35,8 @@ def _now_iso() -> str:
 
 def normalize_agent_prefs(raw: Any) -> dict[str, str | bool]:
     """Return sanitized Tier 1 prefs from JSON."""
+    from agents.fatigue import VALID_ENERGY_LEVELS
+
     if not isinstance(raw, dict):
         return {}
     out: dict[str, str | bool] = {}
@@ -33,12 +44,21 @@ def normalize_agent_prefs(raw: Any) -> dict[str, str | bool]:
         value = raw.get(key)
         if value is None:
             continue
+        if key == "energy_level":
+            text = str(value).strip()
+            if text in VALID_ENERGY_LEVELS:
+                out[key] = text
+            continue
         text = str(value).strip()
         if text:
             if key == "default_focus":
                 out[key] = text[:500]
             elif key == "inner_voice":
                 out[key] = text[:400]
+            elif key == "fatigue_note":
+                out[key] = text[:200]
+            elif key == "fatigue_reported_at":
+                out[key] = text[:64]
             else:
                 out[key] = text[:120]
     persona = out.get("persona", "")
@@ -74,6 +94,28 @@ async def load_agent_prefs(innersync_user_id: str) -> dict[str, str | bool]:
     if not rows:
         return {}
     return normalize_agent_prefs(rows[0].get("agent_prefs"))
+
+
+async def merge_agent_prefs_fields(
+    innersync_user_id: str,
+    raw_merged: dict[str, Any],
+) -> dict[str, str | bool]:
+    """Upsert merged Tier 1 agent_prefs for a user (service role)."""
+    storage = normalize_agent_prefs(raw_merged)
+    try:
+        await _supabase_post(
+            "app_user_settings",
+            {
+                "user_id": innersync_user_id,
+                "agent_prefs": storage,
+                "updated_at": _now_iso(),
+            },
+            upsert=True,
+        )
+    except Exception as exc:
+        logger.warning("Failed to save agent_prefs for %s: %s", innersync_user_id, exc)
+        raise
+    return storage
 
 
 def extract_tier3_memory(memory: dict[str, Any]) -> dict[str, Any]:

@@ -5,6 +5,7 @@ import logging
 from collections.abc import Iterable
 
 from agents.base import AgentSkill, BaseAgent
+from agents.skills.fatigue_check import FatigueCheckSkill
 from agents.skills.inner_voice import InnerVoiceSkill
 from agents.skills.journal_sync import JournalSyncSkill
 
@@ -14,12 +15,13 @@ logger = logging.getLogger("alphapy.agents")
 _AGENT_DEFINITIONS: dict[str, dict[str, object]] = {
     "reflection": {
         "description": "Daily journal reflection and pattern awareness.",
-        "skills": ("inner_voice", "journal_sync"),
+        "skills": ("inner_voice", "fatigue_check", "journal_sync"),
     },
 }
 
 _SKILL_INSTANCES: dict[str, AgentSkill] = {
     "inner_voice": InnerVoiceSkill(),
+    "fatigue_check": FatigueCheckSkill(),
     "journal_sync": JournalSyncSkill(),
 }
 
