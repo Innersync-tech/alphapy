@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from agents.base import AgentSkill, BaseAgent
 from agents.skills.journal_sync import JournalSyncSkill

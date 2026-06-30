@@ -180,7 +180,7 @@ async def get_active_session(
             "select": "id,agent_name,status,started_at,metadata",
             "innersync_user_id": f"eq.{innersync_user_id}",
             "agent_name": f"eq.{agent_name}",
-            "status": f"eq.active",
+            "status": "eq.active",
             "order": "started_at.desc",
             "limit": 1,
         },
