@@ -27,7 +27,7 @@ async def test_inner_voice_skill_returns_user_text(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_inner_voice_skill_empty_prefs_message(monkeypatch) -> None:
     from agents.base import AgentContext
-    from agents.skills.inner_voice import InnerVoiceSkill, NO_INNER_VOICE_MESSAGE
+    from agents.skills.inner_voice import NO_INNER_VOICE_MESSAGE, InnerVoiceSkill
 
     async def _fake_load_prefs(_user_id: str):
         return {}
