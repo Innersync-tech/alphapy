@@ -11,17 +11,15 @@ from agents.memory import (
     get_user_memory,
     patch_user_memory,
 )
+from agents.policy import (
+    build_agent_system_prompt,
+    build_agent_user_message,
+)
 from agents.registry import resolve_agent
 from gpt.helpers import ask_gpt
 from utils.sanitizer import safe_prompt
 
 logger = logging.getLogger("alphapy.agents.runtime")
-
-_AGENT_SYSTEM_PROMPT = """You are an Alphapy personal growth agent for Innersync users.
-You help with journaling reflection, emotional awareness, fatigue checks, and personal growth.
-Use only the skill context provided below. Be concise, warm, and actionable.
-Never invent user data that is not in the context blocks.
-Respond in the same language as the user's message when possible."""
 
 
 async def _build_skill_context(ctx: AgentContext) -> dict[str, str]:
@@ -91,10 +89,13 @@ async def run_agent_session(
     context_blob = _assemble_prompt(skill_blocks, memory)
     prompt = user_message or "Give a short reflection based on the context."
     messages = [
-        {"role": "system", "content": _AGENT_SYSTEM_PROMPT},
+        {"role": "system", "content": build_agent_system_prompt()},
         {
             "role": "user",
-            "content": f"Context:\n{context_blob}\n\nUser request: {safe_prompt(prompt[:2000])}",
+            "content": build_agent_user_message(
+                context_blob=context_blob,
+                user_request=safe_prompt(prompt[:2000]),
+            ),
         },
     ]
 

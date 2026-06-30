@@ -212,8 +212,15 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 ### Explicit non-goals (MVP)
 
 - No per-user Hermes (Nous Research) deployment
-- No decryption of App ciphertext
+- No decryption of App ciphertext — enforced in `agents/policy.py`; see `docs/agents-safety-guidelines.md`
 - No guild-admin visibility into agent outputs (ephemeral by default)
+
+### Safety & compliance
+
+- [x] `agents/policy.py` — canonical `AGENT_SAFETY_RULES` system prompt
+- [x] `docs/agents-safety-guidelines.md` — jailbreak test matrix
+- [x] `tests/test_agents_policy.py` — policy marker + assembly tests
+- [ ] Manual jailbreak pass on test bot after each policy change
 
 ---
 
