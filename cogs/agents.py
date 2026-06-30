@@ -30,48 +30,20 @@ def _agents_globally_enabled() -> bool:
     return getattr(config, "ALPHAPY_AGENTS_ENABLED", False)
 
 
-class AgentsCog(AlphaCog):
-    """User-facing Alphapy agent commands (/agent)."""
+class AgentGroup(app_commands.Group):
+    """Slash command group: /agent list|start|status"""
 
-    agent_group = app_commands.Group(name="agent", description="Run personal Alphapy agents")
+    def __init__(self, cog: AgentsCog) -> None:
+        super().__init__(name="agent", description="Run personal Alphapy agents")
+        self.cog = cog
 
-    def __init__(self, bot: commands.Bot) -> None:
-        super().__init__(bot)
-        self.bot.tree.add_command(self.agent_group)
-
-    async def _resolve_user(self, interaction: discord.Interaction) -> tuple[str, int] | None:
-        pool = get_bot_db_pool(self.bot)
-        if pool is None:
-            await interaction.response.send_message(
-                "Agent service is temporarily unavailable.",
-                ephemeral=True,
-            )
-            return None
-
-        discord_user_id = interaction.user.id
-        innersync_id = await get_innersync_id_for_discord(
-            pool,
-            discord_user_id,
-            allow_profile_fallback=False,
-        )
-        if not innersync_id:
-            await interaction.response.send_message(
-                "Link your Innersync account first with `/link`, then try again.",
-                ephemeral=True,
-            )
-            return None
-        return innersync_id, discord_user_id
-
-    async def _guild_agents_enabled(self, guild_id: int | None) -> bool:
-        if guild_id is None:
-            return True
-        return self.settings_helper.get_bool("agents", "enabled", guild_id, fallback=False)
-
-    @agent_group.command(name="list", description="List available Alphapy agents")
-    async def agent_list(self, interaction: discord.Interaction) -> None:
+    @app_commands.command(name="list", description="List available Alphapy agents")
+    async def list_cmd(self, interaction: discord.Interaction) -> None:
         if not _agents_globally_enabled():
             await interaction.response.send_message(
-                "Agents are not enabled on this deployment.", ephemeral=True
+                "Agents are not enabled on this deployment. "
+                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
+                ephemeral=True,
             )
             return
 
@@ -87,7 +59,7 @@ class AgentsCog(AlphaCog):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @agent_group.command(name="start", description="Start an agent session")
+    @app_commands.command(name="start", description="Start an agent session")
     @app_commands.describe(
         agent="Agent to run (reflection, trade, full)",
         message="Optional focus or question for the agent",
@@ -99,27 +71,30 @@ class AgentsCog(AlphaCog):
             app_commands.Choice(name="full", value="full"),
         ]
     )
-    async def agent_start(
+    async def start_cmd(
         self,
         interaction: discord.Interaction,
         agent: app_commands.Choice[str],
         message: str | None = None,
     ) -> None:
+        cog = self.cog
         if not _agents_globally_enabled():
             await interaction.response.send_message(
-                "Agents are not enabled on this deployment.", ephemeral=True
+                "Agents are not enabled on this deployment. "
+                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
+                ephemeral=True,
             )
             return
 
         guild_id = interaction.guild_id
-        if guild_id is not None and not await self._guild_agents_enabled(guild_id):
+        if guild_id is not None and not cog._guild_agents_enabled(guild_id):
             await interaction.response.send_message(
                 "Agents are disabled in this server. Ask an admin to run `/config agents toggle`.",
                 ephemeral=True,
             )
             return
 
-        resolved = await self._resolve_user(interaction)
+        resolved = await cog._resolve_user(interaction)
         if resolved is None:
             return
         innersync_id, discord_user_id = resolved
@@ -164,7 +139,7 @@ class AgentsCog(AlphaCog):
             embed.set_footer(text=f"Session {result.session_id[:8]}… · skills: {skills_used}")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @agent_group.command(name="status", description="Show your active agent session")
+    @app_commands.command(name="status", description="Show your active agent session")
     @app_commands.describe(agent="Agent name to check")
     @app_commands.choices(
         agent=[
@@ -173,18 +148,20 @@ class AgentsCog(AlphaCog):
             app_commands.Choice(name="full", value="full"),
         ]
     )
-    async def agent_status(
+    async def status_cmd(
         self,
         interaction: discord.Interaction,
         agent: app_commands.Choice[str],
     ) -> None:
         if not _agents_globally_enabled():
             await interaction.response.send_message(
-                "Agents are not enabled on this deployment.", ephemeral=True
+                "Agents are not enabled on this deployment. "
+                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
+                ephemeral=True,
             )
             return
 
-        resolved = await self._resolve_user(interaction)
+        resolved = await self.cog._resolve_user(interaction)
         if resolved is None:
             return
         innersync_id, _ = resolved
@@ -202,6 +179,46 @@ class AgentsCog(AlphaCog):
             color=_AGENT_COLOR,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class AgentsCog(AlphaCog):
+    """User-facing Alphapy agent commands (/agent)."""
+
+    def __init__(self, bot: commands.Bot) -> None:
+        super().__init__(bot)
+        self.agent_group = AgentGroup(self)
+        bot.tree.add_command(self.agent_group)
+
+    async def cog_unload(self) -> None:
+        self.bot.tree.remove_command("agent")
+
+    def _guild_agents_enabled(self, guild_id: int | None) -> bool:
+        if guild_id is None:
+            return True
+        return self.settings_helper.get_bool("agents", "enabled", guild_id, fallback=False)
+
+    async def _resolve_user(self, interaction: discord.Interaction) -> tuple[str, int] | None:
+        pool = get_bot_db_pool(self.bot)
+        if pool is None:
+            await interaction.response.send_message(
+                "Agent service is temporarily unavailable.",
+                ephemeral=True,
+            )
+            return None
+
+        discord_user_id = interaction.user.id
+        innersync_id = await get_innersync_id_for_discord(
+            pool,
+            discord_user_id,
+            allow_profile_fallback=False,
+        )
+        if not innersync_id:
+            await interaction.response.send_message(
+                "Link your Innersync account first with `/link`, then try again.",
+                ephemeral=True,
+            )
+            return None
+        return innersync_id, discord_user_id
 
 
 async def setup(bot: commands.Bot) -> None:
