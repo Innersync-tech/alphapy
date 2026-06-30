@@ -70,6 +70,10 @@ CORE_HERMIT_CONTEXT_PATH = (os.getenv("CORE_HERMIT_CONTEXT_PATH") or "/integrati
 HERMIT_STRATEGY_PACKET_ENABLED = os.getenv("HERMIT_STRATEGY_PACKET_ENABLED", "false").strip().lower() == "true"
 HERMIT_EVENTS_ENABLED = os.getenv("HERMIT_EVENTS_ENABLED", "true").strip().lower() == "true"
 HERMIT_EVENTS_WEBHOOK_SECRET = os.getenv("HERMIT_EVENTS_WEBHOOK_SECRET", "").strip()
+# Alphapy multi-user agents (closed-loop runtime in bot)
+ALPHAPY_AGENTS_ENABLED = os.getenv("ALPHAPY_AGENTS_ENABLED", "false").strip().lower() == "true"
+# supabase = persist sessions/memory via service role; memory = in-process only (tests/dev)
+ALPHAPY_AGENTS_MEMORY_BACKEND = (os.getenv("ALPHAPY_AGENTS_MEMORY_BACKEND") or "supabase").strip().lower()
 # Core → Alphapy: confirm Discord ↔ Innersync link (HMAC via X-Webhook-Signature)
 DISCORD_LINK_WEBHOOK_SECRET = os.getenv("DISCORD_LINK_WEBHOOK_SECRET")
 # Optional path overrides for Core integration (defaults match planned Core routes)

@@ -121,6 +121,13 @@ class Configuration(AlphaCog):
         default_permissions=_admin_perms,
         guild_only=True,
     )
+    agents_group = app_commands.Group(
+        name="agents",
+        description="Alphapy personal agent settings (/agent commands)",
+        default_permissions=_admin_perms,
+        guild_only=True,
+        parent=config,
+    )
     def __init__(self, bot: commands.Bot):
         super().__init__(bot)
         self.rule_processor = RuleProcessor(bot)
@@ -2991,6 +2998,43 @@ class Configuration(AlphaCog):
             "🎉 Engagement",
             f"`engagement.streaks_nicknames` → {enabled} by {interaction.user.mention}.",
             guild_id,
+        )
+
+    # -------------------------------------------------------------------------
+    # /config agents — Alphapy personal agents (/agent)
+    # -------------------------------------------------------------------------
+
+    @agents_group.command(name="show", description="Show Alphapy agent settings for this server")
+    @requires_admin()
+    async def agents_show(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        await self._reply_settings(interaction, "agents", "🤖 Alphapy agents")
+
+    @agents_group.command(
+        name="toggle",
+        description="Enable or disable /agent commands for members in this server",
+    )
+    @requires_admin()
+    @app_commands.describe(enabled="True to enable personal agent commands, false to disable.")
+    async def agents_toggle(self, interaction: discord.Interaction, enabled: bool) -> None:
+        await interaction.response.defer(ephemeral=True)
+        assert interaction.guild is not None
+        await self.settings.set(
+            "agents",
+            "enabled",
+            enabled,
+            interaction.guild.id,
+            interaction.user.id,
+        )
+        state = "enabled" if enabled else "disabled"
+        await interaction.followup.send(
+            f"✅ Alphapy agent commands {state} for this server.",
+            ephemeral=True,
+        )
+        await self._send_audit_log(
+            "🤖 Alphapy agents",
+            f"`agents.enabled` → {enabled} by {interaction.user.mention}.",
+            interaction.guild.id,
         )
 
 

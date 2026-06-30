@@ -229,6 +229,24 @@ Key chosen from a dropdown (e.g. `first_onboarding_done`, `first_guild_join`).
 /automod logs [limit] [user_id] [rule_id] [action] [days]
 ```
 
+### Alphapy agents — `/config agents`
+
+Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment (Railway env). Per-guild toggle:
+
+```
+/config agents show
+/config agents toggle <true|false>
+```
+
+When enabled, linked members can use `/agent list`, `/agent start`, and `/agent status`.
+
+Optional env vars:
+
+```
+ALPHAPY_AGENTS_MEMORY_BACKEND=supabase   # default; uses Supabase agent_sessions + agent_memory
+ALPHAPY_AGENTS_MEMORY_BACKEND=memory     # in-process only (local dev)
+```
+
 ### Engagement — `/engagement`
 ```
 /engagement show
@@ -326,6 +344,8 @@ The following environment variables are required/optional for bot operation:
 - `HERMIT_STRATEGY_PACKET_ENABLED`: When `true`, inject structured `strategy_packet` JSON from Core into GPT system prompts (pilot; requires Core + Hermit push).
 - `HERMIT_EVENTS_ENABLED`: When `true` (default), emit lightweight events to Core `POST /integrations/hermit/events` (e.g. after `/growthcheckin`, Discord link complete).
 - `HERMIT_EVENTS_WEBHOOK_SECRET`: Optional HMAC secret for event ingest (defaults to shared webhook secret if unset).
+- `ALPHAPY_AGENTS_ENABLED`: Enable multi-user `/agent` commands (`false` by default).
+- `ALPHAPY_AGENTS_MEMORY_BACKEND`: `supabase` (default, persistent sessions via Supabase) or `memory` (in-process, dev/tests).
 
 ### Optional - Innersync identity (Discord link webhook)
 - `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.

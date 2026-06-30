@@ -422,6 +422,16 @@ settings_service.register(
         default=0,  # Must be configured per guild
     )
 )
+# --- Alphapy agents module settings ---
+settings_service.register(
+    SettingDefinition(
+        scope="agents",
+        key="enabled",
+        description="Enable personal Alphapy agent commands (/agent) for members in this guild.",
+        value_type="bool",
+        default=False,
+    )
+)
 # --- Engagement module settings ---
 for _eng_feature in ("challenges", "weekly", "badges", "streaks", "og"):
     settings_service.register(
