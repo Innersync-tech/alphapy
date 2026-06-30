@@ -1,6 +1,8 @@
 # Alphapy Agents — Architecture & MVP Plan
 
-Multi-user Alphapy agents that run in a **closed loop** inside the Discord bot (and optionally via API), distinct from the personal **Hermes** agent on OpenClaw/VPS.
+Multi-user Alphapy agents that run in a **closed loop** inside the Discord bot (and optionally via API), distinct from the personal **Hermes** agent (Nous Research, VPS).
+
+> **Naming:** **Hermes** is the Nous Research personal agent. **Hermit** is the Innersync Python skill host that publishes to Core. Hermes is **not** OpenClaw — unrelated projects.
 
 ---
 
@@ -10,7 +12,7 @@ Multi-user Alphapy agents that run in a **closed loop** inside the Discord bot (
 
 | Layer | Component | Role |
 |-------|-----------|------|
-| Personal agent | **Hermes** (OpenClaw, VPS) | Long-horizon strategy, Discord DMs, owner-only |
+| Personal agent | **Hermes** (Nous Research, VPS) | Long-horizon strategy, Discord DMs, owner-only |
 | Publisher | **Hermit** (`Hermit/`) | Skill host → pushes strategic context to Core |
 | Broker | **Core API** (`hermit_integrations.py`) | Per-user `hermit_strategic_context`, `hermit_events` |
 | Executor | **Alphapy** (`gpt/helpers.py`) | Stateless Grok calls; injects Hermit context + reflections |
@@ -20,7 +22,7 @@ Multi-user Alphapy agents that run in a **closed loop** inside the Discord bot (
 ```mermaid
 flowchart LR
   subgraph today [Today — Hermes path]
-    Hermes[Hermes OpenClaw] --> Hermit[Hermit skills]
+    Hermes[Hermes Nous Research] --> Hermit[Hermit skills]
     Hermit -->|HMAC push| Core[Core API]
     Core -->|per-user context| Alphapy[Alphapy ask_gpt]
     User1[User] -->|/growthcheckin| Alphapy
@@ -32,7 +34,7 @@ flowchart LR
 | Gap | Hermes/Hermit today | Needed for Alphapy agents |
 |-----|---------------------|---------------------------|
 | Runtime | Single-owner VPS cron | Per-user sessions in bot process |
-| Trigger | External OpenClaw | `/agent start`, webhooks, scheduled jobs |
+| Trigger | External Hermes (Nous) | `/agent start`, webhooks, scheduled jobs |
 | Memory | Core strategic snapshot (TTL) | Durable per-user agent memory + session log |
 | Skills | Platform telemetry blocks | User journals, streaks, trades, fatigue, inner voice |
 | Closed loop | Events → Hermit re-push | Session complete → memory patch → Hermit event |
@@ -47,7 +49,7 @@ flowchart LR
 
 ### Recommendation: lightweight agent runtime **inside Alphapy**, bridge Hermes via Core
 
-Do **not** run OpenClaw per user. Run a **thin runtime** in Alphapy that mirrors Hermit's skill registry pattern:
+Do **not** run a separate Hermes/Nous instance per user. Run a **thin runtime** in Alphapy that mirrors Hermit's skill registry pattern:
 
 ```
 Discord /agent start reflection
@@ -210,7 +212,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 
 ### Explicit non-goals (MVP)
 
-- No OpenClaw deployment per user
+- No per-user Hermes (Nous Research) deployment
 - No decryption of App ciphertext
 - No guild-admin visibility into agent outputs (ephemeral by default)
 
@@ -221,7 +223,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 | | Hermes | Alphapy agents |
 |---|--------|----------------|
 | Users | Owner / strategic | All linked users |
-| Host | VPS OpenClaw | Alphapy Railway |
+| Host | VPS (Nous Research) | Alphapy Railway |
 | Memory | Core strategic context | `agent_memory` + sessions |
 | Skills | Platform telemetry | User growth + trading |
 | Trigger | Conversation / cron | `/agent`, API, cron |

@@ -71,7 +71,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 
 ## 🤖 Agent: AlphapyAgents (multi-user closed loop)
 - **Path**: `agents/`, `cogs/agents.py`, `docs/alphapy-agents-architecture.md`
-- **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal Hermes on OpenClaw
+- **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal **Hermes** (Nous Research) on VPS
 - **Commands**: `/agent list`, `/agent start`, `/agent status`
 - **Agents**: `reflection` (journal sync), `trade` (demo trade insight), `full` (both)
 - **Skills**: `journal_sync`, `trade_insight` (extensible via `agents/registry.py`)
