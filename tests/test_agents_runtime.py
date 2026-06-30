@@ -74,7 +74,7 @@ async def test_run_agent_session_local_memory(monkeypatch) -> None:
     async def _fake_ask_gpt(messages, user_id=None, **kwargs):
         return "You are building a steady reflection habit. Keep going."
 
-    monkeypatch.setattr("agents.skills.journal_sync.load_user_reflections", _fake_load_reflections)
+    monkeypatch.setattr("agents.skills.journal_sync.load_agent_reflection_context", _fake_load_reflections)
     monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
 
     result = await run_agent_session(

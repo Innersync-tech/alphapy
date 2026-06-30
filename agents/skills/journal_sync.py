@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from agents.base import AgentContext, BaseAgentSkill
-from gpt.context_loader import load_user_reflections
+from gpt.context_loader import load_agent_reflection_context
 from gpt.helpers import bot_instance
 from utils.db_helpers import get_bot_db_pool
 from utils.engagement_service import get_streak
@@ -19,12 +19,13 @@ class JournalSyncSkill(BaseAgentSkill):
     async def gather(self, ctx: AgentContext) -> str:
         lines: list[str] = []
 
-        reflection_context = await load_user_reflections(ctx.discord_user_id, limit=5)
+        reflection_context = await load_agent_reflection_context(ctx.discord_user_id, limit=5)
         if reflection_context.strip():
             lines.append(reflection_context.strip())
         else:
             lines.append(
-                "No shared reflections available (user may not have linked or opted in)."
+                "No reflections explicitly shared with Alphapy "
+                "(share per entry from the App dashboard)."
             )
 
         if ctx.guild_id is not None:

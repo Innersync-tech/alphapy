@@ -274,7 +274,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Webhooks**:
   - `POST /webhooks/app-reflections`: payload `user_id` (Discord), `reflection_id`, `plaintext_content` (JSONB). Upsert into `app_reflections`. HMAC via `X-Webhook-Signature`; optional secret `APP_REFLECTIONS_WEBHOOK_SECRET`.
   - `POST /webhooks/revoke-reflection`: payload `user_id`, `reflection_id`. DELETE from `app_reflections`. Same signature pattern.
-- **Integration**: `gpt/context_loader.load_user_reflections()` loads from Supabase `reflections_shared` (existing) and from `app_reflections` (last 30 days). Merged into Grok context only for user-self flows (e.g. `/growthcheckin`). Ticket "Suggest reply" calls `ask_gpt(..., include_reflections=False)` so no reflection context is sent there.
+- **Integration**: `load_agent_reflection_context()` for agents (`journal_sync`); only `reflection_alphapy_consent` + matching `app_reflections` / `reflections_shared`. `/growthcheckin` uses `load_user_reflections()` (same consent gate for App data + Discord check-ins).
 
 ---
 
