@@ -103,5 +103,6 @@ If an agent response violates policy in production:
 ## Related docs
 
 - `docs/alphapy-agents-architecture.md` — technical architecture  
+- `Innersync-meta/AGENT-SAFETY-POLICY.md` — **platform-wide** safety standard + Matrix A/B overview  
 - `Innersync-meta/ROADMAP-ALPHAPY-AGENTS.md` — product roadmap  
 - `AGENTS.md` § AlphapyAgents — bot manifest  
