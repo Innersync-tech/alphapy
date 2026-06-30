@@ -220,7 +220,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 - [x] `agents/policy.py` — canonical `AGENT_SAFETY_RULES` system prompt
 - [x] `docs/agents-safety-guidelines.md` — jailbreak test matrix
 - [x] `tests/test_agents_policy.py` — policy marker + assembly tests
-- [ ] Manual jailbreak pass on test bot after each policy change
+- [x] Manual jailbreak pass on test bot (Matrix A1–A7, Innersync Dev, 30 jun 2026)
 
 ---
 
