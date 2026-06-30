@@ -12,6 +12,7 @@ try:
 except ImportError:
     import config  # type: ignore
 
+from agents.base import AgentResult
 from agents.memory import get_active_session
 from agents.registry import list_agents, resolve_agent
 from agents.runtime import run_agent_session
@@ -24,6 +25,28 @@ from utils.sanitizer import safe_embed_text
 logger = logging.getLogger(__name__)
 
 _AGENT_COLOR = 0x5865F2
+
+
+def _agent_response_embed(result: AgentResult) -> discord.Embed:
+    """Build the /agent start reply: user display name as title, agent type in footer."""
+    agent_name = result.agent_name
+    if result.display_name:
+        title = safe_embed_text(result.display_name, 256)
+    else:
+        title = safe_embed_text(agent_name.replace("_", " ").title(), 256)
+
+    footer_parts = [f"Agent: {agent_name}", f"Session {result.session_id[:8]}…"]
+    if result.skill_blocks:
+        skills_used = ", ".join(result.skill_blocks.keys())
+        footer_parts.append(f"skills: {skills_used}")
+
+    embed = discord.Embed(
+        title=title,
+        description=safe_embed_text(result.summary[:4000]),
+        color=_AGENT_COLOR,
+    )
+    embed.set_footer(text=" · ".join(footer_parts))
+    return embed
 
 
 def _agents_globally_enabled() -> bool:
@@ -120,15 +143,9 @@ class AgentGroup(app_commands.Group):
             payload={"agent": agent_name, "session_id": result.session_id},
         )
 
-        embed = discord.Embed(
-            title=f"Agent: {agent_name}",
-            description=safe_embed_text(result.summary[:4000]),
-            color=_AGENT_COLOR,
+        await interaction.followup.send(
+            embed=_agent_response_embed(result), ephemeral=True
         )
-        if result.skill_blocks:
-            skills_used = ", ".join(result.skill_blocks.keys())
-            embed.set_footer(text=f"Session {result.session_id[:8]}… · skills: {skills_used}")
-        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="status", description="Show your active reflection agent session")
     async def status_cmd(self, interaction: discord.Interaction) -> None:

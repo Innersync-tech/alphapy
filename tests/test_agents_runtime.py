@@ -31,9 +31,9 @@ async def test_memory_patch_local_backend(monkeypatch) -> None:
     user_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     assert await get_user_memory(user_id, "reflection") == {}
 
-    updated = await patch_user_memory(user_id, "reflection", {"count": 1})
-    assert updated["count"] == 1
-    assert (await get_user_memory(user_id, "reflection"))["count"] == 1
+    updated = await patch_user_memory(user_id, "reflection", {"session_count": 1, "last_agent": "reflection"})
+    assert updated["session_count"] == 1
+    assert (await get_user_memory(user_id, "reflection"))["session_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -91,6 +91,45 @@ async def test_run_agent_session_local_memory(monkeypatch) -> None:
     stored = await get_user_memory("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "reflection")
     assert "last_summary_preview" not in stored
     assert stored.get("session_count") == 1
+    assert "last_session_at" in stored
+
+
+@pytest.mark.asyncio
+async def test_run_agent_session_includes_agent_profile_prefs(monkeypatch) -> None:
+    import config
+    from agents.memory import clear_local_store
+    from agents.runtime import run_agent_session
+
+    monkeypatch.setattr(config, "ALPHAPY_AGENTS_MEMORY_BACKEND", "memory")
+    clear_local_store()
+
+    async def _fake_load_reflections(discord_id, limit=5):
+        return ""
+
+    async def _fake_load_prefs(user_id):
+        return {"display_name": "Nova", "persona": "calm", "default_focus": "boundaries"}
+
+    captured_messages: list[list[dict]] = []
+
+    async def _fake_ask_gpt(messages, user_id=None, **kwargs):
+        captured_messages.append(messages)
+        return "Hello Nova."
+
+    monkeypatch.setattr("agents.skills.journal_sync.load_agent_reflection_context", _fake_load_reflections)
+    monkeypatch.setattr("agents.runtime.load_agent_prefs", _fake_load_prefs)
+    monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
+
+    await run_agent_session(
+        innersync_user_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        discord_user_id=42,
+        guild_id=1,
+        agent_name="reflection",
+    )
+
+    user_content = captured_messages[0][1]["content"]
+    assert "[agent_profile]" in user_content
+    assert "Nova" in user_content
+    assert "boundaries" in user_content
 
 
 @pytest.mark.asyncio
@@ -134,7 +173,9 @@ async def test_run_agent_session_clears_stale_memory_without_consent(monkeypatch
     user_content = captured_messages[0][1]["content"]
     assert "FUCK" not in user_content
     assert "[memory]" not in user_content
+    assert "Mantra" not in user_content
 
     stored = await get_user_memory(user_id, "reflection")
     assert "last_summary_preview" not in stored
     assert stored.get("session_count") == 4
+    assert "last_session_at" in stored

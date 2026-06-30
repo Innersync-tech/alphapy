@@ -41,10 +41,6 @@ class JournalSyncSkill(BaseAgentSkill):
                         f"Discord engagement streak: {days} day(s), last active {last_day}."
                     )
 
-        memory_notes = ctx.memory.get("journal_notes")
-        if memory_notes:
-            lines.append(f"Agent memory notes: {memory_notes}")
-
         return "\n".join(lines)
 
     async def execute(self, ctx: AgentContext) -> str | None:

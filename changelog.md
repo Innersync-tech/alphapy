@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Agent memory Phase 2.1** — `agents/profile.py`: load Tier 1 prefs from `app_user_settings.agent_prefs`; `[agent_profile]` prompt block; Tier 3-only durable memory (`session_count`, `last_session_at`, `last_session_id`, `last_agent`).
+
 ### Fixed
 - **App reflection share webhook** — `POST /webhooks/app-reflections` accepts canonical Core payload (`user_id` as Discord snowflake, `reflection_id`, `plaintext_content` JSON object). Legacy flat fields still normalized via `webhooks/reflection_payload.py`.
 - **Consent-gated agent context** — `load_agent_reflection_context()` (used by `/agent` + `journal_sync`) only loads `app_reflections` / `reflections_shared` rows with active `reflection_alphapy_consent`; no bulk vault sync.

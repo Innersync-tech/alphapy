@@ -28,6 +28,7 @@ class AgentResult:
     summary: str
     skill_blocks: dict[str, str]
     memory_patch: dict[str, Any] = field(default_factory=dict)
+    display_name: str | None = None
 
 
 @runtime_checkable
