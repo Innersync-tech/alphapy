@@ -1,0 +1,32 @@
+# Canonical Innersync gitleaks config — consumed by META reusable workflow.
+# Copy/adopt: templates/github/secret-scan/README.md
+
+title = "Innersync secret scanning"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders, examples, and low-risk paths"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.env\.sample$''',
+  '''(^|/)templates/github/secret-scan/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.next/''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)pip-audit-report\.json$''',
+]
+regexTarget = "match"
+regexes = [
+  '''(?i)your[_ -]?(discord|secret|token|password|api[_ -]?key|client[_ -]?secret)''',
+  '''(?i)changeme|replace[_ -]?me|insert[_ -]?here''',
+  '''<[A-Z][A-Z0-9_]*>''',
+  '''\$\{[A-Z][A-Z0-9_]*\}''',
+  '''postgresql://user@''',
+  '''1234567890123456''',
+  '''550e8400-e29b-41d4-a716-446655440000''',
+  '''support@innersync\.tech''',
+]
