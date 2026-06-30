@@ -227,4 +227,8 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 | Skills | Platform telemetry | User growth + trading |
 | Trigger | Conversation / cron | `/agent`, API, cron |
 
+## Related docs
+
+- **Product roadmap (META):** `Innersync-meta/ROADMAP-ALPHAPY-AGENTS.md` — naming, multi-turn sessions, open steps, feature phases
+
 **Bridge:** `emit_hermit_event` keeps the existing Hermit closed loop informed without coupling runtimes.
