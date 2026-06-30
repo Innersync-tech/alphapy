@@ -234,7 +234,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 - [ ] `POST /api/agents/run` on `api.py` (Mind/App trigger)
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh
 - [ ] Premium-only agents or higher limits for `yearly`/`lifetime`
-- [ ] GDPR: purge `agent_sessions` / `agent_memory` on user delete webhook
+- [x] GDPR: purge `agent_sessions` / `agent_memory` on user delete webhook
 - [ ] Observability: agent session metrics in telemetry ingest
 
 ### Explicit non-goals (MVP)
