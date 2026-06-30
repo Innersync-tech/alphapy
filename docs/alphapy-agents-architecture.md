@@ -1,3 +1,8 @@
+---
+title: Alphapy Agents — Architecture & MVP Plan
+description: Multi-user Alphapy agents architecture, stack analysis, and MVP plan distinct from the Hermes personal agent.
+---
+
 # Alphapy Agents — Architecture & MVP Plan
 
 Multi-user Alphapy agents that run in a **closed loop** inside the Discord bot (and optionally via API), distinct from the personal **Hermes** agent (Nous Research, VPS).

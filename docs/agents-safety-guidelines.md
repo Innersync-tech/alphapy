@@ -1,3 +1,8 @@
+---
+title: Alphapy Agents — Safety Guidelines
+description: Privacy and safety boundaries for Alphapy agents — what data agents may access and enforcement in code.
+---
+
 # Alphapy Agents — Safety Guidelines
 
 **Policy version:** `agents/policy.py` → `AGENT_POLICY_VERSION`  
