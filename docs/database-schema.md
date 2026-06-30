@@ -867,7 +867,7 @@ One row per `/agent` invocation. Migration: `Innersync_Core/supabase/0020_agent_
 - Multi-turn turns stored in `agent_session_messages` (Core `0023`) while `status = active`; deleted on session end.
 - RLS enabled with zero policies; `anon`/`authenticated` revoked (service role only).
 - App reads completed session rows via service-role API routes; users can delete individual history rows.
-- GDPR purge on user delete: planned (Phase 4).
+- GDPR purge on user delete: `purge_agent_user_data()` via `webhooks/supabase.py` and `/delete_my_data`.
 
 ---
 
@@ -903,6 +903,7 @@ Durable per-user JSON blob per agent type.
 **Notes:**
 - Patched on `/agent end` (Tier 2 distill + Tier 3 metadata). Not on every turn.
 - Same RLS / access pattern as `agent_sessions`.
+- GDPR purge on user delete: `purge_agent_user_data()` via `webhooks/supabase.py` and `/delete_my_data`.
 
 ---
 

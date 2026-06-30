@@ -14,6 +14,7 @@ from discord.ext import commands
 
 import config
 from utils.db_helpers import acquire_safe, is_pool_healthy
+from utils.innersync_identity import get_innersync_id_for_discord
 from utils.logger import logger
 
 
@@ -137,6 +138,18 @@ async def _purge_user_data(pool: asyncpg.Pool, user_id: int) -> None:
                 )
                 logger.info("delete_my_data: anonymized %s in %s (user_id=%s)", result, table, user_id)
 
+    innersync_id = await get_innersync_id_for_discord(pool, user_id)
+    try:
+        from agents.memory import purge_agent_user_data
+
+        await purge_agent_user_data(innersync_id, discord_user_id=user_id)
+    except Exception as exc:
+        logger.error(
+            "delete_my_data: agent memory purge failed for user_id=%s: %s",
+            user_id,
+            exc,
+        )
+
 
 class DeleteMyDataCog(commands.Cog):
     """Provides the /delete_my_data slash command for GDPR self-service erasure."""
@@ -179,6 +192,7 @@ class DeleteMyDataCog(commands.Cog):
                 "• Command audit logs\n"
                 "• Growth check-in reflections\n"
                 "• AI usage records and quota counters\n"
+                "• Agent session history and agent memory (Supabase)\n"
                 "• Automod logs\n"
                 "• Terms acceptance records\n\n"
                 "Your reminders and custom commands created by you will have your ID anonymised.\n\n"

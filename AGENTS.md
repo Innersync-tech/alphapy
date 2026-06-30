@@ -26,7 +26,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Commands**: `/link` (Core link-session URL, rate limited), `/unlink` (Core `POST /integrations/discord/unlink` + Railway sync via webhook), `/profile` (Core bot-profile when configured)
 - **API**: Reminder and dashboard flows resolve JWT `sub` → Discord via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int`; legacy `profiles.discord_id` fallback opt-in). One-off backfill: `scripts/backfill_discord_links_from_profiles.py`
 - **Webhooks**: `POST /webhooks/discord-link` (HMAC `DISCORD_LINK_WEBHOOK_SECRET`) — Core sends `event: link` or `event: unlink`; upserts or deletes `alphapy_discord_links`; may DM the user
-- **GDPR**: `alphapy_discord_links` rows purged with other Railway PII in `webhooks/supabase.py` user delete handler
+- **GDPR**: `alphapy_discord_links` rows purged with other Railway PII in `webhooks/supabase.py` user delete handler; Supabase `agent_sessions` / `agent_memory` purged via `agents/memory.purge_agent_user_data()`
 
 ---
 

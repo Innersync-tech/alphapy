@@ -168,6 +168,15 @@ async def supabase_auth_webhook(request: Request) -> dict[str, str]:
             )
 
     if event_type in {"USER_DELETED", "USER_DESTROYED"} and user_id:
+        try:
+            from agents.memory import purge_agent_user_data
+
+            await purge_agent_user_data(innersync_user_id=user_id)
+        except Exception as exc:
+            logger.error(
+                "GDPR agent purge failed for supabase_user_id=%s: %s", user_id, exc
+            )
+
         discord_id = _extract_discord_id(payload)
         if discord_id is None:
             logger.warning(

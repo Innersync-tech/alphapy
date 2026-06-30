@@ -79,6 +79,104 @@ async def clear_all_user_memory(innersync_user_id: str) -> None:
         response.raise_for_status()
 
 
+async def purge_agent_user_data(
+    innersync_user_id: str | None = None,
+    *,
+    discord_user_id: int | None = None,
+) -> None:
+    """GDPR erasure: remove all agent sessions, messages, and durable memory for a user."""
+    if not innersync_user_id and discord_user_id is None:
+        raise ValueError("purge_agent_user_data requires innersync_user_id and/or discord_user_id")
+
+    if not _use_supabase():
+        _purge_agent_user_data_local(innersync_user_id, discord_user_id=discord_user_id)
+        return
+
+    user_ids = await _collect_innersync_user_ids_for_purge(innersync_user_id, discord_user_id)
+    await _delete_agent_sessions(innersync_user_id, discord_user_id=discord_user_id)
+    for uid in user_ids:
+        await clear_all_user_memory(uid)
+
+    logger.info(
+        "GDPR agent purge complete: innersync_user_id=%s discord_user_id=%s",
+        innersync_user_id,
+        discord_user_id,
+    )
+
+
+def _purge_agent_user_data_local(
+    innersync_user_id: str | None,
+    *,
+    discord_user_id: int | None,
+) -> None:
+    discord_text = str(discord_user_id) if discord_user_id is not None else None
+    target_innersync = {innersync_user_id.lower()} if innersync_user_id else set()
+
+    for session_id, row in list(_local_sessions.items()):
+        row_innersync = str(row.get("innersync_user_id", "")).lower()
+        row_discord = str(row.get("discord_user_id", ""))
+        if (
+            (innersync_user_id and row_innersync == innersync_user_id.lower())
+            or (discord_text and row_discord == discord_text)
+        ):
+            target_innersync.add(row_innersync)
+            _local_sessions.pop(session_id, None)
+            _local_session_messages.pop(session_id, None)
+
+    for uid in target_innersync:
+        prefix = f"{uid}:"
+        for key in list(_local_memory.keys()):
+            if key.startswith(prefix):
+                _local_memory.pop(key, None)
+
+
+async def _collect_innersync_user_ids_for_purge(
+    innersync_user_id: str | None,
+    discord_user_id: int | None,
+) -> set[str]:
+    ids: set[str] = set()
+    if innersync_user_id:
+        ids.add(innersync_user_id)
+
+    if discord_user_id is None:
+        return ids
+
+    rows = await _supabase_get(
+        _SESSIONS_TABLE,
+        {
+            "select": "innersync_user_id",
+            "discord_user_id": f"eq.{discord_user_id}",
+        },
+    )
+    for row in rows:
+        uid = row.get("innersync_user_id")
+        if uid:
+            ids.add(str(uid))
+    return ids
+
+
+async def _delete_agent_sessions(
+    innersync_user_id: str | None,
+    *,
+    discord_user_id: int | None,
+) -> None:
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_SESSIONS_TABLE}"
+    if innersync_user_id:
+        params = {"innersync_user_id": f"eq.{innersync_user_id}"}
+    elif discord_user_id is not None:
+        params = {"discord_user_id": f"eq.{discord_user_id}"}
+    else:
+        return
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.delete(
+            url,
+            headers=_headers(prefer=["return=minimal"]),
+            params=params,
+        )
+        response.raise_for_status()
+
+
 async def clear_derived_memory(innersync_user_id: str, agent_name: str) -> dict[str, Any]:
     """Remove Tier 2 derived profile; keep Tier 3 operational metadata."""
     current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
