@@ -46,6 +46,22 @@ async def test_fetch_active_consent_reflection_ids_on_error(
 
 
 @pytest.mark.asyncio
+async def test_fetch_active_consent_reflection_ids_without_revoked_at_column(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prod schemas without revoked_at should still return consent rows."""
+
+    async def _fake_get(table: str, params: dict | None = None) -> list[dict]:
+        if params and "revoked_at" in params:
+            raise RuntimeError("column reflection_alphapy_consent.revoked_at does not exist")
+        return [{"reflection_id": "r1"}]
+
+    monkeypatch.setattr(cl, "_supabase_get", _fake_get)
+    ids = await cl._fetch_active_consent_reflection_ids("user-uuid")
+    assert ids == frozenset({"r1"})
+
+
+@pytest.mark.asyncio
 async def test_load_consented_reflections_shared_formats_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
