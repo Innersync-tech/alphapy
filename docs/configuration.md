@@ -238,7 +238,7 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment (Railway env). Per-guil
 /config agents toggle <true|false>
 ```
 
-When enabled, linked members can use `/agent list`, `/agent start`, and `/agent status`.
+When enabled, linked members can use `/agent list`, `/agent start`, `/agent continue`, `/agent end`, and `/agent status`.
 
 Optional env vars:
 

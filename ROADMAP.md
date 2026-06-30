@@ -14,7 +14,19 @@ This document outlines the evolution from v3.9.0 forward.
 - **Safety**: `agents/policy.py`, Matrix A manual probes passed on Innersync Dev
 - **Cross-repo**: [Innersync-meta/AGENT-SAFETY-POLICY.md](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md), [ROADMAP-ALPHAPY-AGENTS.md](https://github.com/Innersync-tech/Innersync-meta/blob/main/ROADMAP-ALPHAPY-AGENTS.md)
 
-**Next (Phase 2):** agent display name, multi-turn sessions, GDPR purge on user delete.
+**Next (Phase 3+):** skills expansion, GDPR purge on user delete, App agent runs (Phase 4.0).
+
+---
+
+## ✅ COMPLETED: Agent Memory & Conversation (v3.10.0 — Phases 2.1–2.3)
+
+**Status:** ✅ **Shipped** (30 jun 2026) — Alphapy [#255–#257](https://github.com/Innersync-tech/alphapy/pulls?q=is%3Apr+agent+memory), App [#101–#106](https://github.com/Innersync-tech/innersync-dashboard/pulls?q=is%3Apr+agent), Core [#58–#59](https://github.com/Innersync-tech/Innersync_Core/pulls?q=0022+OR+0023)
+
+- **Tier 1 prefs** — `display_name`, persona, focus via App `agent_prefs`
+- **Tier 2 derived profile** — consent-gated distill; purge on revoke
+- **Tier 3 metadata** — `session_count`, `last_session_at` (no journal text)
+- **Multi-turn** — `/agent start` → `/agent continue` → `/agent end`; `agent_session_messages` (Core `0023`)
+- **App** — Settings hub; Alphapy section (sharing + agent memory); session history with per-row delete
 
 ---
 

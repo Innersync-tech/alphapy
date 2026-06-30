@@ -95,7 +95,7 @@ alphapy/agents/
   skills/
     journal_sync.py
     trade_insight.py   # dormant — not registered until product decision
-cogs/agents.py     /agent list|start|status
+cogs/agents.py     /agent list|start|continue|end|status
 ```
 
 ---
@@ -105,8 +105,10 @@ cogs/agents.py     /agent list|start|status
 | Command | Behavior |
 |---------|----------|
 | `/agent list` | Lists registered agents (`reflection`) |
-| `/agent start [message]` | Runs reflection closed loop; ephemeral response |
-| `/agent status` | Shows active reflection session if any |
+| `/agent start [message]` | First turn; session stays `active` |
+| `/agent continue <message>` | Append a turn using session message history |
+| `/agent end` | Distill Tier 2, patch Tier 3, complete session, delete ephemeral messages |
+| `/agent status` | Active session start time + turn count |
 
 **Gates:**
 
@@ -146,7 +148,16 @@ ALPHAPY_AGENTS_MEMORY_BACKEND=memory   # no Supabase migration needed
 
 ## 5. Supabase schema (sessions + memory)
 
-Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
+Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_agent_session_messages.sql` for multi-turn)
+
+### Session model (Phase 2.3)
+
+1. `/agent start` → `create_session` (status `active`) → first LLM turn → rows in `agent_session_messages`
+2. `/agent continue` → load message history → LLM → append turn
+3. `/agent end` → Tier 2 distill (if consented) → `patch_user_memory` (Tier 3) → `complete_session` → delete `agent_session_messages`
+4. `emit_hermit_event(gpt_command)` fires on **end**, not on start
+
+`run_agent_session(finalize=True)` remains for tests — start + end in one call.
 
 ### `agent_sessions`
 
@@ -158,7 +169,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 | `guild_id` | text nullable | Multi-guild scope |
 | `agent_name` | text | e.g. `reflection` |
 | `status` | text | `active`, `completed`, `failed` |
-| `summary` | text nullable | LLM output preview |
+| `summary` | text nullable | Tier-2-conform distilled labels only (not raw LLM text) |
 | `memory_patch` | jsonb | Delta applied this session |
 | `metadata` | jsonb | Source, skill flags |
 | `started_at` / `completed_at` / `updated_at` | timestamptz | Audit |
@@ -168,10 +179,22 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 | Column | Type | Notes |
 |--------|------|-------|
 | `innersync_user_id` + `agent_name` | unique | One blob per user per agent |
-| `memory` | jsonb | Durable facts, last themes, preferences |
+| `memory` | jsonb | Tier 1 prefs (via App), Tier 2 `derived_profile`, Tier 3 operational metadata |
 | `updated_at` | timestamptz | |
 
-**RLS:** Same deny-by-default pattern as `hermit_*` tables — service role only; Alphapy uses `SUPABASE_SERVICE_ROLE_KEY`.
+### `agent_session_messages` (Core `0023`)
+
+Ephemeral multi-turn working memory. Rows cascade-delete when the parent session ends.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `session_id` | uuid FK | References `agent_sessions.id` |
+| `turn_index` | int | 0-based turn number |
+| `role` | text | `user` or `assistant` |
+| `content` | text | Prompt/response for that turn |
+| `created_at` | timestamptz | |
+
+**RLS:** Service role only (same pattern as `agent_sessions`).
 
 ---
 

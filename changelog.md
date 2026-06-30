@@ -4,19 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Added
-- **Agent memory Phase 2.1** — `agents/profile.py`: load Tier 1 prefs from `app_user_settings.agent_prefs`; `[agent_profile]` prompt block; Tier 3-only durable memory (`session_count`, `last_session_at`, `last_session_id`, `last_agent`).
-- **Agent memory Phase 2.2** — `agents/tier2.py`: consent-gated distill pipeline (schema validation, blocklist, confidence threshold); `derived_profile` in `agent_memory`; Tier 2 purge on `revoke-reflection` webhook; session summaries store distilled labels only.
-- **Agent memory Phase 2.3** — Multi-turn Discord sessions: `/agent continue`, `/agent end`; ephemeral `agent_session_messages`; Tier 2 distill + Tier 3 patch on session end only.
-
 ### Fixed
 - **App reflection share webhook** — `POST /webhooks/app-reflections` accepts canonical Core payload (`user_id` as Discord snowflake, `reflection_id`, `plaintext_content` JSON object). Legacy flat fields still normalized via `webhooks/reflection_payload.py`.
 - **Consent-gated agent context** — `load_agent_reflection_context()` (used by `/agent` + `journal_sync`) only loads `app_reflections` / `reflections_shared` rows with active `reflection_alphapy_consent`; no bulk vault sync.
 - **`reflection_alphapy_consent` schema drift** — `_fetch_active_consent_reflection_ids()` retries without `revoked_at` filter when column missing (pre-migration 0021).
 - **Agent memory privacy** — durable `agent_memory` no longer stores journal plaintext previews; consent revoke + bot-sharing toggle purge agent memory for the user.
 
+## [3.10.0] - 2026-06-30
+
+### Added
+- **Agent memory Phase 2.1** — `agents/profile.py`: Tier 1 prefs from `app_user_settings.agent_prefs`; `[agent_profile]` prompt block; Tier 3-only durable memory (`session_count`, `last_session_at`, `last_session_id`, `last_agent`).
+- **Agent memory Phase 2.2** — `agents/tier2.py`: consent-gated distill pipeline (schema validation, blocklist, confidence threshold); `derived_profile` in `agent_memory`; Tier 2 purge on `revoke-reflection` webhook; session summaries store distilled labels only.
+- **Agent memory Phase 2.3** — Multi-turn Discord sessions: `/agent continue`, `/agent end`; ephemeral `agent_session_messages` (Core `0023`); Tier 2 distill + Tier 3 patch on session end only; Hermit `gpt_command` on `/agent end`.
+
 ### Changed
 - **`/agent` reflection skill** — `journal_sync` loads opt-in shared reflections only (not encrypted App vault); engagement streaks unchanged.
+- **`/agent start`** — Opens a multi-turn session (status stays `active` until `/agent end`); blocks duplicate starts while a session is active.
+- **Agent embeds** — User `display_name` as title; agent type and turn count in footer.
 
 ## [3.9.0] - 2026-06-30
 

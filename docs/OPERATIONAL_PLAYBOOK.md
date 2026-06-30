@@ -67,8 +67,10 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment and `/config agents tog
 
 - [ ] `/link` completes for a test user
 - [ ] `/agent list` shows `reflection`
-- [ ] `/agent start message:Hello` returns ephemeral embed with session id in footer
-- [ ] Row appears in Supabase `agent_sessions` (status `completed`)
+- [ ] `/agent start message:Hello` returns ephemeral embed; session stays `active`
+- [ ] `/agent continue message:Follow up` returns second turn; footer shows turn count
+- [ ] `/agent end` completes session; row in `agent_sessions` has status `completed`
+- [ ] Core `0023` applied: `agent_session_messages` empty after end (ephemeral purge)
 - [ ] Optional: run Matrix A probes from [agents-safety-guidelines.md](agents-safety-guidelines.md)
 
 ## Troubleshooting reminders

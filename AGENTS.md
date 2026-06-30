@@ -72,14 +72,14 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ## 🤖 Agent: AlphapyAgents (multi-user closed loop)
 - **Path**: `agents/`, `cogs/agents.py`, `docs/alphapy-agents-architecture.md`
 - **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal **Hermes** (Nous Research) on VPS
-- **Commands**: `/agent list`, `/agent start`, `/agent status`
+- **Commands**: `/agent list`, `/agent start`, `/agent continue`, `/agent end`, `/agent status`
 - **Admin config**: `/config agents show`, `/config agents toggle`
 - **Safety policy**: `agents/policy.py` (`AGENT_SAFETY_RULES` + `build_agent_system_prompt()`); see `docs/agents-safety-guidelines.md` and [Innersync-meta AGENT-SAFETY-POLICY](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md)
 - **Agents**: `reflection` (journal sync; trade agents deferred)
 - **Skills**: `journal_sync` (`trade_insight` skill file kept dormant for later)
-- **Memory**: Supabase `agent_sessions` + `agent_memory` (service role); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
+- **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
-- **Events**: `emit_hermit_event(gpt_command)` after each session for closed-loop Hermit integration
+- **Events**: `emit_hermit_event(gpt_command)` on `/agent end` (one per completed multi-turn session)
 
 ---
 
