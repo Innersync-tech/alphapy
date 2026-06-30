@@ -4,8 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Added
-- (No changes yet)
+### Fixed
+- **App reflection share webhook** — `POST /webhooks/app-reflections` accepts canonical Core payload (`user_id` as Discord snowflake, `reflection_id`, `plaintext_content` JSON object). Legacy flat fields still normalized via `webhooks/reflection_payload.py`.
+- **Consent-gated agent context** — `load_agent_reflection_context()` (used by `/agent` + `journal_sync`) only loads `app_reflections` / `reflections_shared` rows with active `reflection_alphapy_consent`; no bulk vault sync.
+- **`reflection_alphapy_consent` schema drift** — `_fetch_active_consent_reflection_ids()` retries without `revoked_at` filter when column missing (pre-migration 0021).
+- **Agent memory privacy** — durable `agent_memory` no longer stores journal plaintext previews; consent revoke + bot-sharing toggle purge agent memory for the user.
+
+### Changed
+- **`/agent` reflection skill** — `journal_sync` loads opt-in shared reflections only (not encrypted App vault); engagement streaks unchanged.
 
 ## [3.9.0] - 2026-06-30
 
