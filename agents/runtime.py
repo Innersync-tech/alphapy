@@ -12,15 +12,15 @@ from agents.memory import (
     patch_user_memory,
     strip_sensitive_memory_keys,
 )
+from agents.policy import (
+    build_agent_system_prompt,
+    build_agent_user_message,
+)
 from agents.profile import (
     build_agent_profile_block,
     extract_tier3_memory,
     load_agent_prefs,
     tier3_memory_patch,
-)
-from agents.policy import (
-    build_agent_system_prompt,
-    build_agent_user_message,
 )
 from agents.registry import resolve_agent
 from gpt.helpers import ask_gpt

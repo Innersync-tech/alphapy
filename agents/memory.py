@@ -13,6 +13,7 @@ try:
 except ImportError:
     import config  # type: ignore
 
+from agents.profile import TIER3_FIELDS
 from utils.supabase_client import (
     SupabaseConfigurationError,
     _headers,
@@ -20,8 +21,6 @@ from utils.supabase_client import (
     _supabase_get,
     _supabase_post,
 )
-
-from agents.profile import TIER3_FIELDS
 
 logger = logging.getLogger("alphapy.agents.memory")
 
