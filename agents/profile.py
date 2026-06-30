@@ -10,6 +10,7 @@ from utils.supabase_client import _supabase_get
 logger = logging.getLogger("alphapy.agents.profile")
 
 TIER1_FIELDS = frozenset({"display_name", "persona", "default_focus", "language_pref"})
+TIER1_BOOL_FIELDS = frozenset({"learn_from_shared"})
 TIER3_FIELDS = frozenset({"session_count", "last_session_at", "last_session_id", "last_agent"})
 
 PERSONA_DESCRIPTIONS: dict[str, str] = {
@@ -23,11 +24,11 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def normalize_agent_prefs(raw: Any) -> dict[str, str]:
+def normalize_agent_prefs(raw: Any) -> dict[str, str | bool]:
     """Return sanitized Tier 1 prefs from JSON."""
     if not isinstance(raw, dict):
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, str | bool] = {}
     for key in TIER1_FIELDS:
         value = raw.get(key)
         if value is None:
@@ -35,13 +36,23 @@ def normalize_agent_prefs(raw: Any) -> dict[str, str]:
         text = str(value).strip()
         if text:
             out[key] = text[:500] if key == "default_focus" else text[:120]
-    persona = out.get("persona", "").lower()
-    if persona and persona not in PERSONA_DESCRIPTIONS:
+    persona = out.get("persona", "")
+    if isinstance(persona, str) and persona.lower() and persona.lower() not in PERSONA_DESCRIPTIONS:
         out["persona"] = "calm"
+    if "learn_from_shared" in raw:
+        out["learn_from_shared"] = bool(raw.get("learn_from_shared"))
     return out
 
 
-async def load_agent_prefs(innersync_user_id: str) -> dict[str, str]:
+def learn_from_shared_enabled(prefs: dict[str, str | bool]) -> bool:
+    """Whether Tier 2 distill is allowed for this user."""
+    value = prefs.get("learn_from_shared")
+    if value is None:
+        return False
+    return bool(value)
+
+
+async def load_agent_prefs(innersync_user_id: str) -> dict[str, str | bool]:
     """Load Tier 1 prefs from App settings (service role)."""
     try:
         rows = await _supabase_get(
@@ -68,27 +79,47 @@ def extract_tier3_memory(memory: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_agent_profile_block(
-    prefs: dict[str, str],
+    prefs: dict[str, str | bool],
     tier3: dict[str, Any],
+    *,
+    derived_profile: dict[str, Any] | None = None,
 ) -> str:
     """Format [agent_profile] context for the LLM (no journal text)."""
     lines: list[str] = []
 
     display_name = prefs.get("display_name")
-    if display_name:
+    if isinstance(display_name, str) and display_name:
         lines.append(f"Preferred agent name: {display_name}")
 
-    persona = prefs.get("persona", "").lower()
-    if persona in PERSONA_DESCRIPTIONS:
-        lines.append(f"Tone: {persona} ({PERSONA_DESCRIPTIONS[persona]})")
+    persona = prefs.get("persona", "")
+    if isinstance(persona, str) and persona.lower() in PERSONA_DESCRIPTIONS:
+        lines.append(f"Tone: {persona.lower()} ({PERSONA_DESCRIPTIONS[persona.lower()]})")
 
     default_focus = prefs.get("default_focus")
-    if default_focus:
+    if isinstance(default_focus, str) and default_focus:
         lines.append(f"Default reflection focus: {default_focus}")
 
     language_pref = prefs.get("language_pref")
-    if language_pref:
+    if isinstance(language_pref, str) and language_pref:
         lines.append(f"Preferred language: {language_pref}")
+
+    if derived_profile:
+        insights = derived_profile.get("insights") or []
+        if insights:
+            lines.append("Remembered patterns (generalized, not journal quotes):")
+            for ins in insights[:8]:
+                if not isinstance(ins, dict):
+                    continue
+                label = ins.get("label")
+                itype = ins.get("type")
+                if label:
+                    lines.append(f"- {label}" + (f" ({itype})" if itype else ""))
+        themes = derived_profile.get("active_themes") or []
+        if themes:
+            lines.append("Active themes: " + ", ".join(str(t) for t in themes[:6]))
+        loops = derived_profile.get("open_loops") or []
+        if loops:
+            lines.append("Open loops: " + "; ".join(str(loop) for loop in loops[:3]))
 
     session_count = tier3.get("session_count")
     if session_count is not None:

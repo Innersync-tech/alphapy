@@ -109,6 +109,30 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
         reflection_id,
         count,
     )
+
+    from agents.memory import purge_tier2_for_reflection
+    from utils.innersync_identity import get_innersync_id_for_discord
+
+    innersync_user_id = await get_innersync_id_for_discord(
+        pool,
+        int(discord_user_id),
+        allow_profile_fallback=True,
+    )
+    if innersync_user_id:
+        try:
+            await purge_tier2_for_reflection(
+                innersync_user_id,
+                "reflection",
+                str(reflection_id),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Tier 2 purge after revoke failed user=%s reflection=%s: %s",
+                innersync_user_id,
+                reflection_id,
+                exc,
+            )
+
     forward_revoke_reflection(
         {"user_id": discord_user_id, "reflection_id": reflection_id}
     )
