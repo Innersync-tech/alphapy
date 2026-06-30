@@ -4,6 +4,30 @@ All notable releases of Alphapy will be documented in this file.
 
 ---
 
+## [3.9.0] - 2026-06-30 - "Reflection Loop"
+
+### Minor Release: Alphapy Agents MVP + Safety Policy
+
+Multi-user personal agents for linked Innersync users, with explicit privacy boundaries and jailbreak-tested safety policy.
+
+#### What's New
+- **Alphapy Agents**: `/agent list`, `/agent start`, `/agent status` for the `reflection` agent (journal sync + streaks)
+- **Guild admin**: `/config agents show`, `/config agents toggle` (requires `ALPHAPY_AGENTS_ENABLED=true` on deployment)
+- **Supabase memory**: `agent_sessions` + `agent_memory` (Core `0020` migration)
+- **Safety policy**: `agents/policy.py` — no decryption of App journals; UNTRUSTED skill context; Matrix A jailbreak probes passed on test bot
+- **Docs**: `docs/alphapy-agents-architecture.md`, `docs/agents-safety-guidelines.md`, `/agent` in `docs/commands.md`
+
+#### Security & Reliability
+- Webhook HMAC fail-closed in production / strict mode
+- Embed injection hardening (`safe_embed_text` on additional user-controlled fields)
+- `pip-audit` in CI
+- Premium verify path fix (`/api/premium/verify`)
+
+#### Deferred
+- `trade` agent and `trade_insight` skill (product decision pending)
+
+---
+
 ## [3.8.0] - 2026-05-25 - "Enterprise Ready"
 
 ### Minor Release: Innersync Identity, Hermit Context, and Hot-Path Caching

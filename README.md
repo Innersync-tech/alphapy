@@ -10,7 +10,7 @@ Modular Discord bot for conscious communities: server tools, AI coaching, knowle
 
 Alphapy powers the **Innersync • Alphapips** community with:
 
-- **AI:** growth coaching (`/growthcheckin`), topic learning (`/learn_topic`), captions (`/create_caption`)
+- **AI:** growth coaching (`/growthcheckin`), topic learning (`/learn_topic`), captions (`/create_caption`), **personal agents** (`/agent`)
 - **Tickets:** support channels with claim/close, Grok summaries, FAQ suggestions
 - **Reminders:** one-off and recurring, including auto-detection from announcement embeds
 - **Infra:** PostgreSQL (Supabase), Alembic migrations, FastAPI metrics, pytest
@@ -42,7 +42,8 @@ alphapy/
 ├── bot.py              # Entrypoint
 ├── api.py              # FastAPI (health, metrics, reminders API)
 ├── config.py
-├── cogs/               # Slash commands & features (growth, learn, ticketbot, reminders, …)
+├── cogs/               # Slash commands & features (growth, learn, ticketbot, reminders, agents, …)
+├── agents/             # Multi-user agent runtime (reflection, skills, policy, memory)
 ├── utils/              # DB, metrics, timezone, drive_sync, …
 ├── gpt/                # Grok/LLM helpers, dataset_loader (learn_topic)
 ├── tests/
@@ -59,6 +60,7 @@ alphapy/
 |----------|----------|
 | `BOT_TOKEN` | `GROK_API_KEY` / `OPENAI_API_KEY` |
 | `DATABASE_URL` | `GOOGLE_CREDENTIALS_JSON` (Drive, optional) |
+| | `ALPHAPY_AGENTS_ENABLED`, `ALPHAPY_AGENTS_MEMORY_BACKEND` (agents) |
 | | `API_KEY` (API auth), Supabase vars, ticket/reminder config |
 
 Full list and multi-guild setup: [docs/configuration.md](docs/configuration.md).  
@@ -67,6 +69,11 @@ Google Drive credentials: [docs/GOOGLE_CREDENTIALS_SETUP.md](docs/GOOGLE_CREDENT
 ---
 
 ## Features (summary)
+
+### AI & personal agents
+
+- **Growth check-in:** `/growthcheckin` — Grok coaching with optional reflection context
+- **Alphapy Agents:** `/agent start` — personal reflection agent for linked users (`/link` required); guild enable via `/config agents toggle`. See [docs/alphapy-agents-architecture.md](docs/alphapy-agents-architecture.md) and [docs/agents-safety-guidelines.md](docs/agents-safety-guidelines.md).
 
 ### System & Information
 

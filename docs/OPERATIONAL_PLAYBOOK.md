@@ -12,6 +12,7 @@ Quick checklist and verification steps after adding the bot to a new server.
 - **Multi-guild configuration** (required channels, feature config): [configuration.md](configuration.md)
 - **Reminders** (one-off vs recurring, embed watcher): [AGENTS.md](../AGENTS.md) (EmbedReminderWatcher, ReminderManager)
 - **Ticket system**: [AGENTS.md](../AGENTS.md) and [configuration.md](configuration.md)
+- **Alphapy Agents**: [alphapy-agents-architecture.md](alphapy-agents-architecture.md), [agents-safety-guidelines.md](agents-safety-guidelines.md)
 
 ## Pre-flight checklist
 
@@ -59,6 +60,16 @@ After starting the bot, confirm in the logs:
 
 - Restart the bot within the same minute window of a scheduled send.
 - Verify only one send occurs (duplicates prevented via `last_sent_at`).
+
+### 6. Alphapy Agents (if enabled)
+
+Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment and `/config agents toggle true` in the guild.
+
+- [ ] `/link` completes for a test user
+- [ ] `/agent list` shows `reflection`
+- [ ] `/agent start message:Hello` returns ephemeral embed with session id in footer
+- [ ] Row appears in Supabase `agent_sessions` (status `completed`)
+- [ ] Optional: run Matrix A probes from [agents-safety-guidelines.md](agents-safety-guidelines.md)
 
 ## Troubleshooting reminders
 
