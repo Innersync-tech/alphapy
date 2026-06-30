@@ -206,13 +206,14 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 | Encrypted journals | Only `load_user_reflections` / opt-in plaintext paths — never decrypt in bot |
 | Prompt injection | `safe_prompt` on skill blocks; mark external context as untrusted (same as Hermit) |
 | GPT abuse | Existing `check_and_increment_gpt_quota` inside `ask_gpt` |
+| Agent session abuse | `check_and_increment_agent_session_quota` on `/agent start` (free: 10/day, monthly: 25/day) |
 | Guild blast radius | `agents.enabled` off by default per guild |
 | API (future) | `verify_api_key` + Core JWT user resolution; per-user rate limit table |
 | Premium | Higher GPT limits via existing tiers; optional `agents.premium_only` setting later |
 | PII retention | Session `summary` capped at 4k chars; GDPR purge hook on user delete (extend `webhooks/supabase.py`) |
 | Transport | HTTPS + service role; no client-side Supabase keys in bot |
 
-**Rate limit sketch (post-MVP):** `agent_invocations` table or Redis counter: `max 10 sessions/user/day` on free tier.
+**Rate limit (shipped):** `agent_session_usage` table (Railway migration 024): free 10 starts/user/day, monthly 25, yearly/lifetime unlimited.
 
 ---
 

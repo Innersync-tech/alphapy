@@ -28,3 +28,11 @@ REMINDER_LIMIT: dict[str, int | None] = {
     "yearly": None,
     "lifetime": None,
 }
+
+# Daily /agent start cap per Discord user. None means unlimited.
+AGENT_DAILY_SESSION_LIMIT: dict[str, int | None] = {
+    "free": 10,
+    "monthly": 25,
+    "yearly": None,
+    "lifetime": None,
+}

@@ -45,6 +45,7 @@ async def _purge_railway_data(pool, discord_id: int, supabase_user_id: str) -> N
         ("terms_acceptance", "user_id"),
         ("gdpr_acceptance", "user_id"),      # GDPR button acceptance record
         ("gpt_usage", "user_id"),             # daily GPT quota counters
+        ("agent_session_usage", "user_id"),   # daily /agent start counters
         ("automod_logs", "user_id"),
         ("automod_user_history", "user_id"),
         ("app_reflections", "user_id"),

@@ -515,3 +515,76 @@ async def check_and_increment_gpt_quota(
     except Exception as e:
         logger.warning("GPT quota: DB check failed for user %s — failing open: %s", user_id, e)
         return True, 0, limit
+
+
+# ---------------------------------------------------------------------------
+# Agent session daily quota (/agent start)
+# ---------------------------------------------------------------------------
+
+async def _tier_for_agent_quota(user_id: int, guild_id: int | None) -> str:
+    """Resolve premium tier for agent session limits (global per user per day)."""
+    if guild_id is not None:
+        return await get_user_tier(user_id, guild_id)
+    active_guild = await get_active_premium_guild(user_id)
+    if active_guild is not None:
+        return await get_user_tier(user_id, active_guild)
+    return "free"
+
+
+async def check_and_increment_agent_session_quota(
+    user_id: int,
+    guild_id: int | None = None,
+) -> tuple[bool, int, int | None]:
+    """
+    Check whether the user may start another agent session today and increment if so.
+
+    Returns (allowed, current_count, limit).
+    - limit=None → unlimited tier (always allowed).
+
+    Fails open on DB error.
+    """
+    from utils.premium_tiers import AGENT_DAILY_SESSION_LIMIT
+
+    tier = await _tier_for_agent_quota(user_id, guild_id)
+    limit = AGENT_DAILY_SESSION_LIMIT.get(tier)
+
+    if limit is None:
+        return True, 0, None
+
+    pool = await _ensure_pool()
+    if pool is None:
+        logger.warning(
+            "Agent session quota: DB pool unavailable — failing open for user %s", user_id
+        )
+        return True, 0, limit
+
+    try:
+        async with acquire_safe(pool) as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO agent_session_usage (user_id, usage_date, session_count)
+                VALUES ($1, CURRENT_DATE, 1)
+                ON CONFLICT (user_id, usage_date)
+                DO UPDATE SET session_count = agent_session_usage.session_count + 1
+                RETURNING session_count
+                """,
+                user_id,
+            )
+            count = row["session_count"] if row else 1
+        if count > limit:
+            async with acquire_safe(pool) as conn:
+                await conn.execute(
+                    """
+                    UPDATE agent_session_usage
+                    SET session_count = session_count - 1
+                    WHERE user_id = $1 AND usage_date = CURRENT_DATE
+                    """,
+                    user_id,
+                )
+            return False, count - 1, limit
+        return True, count, limit
+    except Exception as e:
+        logger.warning(
+            "Agent session quota: DB check failed for user %s — failing open: %s", user_id, e
+        )
+        return True, 0, limit

@@ -50,6 +50,15 @@ class NoActiveAgentSessionError(ValueError):
     """Raised when continuing or ending without an active session."""
 
 
+class AgentSessionQuotaExceededError(ValueError):
+    """Raised when the user has reached their daily /agent start limit."""
+
+    def __init__(self, count: int, limit: int) -> None:
+        self.count = count
+        self.limit = limit
+        super().__init__(f"Daily agent session limit reached ({count}/{limit})")
+
+
 async def _build_skill_context(ctx: AgentContext) -> dict[str, str]:
     agent = resolve_agent(ctx.agent_name)
     if agent is None:
@@ -236,6 +245,15 @@ async def start_agent_session(
             f"Active session already exists for agent {agent_name!r}. "
             "Use /agent continue or /agent end first."
         )
+
+    from utils.premium_guard import check_and_increment_agent_session_quota
+
+    allowed, _count, limit = await check_and_increment_agent_session_quota(
+        discord_user_id,
+        guild_id,
+    )
+    if not allowed and limit is not None:
+        raise AgentSessionQuotaExceededError(_count, limit)
 
     prefs, tier3, derived_profile, _prior_session_count = await _load_durable_state(
         innersync_user_id,

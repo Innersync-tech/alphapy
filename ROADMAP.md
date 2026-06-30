@@ -14,7 +14,7 @@ This document outlines the evolution from v3.9.0 forward.
 - **Safety**: `agents/policy.py`, Matrix A manual probes passed on Innersync Dev
 - **Cross-repo**: [Innersync-meta/AGENT-SAFETY-POLICY.md](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md), [ROADMAP-ALPHAPY-AGENTS.md](https://github.com/Innersync-tech/Innersync-meta/blob/main/ROADMAP-ALPHAPY-AGENTS.md)
 
-**Next (Phase 3+):** skills expansion, App agent runs (Phase 4.0). **Phase 4 GDPR purge** for agent Supabase tables shipped in Unreleased.
+**Next (Phase 3+):** skills expansion, App agent runs (Phase 4.0). **Phase 4 GDPR purge** and **agent session rate limits** shipped in Unreleased.
 
 ---
 

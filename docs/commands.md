@@ -725,7 +725,7 @@ Start a multi-turn reflection agent session (first turn).
 
 **Permissions:** Linked Innersync users only (ephemeral)
 
-**Note:** Blocked if you already have an active session — use `/agent continue` or `/agent end` first.
+**Note:** Blocked if you already have an active session — use `/agent continue` or `/agent end` first. Free tier: up to **10** `/agent start` calls per user per day; monthly **25**; yearly/lifetime unlimited. `/agent continue` does not count toward the cap.
 
 ---
 

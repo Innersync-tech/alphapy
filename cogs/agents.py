@@ -17,6 +17,7 @@ from agents.memory import get_active_session, get_session_messages
 from agents.registry import list_agents, resolve_agent
 from agents.runtime import (
     ActiveAgentSessionError,
+    AgentSessionQuotaExceededError,
     NoActiveAgentSessionError,
     continue_agent_session,
     end_agent_session,
@@ -141,6 +142,13 @@ class AgentGroup(app_commands.Group):
             await interaction.followup.send(
                 "You already have an active session. Use `/agent continue` to add a turn "
                 "or `/agent end` to finish.",
+                ephemeral=True,
+            )
+            return
+        except AgentSessionQuotaExceededError as exc:
+            await interaction.followup.send(
+                f"You've reached your daily limit of **{exc.limit}** agent sessions. "
+                "Try again tomorrow or upgrade for more: `/premium`",
                 ephemeral=True,
             )
             return
