@@ -76,7 +76,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Admin config**: `/config agents show`, `/config agents toggle`
 - **Safety policy**: `agents/policy.py` (`AGENT_SAFETY_RULES` + `build_agent_system_prompt()`); see `docs/agents-safety-guidelines.md` and [Innersync-meta AGENT-SAFETY-POLICY](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md)
 - **Agents**: `reflection` (journal sync; trade agents deferred)
-- **Skills**: `journal_sync` (`trade_insight` skill file kept dormant for later)
+- **Skills**: `inner_voice`, `journal_sync` (`trade_insight` skill file kept dormant for later)
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
 - **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`

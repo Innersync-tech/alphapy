@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Agent session rate limits** — `agent_session_usage` table (migration 024); `check_and_increment_agent_session_quota()` enforces tier caps on `/agent start` (free: 10/day, monthly: 25/day, yearly/lifetime: unlimited).
+- **`inner_voice` agent skill** — Tier 1 `agent_prefs.inner_voice` (App Settings) injected as untrusted context on `/agent` reflection sessions; registered alongside `journal_sync`.
 
 ### Fixed
 - **GDPR agent purge** — `purge_agent_user_data()` removes Supabase `agent_sessions`, `agent_session_messages` (cascade), and `agent_memory` on Supabase `USER_DELETED` webhook and `/delete_my_data` (Phase 4).

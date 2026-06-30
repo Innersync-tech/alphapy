@@ -132,6 +132,7 @@ cogs/agents.py     /agent list|start|continue|end|status
 See starter implementation:
 
 - `agents/base.py` — `AgentSkill` protocol, `AgentContext`, `BaseAgent`
+- `agents/skills/inner_voice.py` — optional Tier 1 `inner_voice` pref from App agent settings
 - `agents/skills/journal_sync.py` — reflections via `load_user_reflections`, engagement streak
 - `agents/skills/trade_insight.py` — dormant (not exposed in `/agent`)
 - `agents/runtime.py` — gather → prompt → `ask_gpt` → memory patch → `complete_session`
@@ -230,8 +231,9 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 
 ### Sprint 2 — Productize
 
+- [x] `journal_sync` skill (reflections opt-in + streaks)
+- [x] `inner_voice` skill — Tier 1 `agent_prefs.inner_voice` (App Settings)
 - [ ] `fatigue_check` skill (sleep/activity signals from App or self-report modal)
-- [ ] `inner_voice` skill (short prompts from `profiles` prefs)
 - [ ] `POST /api/agents/run` on `api.py` (Mind/App trigger)
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh
 - [x] Premium tier caps on `/agent start` (free 10/day, monthly 25/day, yearly/lifetime unlimited)
