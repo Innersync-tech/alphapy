@@ -711,12 +711,12 @@ List available Alphapy agents (currently **reflection** only).
 ---
 
 ### `/agent start`
-Run a single-shot reflection agent session.
+Start a multi-turn reflection agent session (first turn).
 
 **Parameters:**
 - `message` (optional): Focus question or topic for the agent
 
-**Behavior:** Gathers context from enabled skills (e.g. `journal_sync` for opted-in reflections and streaks), runs Grok with the platform safety policy, stores session in Supabase, and returns an embed with the agent response.
+**Behavior:** Creates an `active` session, gathers skill context, runs Grok, stores the turn in `agent_session_messages`, and returns an ephemeral embed. Session stays open until `/agent end`.
 
 **Example:**
 ```
@@ -725,12 +725,35 @@ Run a single-shot reflection agent session.
 
 **Permissions:** Linked Innersync users only (ephemeral)
 
+**Note:** Blocked if you already have an active session — use `/agent continue` or `/agent end` first.
+
+---
+
+### `/agent continue`
+Add a follow-up turn to your active reflection session.
+
+**Parameters:**
+- `message` (required): Your follow-up for the agent
+
+**Behavior:** Loads prior turns from `agent_session_messages`, appends your message, runs Grok, and returns an ephemeral embed.
+
+**Permissions:** Linked Innersync users only (ephemeral)
+
+---
+
+### `/agent end`
+End your active reflection session.
+
+**Behavior:** Runs Tier 2 distill (if learning enabled + active consents), patches Tier 3 memory (`session_count++`), completes the session, deletes ephemeral messages, and emits a Hermit `gpt_command` event.
+
+**Permissions:** Linked Innersync users only (ephemeral)
+
 ---
 
 ### `/agent status`
 Show your active reflection agent session, if any.
 
-**Note:** Each `/agent start` completes immediately today (single-shot). Status is usually empty unless multi-turn sessions ship in a future release.
+**Behavior:** Returns start time and turn count. Empty when no session is active.
 
 **Permissions:** Linked Innersync users only (ephemeral)
 

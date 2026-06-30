@@ -4,6 +4,27 @@ All notable releases of Alphapy will be documented in this file.
 
 ---
 
+## [3.10.0] - 2026-06-30 - "Agent Memory & Conversation"
+
+### Minor Release: Privacy-safe agent memory (Phases 2.1–2.3)
+
+Tiered memory model, derived insights, and multi-turn Discord sessions — without storing journal plaintext in durable memory.
+
+#### What's New
+- **Phase 2.1** — Tier 1 prefs (`agent_prefs` via App); Tier 3 operational metadata only in `agent_memory`; `[agent_profile]` prompt block
+- **Phase 2.2** — Tier 2 distill pipeline (`agents/tier2.py`); consent-linked purge on revoke-share; distilled session summaries
+- **Phase 2.3** — `/agent continue`, `/agent end`; ephemeral `agent_session_messages` (Core `0023`); Tier 2/3 updates on session end
+- **Discord UX** — Display name in embed title; turn count in footer; `/agent status` shows active turn count
+
+#### Migrations & PRs
+- Core `0022` (`agent_prefs`), `0023` (`agent_session_messages`)
+- Alphapy [#255](https://github.com/Innersync-tech/alphapy/pull/255) (2.1), [#256](https://github.com/Innersync-tech/alphapy/pull/256) (2.2), [#257](https://github.com/Innersync-tech/alphapy/pull/257) (2.3)
+
+#### Deferred (Phase 4.0)
+- `POST /api/agents/run` — App-triggered agent runs (separate from 2.3)
+
+---
+
 ## [3.9.0] - 2026-06-30 - "Reflection Loop"
 
 ### Minor Release: Alphapy Agents MVP + Safety Policy

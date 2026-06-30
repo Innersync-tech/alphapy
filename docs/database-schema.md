@@ -855,7 +855,7 @@ One row per `/agent` invocation. Migration: `Innersync_Core/supabase/0020_agent_
 - `guild_id` (TEXT, nullable)
 - `agent_name` (TEXT, NOT NULL): e.g. `reflection`
 - `status` (TEXT): `active`, `completed`, `failed`, `cancelled`
-- `summary` (TEXT): Agent response preview
+- `summary` (TEXT): Tier-2-conform distilled labels (not raw LLM output)
 - `memory_patch` (JSONB): Patches applied to `agent_memory` after run
 - `metadata` (JSONB): e.g. `source: discord_slash`
 - `started_at`, `completed_at`, `updated_at` (TIMESTAMPTZ)
@@ -864,8 +864,27 @@ One row per `/agent` invocation. Migration: `Innersync_Core/supabase/0020_agent_
 
 **Notes:**
 - Written by `agents/memory.py` via Supabase PostgREST.
+- Multi-turn turns stored in `agent_session_messages` (Core `0023`) while `status = active`; deleted on session end.
 - RLS enabled with zero policies; `anon`/`authenticated` revoked (service role only).
-- GDPR purge on user delete: planned (Sprint 2).
+- App reads completed session rows via service-role API routes; users can delete individual history rows.
+- GDPR purge on user delete: planned (Phase 4).
+
+---
+
+### `agent_session_messages`
+
+Ephemeral multi-turn message history. Migration: `Innersync_Core/supabase/0023_agent_session_messages.sql`.
+
+**Columns:**
+- `id` (UUID, PRIMARY KEY)
+- `session_id` (UUID, FK → `agent_sessions.id` ON DELETE CASCADE)
+- `turn_index` (INT, NOT NULL): 0-based turn
+- `role` (TEXT): `user` or `assistant`
+- `content` (TEXT, NOT NULL)
+- `created_at` (TIMESTAMPTZ)
+
+**Notes:**
+- Alphapy service role only; deleted when session completes or is removed from App history.
 
 ---
 
@@ -876,13 +895,13 @@ Durable per-user JSON blob per agent type.
 **Columns:**
 - `innersync_user_id` (UUID, NOT NULL)
 - `agent_name` (TEXT, NOT NULL)
-- `memory` (JSONB): e.g. `last_session_id`, `last_summary_preview`
+- `memory` (JSONB): Tier 1 prefs (App), Tier 2 `derived_profile`, Tier 3 operational metadata — never journal plaintext
 - `updated_at` (TIMESTAMPTZ)
 
 **Primary Key:** `(innersync_user_id, agent_name)`
 
 **Notes:**
-- Patched after each successful `/agent start` run.
+- Patched on `/agent end` (Tier 2 distill + Tier 3 metadata). Not on every turn.
 - Same RLS / access pattern as `agent_sessions`.
 
 ---
