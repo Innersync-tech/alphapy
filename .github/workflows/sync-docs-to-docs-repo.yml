@@ -50,6 +50,10 @@ jobs:
             --exclude=CONTRIBUTOR.md \
             --exclude=premium-layer-plan.md
 
+      - name: Verify Starlight frontmatter
+        working-directory: docs-repo
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/ensure-starlight-frontmatter.sh" src/content/docs/alphapy
+
       - name: Verify publication safety
         working-directory: docs-repo
         run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-publication-safe.sh" src/content/docs/alphapy
