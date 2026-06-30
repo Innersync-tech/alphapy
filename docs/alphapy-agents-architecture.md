@@ -107,7 +107,7 @@ cogs/agents.py     /agent list|start|status
 **Gates:**
 
 - Global: `ALPHAPY_AGENTS_ENABLED=true`
-- Per guild: `agents.enabled` (SettingsService, default `false`)
+- Per guild: `/config agents toggle true` (SettingsService, default `false`)
 - User: `/link` required (`get_innersync_id_for_discord`)
 - Quota: `ask_gpt` daily limit (existing `gpt_usage`)
 
@@ -135,7 +135,7 @@ Enable locally:
 ```bash
 ALPHAPY_AGENTS_ENABLED=true
 ALPHAPY_AGENTS_MEMORY_BACKEND=memory   # no Supabase migration needed
-# Per guild: /config agents enabled true  (or settings wizard)
+# Per guild: /config agents toggle true
 ```
 
 ---

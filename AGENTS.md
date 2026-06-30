@@ -73,6 +73,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Path**: `agents/`, `cogs/agents.py`, `docs/alphapy-agents-architecture.md`
 - **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal **Hermes** (Nous Research) on VPS
 - **Commands**: `/agent list`, `/agent start`, `/agent status`
+- **Admin config**: `/config agents show`, `/config agents toggle`
 - **Agents**: `reflection` (journal sync), `trade` (demo trade insight), `full` (both)
 - **Skills**: `journal_sync`, `trade_insight` (extensible via `agents/registry.py`)
 - **Memory**: Supabase `agent_sessions` + `agent_memory` (service role); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests

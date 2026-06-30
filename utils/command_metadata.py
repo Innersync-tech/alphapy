@@ -46,6 +46,7 @@ ENABLE_DISABLE_PAIRS: list[tuple[str, tuple[str, str]]] = [
     ("config reminders", ("config reminders enable", "config reminders disable")),
     ("config gdpr", ("config gdpr enable", "config gdpr disable")),
     ("config onboarding", ("config onboarding enable", "config onboarding disable")),
+    ("config agents", ("config agents toggle",)),
     # Add more pairs here as needed
 ]
 

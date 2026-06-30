@@ -114,7 +114,7 @@ class AgentsCog(AlphaCog):
         guild_id = interaction.guild_id
         if guild_id is not None and not await self._guild_agents_enabled(guild_id):
             await interaction.response.send_message(
-                "Agents are disabled in this server. Ask an admin to enable `agents.enabled`.",
+                "Agents are disabled in this server. Ask an admin to run `/config agents toggle`.",
                 ephemeral=True,
             )
             return
