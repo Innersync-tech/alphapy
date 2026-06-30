@@ -21,6 +21,8 @@ from utils.supabase_client import (
     _supabase_post,
 )
 
+from agents.profile import TIER3_FIELDS
+
 logger = logging.getLogger("alphapy.agents.memory")
 
 _MEMORY_TABLE = "agent_memory"
@@ -49,7 +51,28 @@ def strip_sensitive_memory_keys(memory: dict[str, Any]) -> dict[str, Any]:
     """Return memory without keys that can carry opted-out journal content."""
     if not memory:
         return {}
-    return {k: v for k, v in memory.items() if k not in _SENSITIVE_MEMORY_KEYS}
+    cleaned = {k: v for k, v in memory.items() if k not in _SENSITIVE_MEMORY_KEYS}
+    return {k: v for k, v in cleaned.items() if k in TIER3_FIELDS}
+
+
+async def clear_all_user_memory(innersync_user_id: str) -> None:
+    """Delete all agent_memory rows for a user (all agents)."""
+    if not _use_supabase():
+        prefix = f"{innersync_user_id.lower()}:"
+        for key in list(_local_memory.keys()):
+            if key.startswith(prefix):
+                _local_memory.pop(key, None)
+        return
+
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_MEMORY_TABLE}"
+    params = {"innersync_user_id": f"eq.{innersync_user_id}"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.delete(
+            url,
+            headers=_headers(prefer=["return=minimal"]),
+            params=params,
+        )
+        response.raise_for_status()
 
 
 def _now_iso() -> str:
@@ -114,7 +137,9 @@ async def patch_user_memory(
 ) -> dict[str, Any]:
     """Merge patch into durable memory and return the updated blob."""
     current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
-    safe_patch = strip_sensitive_memory_keys(patch)
+    safe_patch = {
+        k: v for k, v in strip_sensitive_memory_keys(patch).items() if k in TIER3_FIELDS
+    }
     current.update(safe_patch)
 
     if not _use_supabase():
