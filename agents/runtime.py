@@ -153,4 +153,5 @@ async def run_agent_session(
         summary=summary,
         skill_blocks=skill_blocks,
         memory_patch=updated_memory,
+        display_name=prefs.get("display_name"),
     )
