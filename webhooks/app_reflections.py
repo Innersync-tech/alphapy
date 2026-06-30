@@ -14,6 +14,11 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from utils.dashboard_webhooks import forward_reflection
 from webhooks.common import get_app_reflections_secret, validate_webhook_signature
+from webhooks.reflection_payload import (
+    ReflectionWebhookPayloadError,
+    extract_plaintext_content,
+    resolve_discord_user_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,26 +65,11 @@ async def handle_app_reflection_webhook(request: Request) -> dict[str, str]:
 
     user_id = payload.get("user_id")
     reflection_id = payload.get("reflection_id")
-    plaintext_content = payload.get("plaintext_content")
 
-    if user_id is None or reflection_id is None or plaintext_content is None:
+    if reflection_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing required fields: user_id, reflection_id, plaintext_content.",
-        )
-
-    try:
-        user_id = int(user_id)
-    except (TypeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id must be an integer (Discord user ID).",
-        ) from exc
-
-    if not isinstance(plaintext_content, dict):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="plaintext_content must be a JSON object.",
+            detail="Missing required field: reflection_id.",
         )
 
     pool: asyncpg.Pool | None = getattr(request.app.state, "db_pool", None)
@@ -91,6 +81,15 @@ async def handle_app_reflection_webhook(request: Request) -> dict[str, str]:
         )
 
     try:
+        discord_user_id = await resolve_discord_user_id(pool, user_id)
+        plaintext_content = extract_plaintext_content(payload)
+    except ReflectionWebhookPayloadError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    try:
         async with pool.acquire() as conn:
             await conn.execute(
                 """
@@ -100,7 +99,7 @@ async def handle_app_reflection_webhook(request: Request) -> dict[str, str]:
                     plaintext_content = EXCLUDED.plaintext_content,
                     created_at = NOW()
                 """,
-                user_id,
+                discord_user_id,
                 reflection_id,
                 json.dumps(plaintext_content),
             )
@@ -113,10 +112,16 @@ async def handle_app_reflection_webhook(request: Request) -> dict[str, str]:
 
     logger.info(
         "App reflection webhook: user_id=%s, reflection_id=%s",
-        user_id,
+        discord_user_id,
         reflection_id,
     )
-    forward_reflection(payload)
+    forward_reflection(
+        {
+            "user_id": discord_user_id,
+            "reflection_id": reflection_id,
+            "plaintext_content": plaintext_content,
+        }
+    )
     return {"status": "acknowledged", "reflection_id": reflection_id}
 
 
