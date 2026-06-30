@@ -233,7 +233,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 
 - [x] `journal_sync` skill (reflections opt-in + streaks)
 - [x] `inner_voice` skill — Tier 1 `agent_prefs.inner_voice` (App Settings)
-- [ ] `fatigue_check` skill (sleep/activity signals from App or self-report modal)
+- [x] `fatigue_check` skill — energy self-report in App + Discord quick check on `/agent start`
 - [ ] `POST /api/agents/run` on `api.py` (Mind/App trigger)
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh
 - [x] Premium tier caps on `/agent start` (free 10/day, monthly 25/day, yearly/lifetime unlimited)

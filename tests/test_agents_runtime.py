@@ -17,8 +17,9 @@ async def test_resolve_agent_reflection_has_journal_skill() -> None:
     agent = resolve_agent("reflection")
     assert agent is not None
     assert agent.name == "reflection"
-    assert any(s.name == "journal_sync" for s in agent.skills)
     assert any(s.name == "inner_voice" for s in agent.skills)
+    assert any(s.name == "fatigue_check" for s in agent.skills)
+    assert any(s.name == "journal_sync" for s in agent.skills)
 
 
 @pytest.mark.asyncio
