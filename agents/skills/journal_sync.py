@@ -11,6 +11,11 @@ from utils.engagement_service import get_streak
 
 logger = logging.getLogger("alphapy.agents.skills.journal_sync")
 
+NO_SHARED_REFLECTIONS_MESSAGE = (
+    "No reflections explicitly shared with Alphapy "
+    "(share per entry from the App dashboard)."
+)
+
 
 class JournalSyncSkill(BaseAgentSkill):
     name = "journal_sync"
@@ -23,10 +28,7 @@ class JournalSyncSkill(BaseAgentSkill):
         if reflection_context.strip():
             lines.append(reflection_context.strip())
         else:
-            lines.append(
-                "No reflections explicitly shared with Alphapy "
-                "(share per entry from the App dashboard)."
-            )
+            lines.append(NO_SHARED_REFLECTIONS_MESSAGE)
 
         if ctx.guild_id is not None:
             pool = get_bot_db_pool(bot_instance) if bot_instance else None
