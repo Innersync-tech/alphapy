@@ -857,11 +857,11 @@ These endpoints receive payloads from Core-API. They do not use API key authenti
 
 ### `POST /webhooks/app-reflections`
 
-Receives plaintext reflection content from the App via Core-API. Payload is stored in `app_reflections` (Railway) and used for Grok context in user-self flows (e.g. `/growthcheckin`; not used for ticket "Suggest reply" for privacy).
+Receives plaintext reflection content from the App via Core-API. Payload is stored in `app_reflections` (Railway) and used for Grok context in user-self flows (e.g. `/growthcheckin`, `/agent` + `journal_sync`; not used for ticket "Suggest reply" for privacy).
 
-**Note:** Grok context for `/growthcheckin` is merged from three sources: Supabase `reflections_shared` (opt-in via `bot_sharing_enabled`), Supabase `reflections` (Discord check-ins, always), and Railway `app_reflections` (this webhook, always). Max 5 reflections total.
+**Note:** Grok context merges consent-gated sources only: Railway `app_reflections` and Supabase `reflections_shared` require an active row in `reflection_alphapy_consent` (non-revoked). Discord check-ins from Supabase `reflections` are separate. `/agent` uses `load_agent_reflection_context()` — never bulk App vault sync.
 
-**Headers:** `X-Webhook-Signature` (optional if no secret configured)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; required in production when `APP_REFLECTIONS_WEBHOOK_SECRET` is set)
 
 **Request body:**
 ```json
