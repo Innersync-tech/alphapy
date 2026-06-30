@@ -205,6 +205,8 @@ Plaintext reflections received from the App via Core-API webhook. Used for Grok 
 2. Supabase `reflections` — Discord check-ins written by `/growthcheckin` itself (no opt-in required)
 3. Railway `app_reflections` — plaintext from Core-API webhook (last 30 days, no opt-in required)
 
+**Also used by Alphapy Agents** (`journal_sync` skill): opt-in shared reflections via `load_user_reflections` — never encrypted App ciphertext. See [agents-safety-guidelines.md](agents-safety-guidelines.md).
+
 ---
 
 ### `alphapy_discord_links`
@@ -835,6 +837,53 @@ Daily activity streak per user per guild.
 **Primary Key:** `(guild_id, user_id)`
 
 **Indexes:** `idx_eng_streaks_guild` on `(guild_id)`
+
+---
+
+## Supabase tables (platform — not Railway)
+
+These tables live in **Supabase Postgres** (Core migrations). Alphapy accesses them via service role only.
+
+### `agent_sessions`
+
+One row per `/agent` invocation. Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`.
+
+**Columns:**
+- `id` (UUID, PRIMARY KEY)
+- `innersync_user_id` (UUID, NOT NULL): Supabase Auth user id
+- `discord_user_id` (TEXT, NOT NULL)
+- `guild_id` (TEXT, nullable)
+- `agent_name` (TEXT, NOT NULL): e.g. `reflection`
+- `status` (TEXT): `active`, `completed`, `failed`, `cancelled`
+- `summary` (TEXT): Agent response preview
+- `memory_patch` (JSONB): Patches applied to `agent_memory` after run
+- `metadata` (JSONB): e.g. `source: discord_slash`
+- `started_at`, `completed_at`, `updated_at` (TIMESTAMPTZ)
+
+**Indexes:** `(innersync_user_id, agent_name, started_at DESC)`; partial index on `status = 'active'`.
+
+**Notes:**
+- Written by `agents/memory.py` via Supabase PostgREST.
+- RLS enabled with zero policies; `anon`/`authenticated` revoked (service role only).
+- GDPR purge on user delete: planned (Sprint 2).
+
+---
+
+### `agent_memory`
+
+Durable per-user JSON blob per agent type.
+
+**Columns:**
+- `innersync_user_id` (UUID, NOT NULL)
+- `agent_name` (TEXT, NOT NULL)
+- `memory` (JSONB): e.g. `last_session_id`, `last_summary_preview`
+- `updated_at` (TIMESTAMPTZ)
+
+**Primary Key:** `(innersync_user_id, agent_name)`
+
+**Notes:**
+- Patched after each successful `/agent start` run.
+- Same RLS / access pattern as `agent_sessions`.
 
 ---
 

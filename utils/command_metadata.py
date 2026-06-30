@@ -24,6 +24,7 @@ COG_CATEGORY_MAP: dict[str, str] = {
     "InviteTracker": "📥 Invites",
     "CustomSlashCommands": "🛠️ Utilities",
     "Configuration": "⚙️ Configuration",
+    "AgentsCog": "🤖 Agents",
     "FAQ": "❓ FAQ",
     "Exports": "📤 Exports",
     "EmbedReminderWatcher": "👀 Embed Watcher",

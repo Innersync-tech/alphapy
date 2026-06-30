@@ -1,8 +1,30 @@
-# 🧬 Innersync • Alphapy Roadmap v3.8.0 "Enterprise Ready"
+# 🧬 Innersync • Alphapy Roadmap v3.9.0 "Reflection Loop"
 
-**Release v3.7.0 Complete!** ⚡ API observability endpoint, request tracing, reminder idempotency keys, migration-driven startup hardening, and CI quality gates.
+**Release v3.9.0 Complete!** 🤖 Alphapy Agents MVP — `/agent` for linked users, Supabase sessions/memory, safety policy, jailbreak-tested.
 
-This document outlines the evolution from v3.7.0 forward.
+This document outlines the evolution from v3.9.0 forward.
+
+## ✅ COMPLETED: Alphapy Agents MVP (v3.9.0)
+
+**Status:** ✅ **Merged to main** (PR #246, 30 jun 2026)
+
+- **Multi-user agents**: `reflection` agent with `journal_sync` skill; `/agent list|start|status`
+- **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `/config agents toggle` (per guild), `/link` required
+- **Memory**: Supabase `agent_sessions` + `agent_memory` (Core `0020`)
+- **Safety**: `agents/policy.py`, Matrix A manual probes passed on Innersync Dev
+- **Cross-repo**: [Innersync-meta/AGENT-SAFETY-POLICY.md](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md), [ROADMAP-ALPHAPY-AGENTS.md](https://github.com/Innersync-tech/Innersync-meta/blob/main/ROADMAP-ALPHAPY-AGENTS.md)
+
+**Next (Phase 2):** agent display name, multi-turn sessions, GDPR purge on user delete.
+
+---
+
+## ✅ COMPLETED: Innersync Identity & Hermit Context (v3.8.0)
+
+**Status:** ✅ **Fully Implemented & Released**
+
+- Discord ↔ Innersync linking (`/link`), Hermit strategic context, auto-mod UX, cache observability
+
+---
 
 ## ✅ COMPLETED: API Observability & CI Quality Gates (v3.7.0)
 

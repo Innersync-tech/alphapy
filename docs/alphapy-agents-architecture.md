@@ -190,14 +190,14 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql`
 
 ## 7. MVP next steps (1–2 sprints)
 
-### Sprint 1 — Closed loop live (this PR)
+### Sprint 1 — Closed loop live (shipped v3.9.0)
 
-- [x] Agent runtime + 2 skills + `/agent` cog
-- [x] Supabase migration draft
-- [ ] Apply migration on staging Supabase
-- [ ] Enable `ALPHAPY_AGENTS_ENABLED` on staging; flip `agents.enabled` on test guild
-- [ ] Unit tests green (`tests/test_agents_runtime.py`)
-- [ ] Document env vars in `docs/configuration.md`
+- [x] Agent runtime + skills + `/agent` cog
+- [x] Supabase migration `0020` (merged in Core)
+- [x] `ALPHAPY_AGENTS_ENABLED` on test bot; `agents.enabled` on test guild
+- [x] Unit tests (`tests/test_agents_runtime.py`, `tests/test_agents_policy.py`)
+- [x] Document env vars in `docs/configuration.md` and `docs/commands.md`
+- [x] Manual jailbreak Matrix A1–A7 on Innersync Dev
 
 ### Sprint 2 — Productize
 

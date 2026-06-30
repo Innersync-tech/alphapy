@@ -4,23 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- (No changes yet)
+
+## [3.9.0] - 2026-06-30
+
+### Added
+- **Alphapy Agents (multi-user closed loop)** — Personal growth agents for linked Innersync users (`agents/`, `cogs/agents.py`):
+  - Commands: `/agent list`, `/agent start`, `/agent status` (ephemeral; single-shot sessions today)
+  - Admin: `/config agents show`, `/config agents toggle` (per-guild gate, default off)
+  - Agent: `reflection` with `journal_sync` skill (opt-in shared reflections + engagement streaks)
+  - Supabase persistence: `agent_sessions` + `agent_memory` (Core migration `0020`, service-role only)
+  - Hermit event emit on agent runs (`gpt_command` payload with session id)
+- **Agent safety policy** (`agents/policy.py`) — `AGENT_SAFETY_RULES` injected on every LLM call; never decrypt App journals; skill context marked UNTRUSTED; jailbreak test matrix in `docs/agents-safety-guidelines.md`
+- **Agent tests** — `tests/test_agents_runtime.py`, `tests/test_agents_policy.py` (optional `AGENT_JAILBREAK_LLM_SMOKE=1` live probes)
+
 ### Security
 - **Webhook signature enforcement (fail-closed)** – `webhooks/common.py` now rejects requests with missing or invalid HMAC signatures in `APP_ENV=production` or `STRICT_SECURITY_MODE=1` (previously logged a warning and continued processing). `DISCORD_LINK_WEBHOOK_SECRET` added to startup warning and strict mode enforcement.
 - **Embed injection hardening** – `safe_embed_text()` applied to user-controlled content that was previously rendered unsanitised: auto-mod log message field (`utils/automod_logging.py`), engagement challenge titles, display names, and badge keys (`cogs/engagement.py`, `utils/engagement_service.py`), and ticket description in staff channel embed (`cogs/ticketbot.py`).
 - **Dependency audit in CI** – `pip-audit` job added to `.github/workflows/bot.yml` to catch known-vulnerable packages on every push.
 
-### Added
-- (No changes yet)
-
 ### Changed
 - **Google Drive credentials** — Load only from `GOOGLE_CREDENTIALS_JSON` (Railway / `.env`). Removed GCP Secret Manager path (`utils/gcp_secrets.py`, `GOOGLE_PROJECT_ID`, `GOOGLE_SECRET_NAME`, `google-cloud-secret-manager` dependency).
-- **Docs** — Updated security and setup guides; removed `docs/RAILWAY_SECRET_MANAGER_SETUP.md`.
+- **Docs** — Updated security and setup guides; removed `docs/RAILWAY_SECRET_MANAGER_SETUP.md`; added `docs/alphapy-agents-architecture.md`, `docs/agents-safety-guidelines.md`, `/agent` section in `docs/commands.md`.
 
 ### Fixed
 - **Premium Core verify 404** — `premium_guard` now calls `POST /api/premium/verify` (was `/premium/verify`; Core only registers the `/api/...` route).
+- **`/agent` slash commands** — Refactored to `AgentGroup` subclass (engagement pattern); fixes non-responding interactions.
 
 ### Removed
 - Hermit pilot startup `print` for `HERMIT_CONTEXT_ENABLED` (verified on Railway dev).
+- **`trade` / `full` agents** — Not registered in `agents/registry.py` until product decision on trading in Innersync (`trade_insight` skill file kept dormant).
 
 ## [3.8.0] - 2026-05-25
 
