@@ -14,6 +14,7 @@ except ImportError:
     import config  # type: ignore
 
 from agents.profile import TIER3_FIELDS
+from agents.tier2 import TIER2_ROOT_KEY, extract_derived_profile, purge_insights_for_reflection
 from utils.supabase_client import (
     SupabaseConfigurationError,
     _headers,
@@ -41,6 +42,8 @@ _SENSITIVE_MEMORY_KEYS = frozenset(
     }
 )
 
+_DURABLE_MEMORY_KEYS = TIER3_FIELDS | {TIER2_ROOT_KEY}
+
 
 def _memory_key(innersync_user_id: str, agent_name: str) -> str:
     return f"{innersync_user_id.lower()}:{agent_name}"
@@ -51,7 +54,7 @@ def strip_sensitive_memory_keys(memory: dict[str, Any]) -> dict[str, Any]:
     if not memory:
         return {}
     cleaned = {k: v for k, v in memory.items() if k not in _SENSITIVE_MEMORY_KEYS}
-    return {k: v for k, v in cleaned.items() if k in TIER3_FIELDS}
+    return {k: v for k, v in cleaned.items() if k in _DURABLE_MEMORY_KEYS}
 
 
 async def clear_all_user_memory(innersync_user_id: str) -> None:
@@ -72,6 +75,29 @@ async def clear_all_user_memory(innersync_user_id: str) -> None:
             params=params,
         )
         response.raise_for_status()
+
+
+async def clear_derived_memory(innersync_user_id: str, agent_name: str) -> dict[str, Any]:
+    """Remove Tier 2 derived profile; keep Tier 3 operational metadata."""
+    current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
+    current.pop(TIER2_ROOT_KEY, None)
+    return await _write_user_memory(innersync_user_id, agent_name, current)
+
+
+async def purge_tier2_for_reflection(
+    innersync_user_id: str,
+    agent_name: str,
+    reflection_id: str,
+) -> dict[str, Any]:
+    """Drop insights linked to a revoked reflection."""
+    current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
+    derived = extract_derived_profile(current)
+    updated = purge_insights_for_reflection(derived, reflection_id)
+    if updated.get("insights"):
+        current[TIER2_ROOT_KEY] = updated
+    else:
+        current.pop(TIER2_ROOT_KEY, None)
+    return await _write_user_memory(innersync_user_id, agent_name, current)
 
 
 def _now_iso() -> str:
@@ -129,6 +155,28 @@ async def clear_user_memory(innersync_user_id: str, agent_name: str) -> None:
         response.raise_for_status()
 
 
+async def _write_user_memory(
+    innersync_user_id: str,
+    agent_name: str,
+    memory: dict[str, Any],
+) -> dict[str, Any]:
+    if not _use_supabase():
+        _local_memory[_memory_key(innersync_user_id, agent_name)] = memory
+        return memory
+
+    await _supabase_post(
+        _MEMORY_TABLE,
+        {
+            "innersync_user_id": innersync_user_id,
+            "agent_name": agent_name,
+            "memory": memory,
+            "updated_at": _now_iso(),
+        },
+        upsert=True,
+    )
+    return memory
+
+
 async def patch_user_memory(
     innersync_user_id: str,
     agent_name: str,
@@ -136,26 +184,13 @@ async def patch_user_memory(
 ) -> dict[str, Any]:
     """Merge patch into durable memory and return the updated blob."""
     current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
-    safe_patch = {
-        k: v for k, v in strip_sensitive_memory_keys(patch).items() if k in TIER3_FIELDS
-    }
-    current.update(safe_patch)
-
-    if not _use_supabase():
-        _local_memory[_memory_key(innersync_user_id, agent_name)] = current
-        return current
-
-    await _supabase_post(
-        _MEMORY_TABLE,
-        {
-            "innersync_user_id": innersync_user_id,
-            "agent_name": agent_name,
-            "memory": current,
-            "updated_at": _now_iso(),
-        },
-        upsert=True,
-    )
-    return current
+    safe_patch = strip_sensitive_memory_keys(patch)
+    for key, value in safe_patch.items():
+        if key in TIER3_FIELDS:
+            current[key] = value
+        elif key == TIER2_ROOT_KEY and isinstance(value, dict):
+            current[TIER2_ROOT_KEY] = value
+    return await _write_user_memory(innersync_user_id, agent_name, current)
 
 
 async def create_session(
