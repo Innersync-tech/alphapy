@@ -12,6 +12,8 @@ paths = [
   '''(^|/)\.env\.example$''',
   '''(^|/)\.env\.sample$''',
   '''(^|/)templates/github/secret-scan/''',
+  '''(^|/)tests/''',
+  '''(^|/)docs/''',
   '''(^|/)node_modules/''',
   '''(^|/)dist/''',
   '''(^|/)\.next/''',
