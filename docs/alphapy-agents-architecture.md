@@ -57,8 +57,7 @@ Discord /agent start reflection
         ▼
 agents/runtime.py  ──► resolve agent + skills
         │                  │
-        │                  ├── journal_sync (reflections, streaks)
-        │                  └── trade_insight (Supabase trades)
+        │                  └── journal_sync (reflections, streaks)
         ▼
 agents/memory.py   ──► load/patch per-user memory (Supabase)
         ▼
@@ -90,7 +89,7 @@ alphapy/agents/
   runtime.py       Closed-loop orchestration
   skills/
     journal_sync.py
-    trade_insight.py
+    trade_insight.py   # dormant — not registered until product decision
 cogs/agents.py     /agent list|start|status
 ```
 
@@ -100,9 +99,9 @@ cogs/agents.py     /agent list|start|status
 
 | Command | Behavior |
 |---------|----------|
-| `/agent list` | Lists registered agents (`reflection`, `trade`, `full`) |
-| `/agent start <agent> [message]` | Runs closed loop; ephemeral response |
-| `/agent status <agent>` | Shows active session if any |
+| `/agent list` | Lists registered agents (`reflection`) |
+| `/agent start [message]` | Runs reflection closed loop; ephemeral response |
+| `/agent status` | Shows active reflection session if any |
 
 **Gates:**
 
@@ -127,7 +126,7 @@ See starter implementation:
 
 - `agents/base.py` — `AgentSkill` protocol, `AgentContext`, `BaseAgent`
 - `agents/skills/journal_sync.py` — reflections via `load_user_reflections`, engagement streak
-- `agents/skills/trade_insight.py` — recent `trades` rows from Supabase
+- `agents/skills/trade_insight.py` — dormant (not exposed in `/agent`)
 - `agents/runtime.py` — gather → prompt → `ask_gpt` → memory patch → `complete_session`
 
 Enable locally:

@@ -6,32 +6,24 @@ from collections.abc import Iterable
 
 from agents.base import AgentSkill, BaseAgent
 from agents.skills.journal_sync import JournalSyncSkill
-from agents.skills.trade_insight import TradeInsightSkill
 
 logger = logging.getLogger("alphapy.agents")
 
+# Public agents exposed via /agent (add trade back here when product-ready).
 _AGENT_DEFINITIONS: dict[str, dict[str, object]] = {
     "reflection": {
         "description": "Daily journal reflection and pattern awareness.",
         "skills": ("journal_sync",),
     },
-    "trade": {
-        "description": "Lightweight trade psychology insight from recent demo trades.",
-        "skills": ("trade_insight",),
-    },
-    "full": {
-        "description": "Combined reflection + trade insight loop.",
-        "skills": ("journal_sync", "trade_insight"),
-    },
 }
 
 _SKILL_INSTANCES: dict[str, AgentSkill] = {
     "journal_sync": JournalSyncSkill(),
-    "trade_insight": TradeInsightSkill(),
 }
 
 
 def list_agents() -> list[str]:
+    """Return agent names shown in /agent list and slash command choices."""
     return list(_AGENT_DEFINITIONS.keys())
 
 

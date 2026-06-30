@@ -61,23 +61,15 @@ class AgentGroup(app_commands.Group):
 
     @app_commands.command(name="start", description="Start an agent session")
     @app_commands.describe(
-        agent="Agent to run (reflection, trade, full)",
         message="Optional focus or question for the agent",
-    )
-    @app_commands.choices(
-        agent=[
-            app_commands.Choice(name="reflection", value="reflection"),
-            app_commands.Choice(name="trade", value="trade"),
-            app_commands.Choice(name="full", value="full"),
-        ]
     )
     async def start_cmd(
         self,
         interaction: discord.Interaction,
-        agent: app_commands.Choice[str],
         message: str | None = None,
     ) -> None:
         cog = self.cog
+        agent_name = "reflection"
         if not _agents_globally_enabled():
             await interaction.response.send_message(
                 "Agents are not enabled on this deployment. "
@@ -99,7 +91,6 @@ class AgentGroup(app_commands.Group):
             return
         innersync_id, discord_user_id = resolved
 
-        agent_name = agent.value
         if resolve_agent(agent_name) is None:
             await interaction.response.send_message("Unknown agent.", ephemeral=True)
             return
@@ -139,20 +130,9 @@ class AgentGroup(app_commands.Group):
             embed.set_footer(text=f"Session {result.session_id[:8]}… · skills: {skills_used}")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="status", description="Show your active agent session")
-    @app_commands.describe(agent="Agent name to check")
-    @app_commands.choices(
-        agent=[
-            app_commands.Choice(name="reflection", value="reflection"),
-            app_commands.Choice(name="trade", value="trade"),
-            app_commands.Choice(name="full", value="full"),
-        ]
-    )
-    async def status_cmd(
-        self,
-        interaction: discord.Interaction,
-        agent: app_commands.Choice[str],
-    ) -> None:
+    @app_commands.command(name="status", description="Show your active reflection agent session")
+    async def status_cmd(self, interaction: discord.Interaction) -> None:
+        agent_name = "reflection"
         if not _agents_globally_enabled():
             await interaction.response.send_message(
                 "Agents are not enabled on this deployment. "
@@ -166,15 +146,15 @@ class AgentGroup(app_commands.Group):
             return
         innersync_id, _ = resolved
 
-        row = await get_active_session(innersync_id, agent.value)
+        row = await get_active_session(innersync_id, agent_name)
         if not row:
             await interaction.response.send_message(
-                "No active session for this agent.", ephemeral=True
+                "No active session for the reflection agent.", ephemeral=True
             )
             return
 
         embed = discord.Embed(
-            title=f"Active session: {agent.value}",
+            title="Active session: reflection",
             description=f"Started: {row.get('started_at', 'unknown')}",
             color=_AGENT_COLOR,
         )
