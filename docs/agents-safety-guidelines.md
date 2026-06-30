@@ -106,6 +106,8 @@ If an agent response violates policy in production:
 3. Patch `AGENT_SAFETY_RULES` + bump version
 4. Re-run jailbreak matrix before re-enable
 
+**Quota abuse:** Users hitting daily `/agent start` limits receive an ephemeral message with `/premium` upsell; no journal or memory data is exposed. See `docs/alphapy-agents-architecture.md` §6 and `docs/SECURITY.md` (agent session quotas).
+
 ---
 
 ## Related docs
