@@ -83,23 +83,34 @@ async def _resolve_innersync_user_id(discord_id: int | str) -> str | None:
 
 async def _fetch_active_consent_reflection_ids(innersync_user_id: str) -> frozenset[str]:
     """Reflection IDs with active (non-revoked) Alphapy share consent."""
+    base_params = {
+        "select": "reflection_id",
+        "user_id": f"eq.{innersync_user_id}",
+        "limit": 500,
+    }
+    rows: list[dict] = []
     try:
         rows = await _supabase_get(
             "reflection_alphapy_consent",
-            {
-                "select": "reflection_id",
-                "user_id": f"eq.{innersync_user_id}",
-                "revoked_at": "is.null",
-                "limit": 500,
-            },
+            {**base_params, "revoked_at": "is.null"},
         )
     except Exception as exc:
-        logger.warning(
-            "Failed to load reflection_alphapy_consent for user_id=%s: %s",
+        # Prod may predate revoked_at column (Core migration 0021); rows are
+        # hard-deleted on App revoke until soft-revoke column exists.
+        logger.debug(
+            "reflection_alphapy_consent revoked_at filter unavailable for user_id=%s: %s",
             innersync_user_id,
             exc,
         )
-        return frozenset()
+        try:
+            rows = await _supabase_get("reflection_alphapy_consent", base_params)
+        except Exception as retry_exc:
+            logger.warning(
+                "Failed to load reflection_alphapy_consent for user_id=%s: %s",
+                innersync_user_id,
+                retry_exc,
+            )
+            return frozenset()
     ids = {str(row["reflection_id"]) for row in rows if row.get("reflection_id")}
     return frozenset(ids)
 
