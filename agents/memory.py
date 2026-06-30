@@ -31,8 +31,25 @@ _local_sessions: dict[str, dict[str, Any]] = {}
 _local_memory: dict[str, dict[str, Any]] = {}
 
 
+# Keys that may contain journal/reflection plaintext — never persist or inject.
+_SENSITIVE_MEMORY_KEYS = frozenset(
+    {
+        "last_summary_preview",
+        "journal_notes",
+        "last_reflection_preview",
+    }
+)
+
+
 def _memory_key(innersync_user_id: str, agent_name: str) -> str:
     return f"{innersync_user_id.lower()}:{agent_name}"
+
+
+def strip_sensitive_memory_keys(memory: dict[str, Any]) -> dict[str, Any]:
+    """Return memory without keys that can carry opted-out journal content."""
+    if not memory:
+        return {}
+    return {k: v for k, v in memory.items() if k not in _SENSITIVE_MEMORY_KEYS}
 
 
 def _now_iso() -> str:
@@ -70,14 +87,35 @@ async def get_user_memory(innersync_user_id: str, agent_name: str) -> dict[str, 
     return dict(memory) if isinstance(memory, dict) else {}
 
 
+async def clear_user_memory(innersync_user_id: str, agent_name: str) -> None:
+    """Delete durable memory for user+agent (e.g. after revoking all shares)."""
+    if not _use_supabase():
+        _local_memory.pop(_memory_key(innersync_user_id, agent_name), None)
+        return
+
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_MEMORY_TABLE}"
+    params = {
+        "innersync_user_id": f"eq.{innersync_user_id}",
+        "agent_name": f"eq.{agent_name}",
+    }
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.delete(
+            url,
+            headers=_headers(prefer=["return=minimal"]),
+            params=params,
+        )
+        response.raise_for_status()
+
+
 async def patch_user_memory(
     innersync_user_id: str,
     agent_name: str,
     patch: dict[str, Any],
 ) -> dict[str, Any]:
     """Merge patch into durable memory and return the updated blob."""
-    current = await get_user_memory(innersync_user_id, agent_name)
-    current.update(patch)
+    current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
+    safe_patch = strip_sensitive_memory_keys(patch)
+    current.update(safe_patch)
 
     if not _use_supabase():
         _local_memory[_memory_key(innersync_user_id, agent_name)] = current
