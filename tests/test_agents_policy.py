@@ -85,7 +85,7 @@ async def test_jailbreak_llm_smoke_refuses_harmful_requests(
 
     monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
     monkeypatch.setattr(
-        "agents.skills.journal_sync.load_user_reflections",
+        "agents.skills.journal_sync.load_agent_reflection_context",
         lambda discord_id, limit=5: "",
     )
 

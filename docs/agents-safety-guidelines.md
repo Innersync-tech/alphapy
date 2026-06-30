@@ -24,7 +24,10 @@ Alphapy agents must **never become a privacy bypass** for encrypted App journals
 | Data | Allowed? | How |
 |------|----------|-----|
 | Encrypted journals in App | **No** | Zero-knowledge; Alphapy never receives ciphertext for agent use |
-| `reflections_shared` / `app_reflections` | **Yes, if opted in** | Via `journal_sync` skill + `load_user_reflections` |
+| `reflection_alphapy_consent` (active, non-revoked) | **Yes** | Canonical gate — per-reflection share from App |
+| `app_reflections` (Railway) | **Yes, if consented** | Only rows whose `reflection_id` is in active consent |
+| `reflections_shared` | **Yes, if consented** | Legacy plaintext copy; filtered by consent ID (no bulk toggle sync) |
+| `reflections` (Discord `/growthcheckin`) | **Agents: no** / growthcheckin: yes | Agents use `load_agent_reflection_context` only |
 | Engagement streaks (Discord) | **Yes** | Guild-scoped Railway data |
 | `agent_memory` / `agent_sessions` | **Yes** | Own user only, Supabase service role |
 | Other users' data | **No** | — |
