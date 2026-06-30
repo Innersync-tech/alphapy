@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from utils.dashboard_webhooks import forward_revoke_reflection
 from webhooks.common import get_app_reflections_secret, validate_webhook_signature
+from webhooks.reflection_payload import ReflectionWebhookPayloadError, resolve_discord_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -58,19 +59,11 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
     user_id = payload.get("user_id")
     reflection_id = payload.get("reflection_id")
 
-    if user_id is None or reflection_id is None:
+    if reflection_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing required fields: user_id, reflection_id.",
+            detail="Missing required field: reflection_id.",
         )
-
-    try:
-        user_id = int(user_id)
-    except (TypeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id must be an integer (Discord user ID).",
-        ) from exc
 
     pool: asyncpg.Pool | None = getattr(request.app.state, "db_pool", None)
     if not pool or pool.is_closing():
@@ -81,13 +74,21 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
         )
 
     try:
+        discord_user_id = await resolve_discord_user_id(pool, user_id)
+    except ReflectionWebhookPayloadError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    try:
         async with pool.acquire() as conn:
             result = await conn.execute(
                 """
                 DELETE FROM app_reflections
                 WHERE user_id = $1 AND reflection_id = $2
                 """,
-                user_id,
+                discord_user_id,
                 reflection_id,
             )
     except Exception as e:
@@ -104,11 +105,13 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
 
     logger.info(
         "Revoke reflection webhook: user_id=%s, reflection_id=%s, deleted=%s",
-        user_id,
+        discord_user_id,
         reflection_id,
         count,
     )
-    forward_revoke_reflection(payload)
+    forward_revoke_reflection(
+        {"user_id": discord_user_id, "reflection_id": reflection_id}
+    )
     return {"status": "deleted", "count": count}
 
 
