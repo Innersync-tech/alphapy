@@ -26,6 +26,7 @@ from agents.runtime import (
     start_agent_session,
 )
 from utils.cog_base import AlphaCog
+from utils.core_discord_integration import normalize_http_url
 from utils.db_helpers import get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord
@@ -34,9 +35,17 @@ from utils.sanitizer import safe_embed_text
 logger = logging.getLogger(__name__)
 
 _AGENT_COLOR = 0x5865F2
+_DEFAULT_APP_BASE = "https://app.innersync.tech"
 
 
-def _agent_response_embed(result: AgentResult) -> discord.Embed:
+def _app_agent_home_url() -> str:
+    """Public App agent chat surface (Phase 4 cross-platform)."""
+    raw = getattr(config, "INNERSYNC_APP_URL", None) or _DEFAULT_APP_BASE
+    base = normalize_http_url(str(raw).strip().rstrip("/")) or _DEFAULT_APP_BASE
+    return f"{base.rstrip('/')}/dashboard/agent"
+
+
+def _agent_response_embed(result: AgentResult, *, active_session: bool = False) -> discord.Embed:
     """Build the /agent start reply: user display name as title, agent type in footer."""
     agent_name = result.agent_name
     if result.display_name:
@@ -50,6 +59,8 @@ def _agent_response_embed(result: AgentResult) -> discord.Embed:
     if result.skill_blocks:
         skills_used = ", ".join(result.skill_blocks.keys())
         footer_parts.append(f"skills: {skills_used}")
+    if active_session:
+        footer_parts.append(f"App → {_app_agent_home_url()}")
 
     embed = discord.Embed(
         title=title,
@@ -165,8 +176,8 @@ class AgentGroup(app_commands.Group):
             )
         except ActiveAgentSessionError:
             await interaction.followup.send(
-                "You already have an active session. Use `/agent continue` to add a turn "
-                "or `/agent end` to finish.",
+                "You already have an active session. Use `/agent continue`, continue in the "
+                f"App ({_app_agent_home_url()}), or `/agent end` to finish.",
                 ephemeral=True,
             )
             return
@@ -185,7 +196,7 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result), ephemeral=True
+            embed=_agent_response_embed(result, active_session=True), ephemeral=True
         )
 
     @app_commands.command(name="continue", description="Continue your active agent session")
@@ -250,7 +261,7 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result), ephemeral=True
+            embed=_agent_response_embed(result, active_session=True), ephemeral=True
         )
 
     @app_commands.command(name="end", description="End your active agent session")
@@ -340,12 +351,21 @@ class AgentGroup(app_commands.Group):
         if turn_count <= 0:
             turn_count = 1
 
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        origin_channel = metadata.get("origin_channel")
+        origin_hint = ""
+        if origin_channel in {"discord", "app"}:
+            label = "Discord" if origin_channel == "discord" else "Innersync App"
+            origin_hint = f"Started on: **{label}**\n"
+
         embed = discord.Embed(
             title="Active session: reflection",
             description=(
+                f"{origin_hint}"
                 f"Started: {row.get('started_at', 'unknown')}\n"
-                f"Turns: {turn_count}\n"
-                "Use `/agent continue` or `/agent end`."
+                f"Turns: {turn_count}\n\n"
+                "Discord: `/agent continue` or `/agent end`\n"
+                f"App: {_app_agent_home_url()}"
             ),
             color=_AGENT_COLOR,
         )
