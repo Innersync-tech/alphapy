@@ -118,7 +118,7 @@ class FatigueQuickCheckView(discord.ui.View):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result), ephemeral=True
+            embed=_agent_response_embed(result, active_session=True), ephemeral=True
         )
 
 
