@@ -3528,6 +3528,135 @@ async def resolve_verification_ticket(
     return {"success": True, "outcome": body.outcome, "ticket_id": ticket_id}
 
 
+# ---------------------------------------------------------------------------
+# Dashboard discord meta (channels / roles for pickers)
+# ---------------------------------------------------------------------------
+
+
+class DiscordMetaChannel(BaseModel):
+    id: str
+    name: str
+    type: Literal["text", "announcement", "category"]
+    parent_id: str | None = None
+
+
+class DiscordMetaRole(BaseModel):
+    id: str
+    name: str
+    color: int | None = None
+    position: int
+
+
+class DiscordMetaResponse(BaseModel):
+    channels: list[DiscordMetaChannel]
+    roles: list[DiscordMetaRole]
+
+
+async def _fetch_discord_meta_on_bot_loop(guild_id: int) -> DiscordMetaResponse:
+    import discord
+
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise RuntimeError("Bot not available")
+
+    guild = bot_instance.get_guild(guild_id)
+    if guild is None:
+        try:
+            guild = await bot_instance.fetch_guild(guild_id)
+        except Exception as exc:
+            raise RuntimeError("Guild not found") from exc
+
+    if not guild.channels:
+        try:
+            await guild.fetch_channels()
+        except Exception:
+            pass
+
+    channels: list[DiscordMetaChannel] = []
+    for channel in guild.channels:
+        if channel.type == discord.ChannelType.category:
+            channels.append(
+                DiscordMetaChannel(
+                    id=str(channel.id),
+                    name=channel.name,
+                    type="category",
+                    parent_id=None,
+                )
+            )
+        elif channel.type == discord.ChannelType.text:
+            channels.append(
+                DiscordMetaChannel(
+                    id=str(channel.id),
+                    name=channel.name,
+                    type="text",
+                    parent_id=str(channel.category_id) if channel.category_id else None,
+                )
+            )
+        elif channel.type == discord.ChannelType.news:
+            channels.append(
+                DiscordMetaChannel(
+                    id=str(channel.id),
+                    name=channel.name,
+                    type="announcement",
+                    parent_id=str(channel.category_id) if channel.category_id else None,
+                )
+            )
+
+    channels.sort(
+        key=lambda item: (
+            item.type != "category",
+            item.parent_id or "",
+            item.name.lower(),
+        )
+    )
+
+    roles: list[DiscordMetaRole] = []
+    for role in sorted(guild.roles, key=lambda item: item.position, reverse=True):
+        if role.is_default() or role.managed or not role.is_assignable():
+            continue
+        roles.append(
+            DiscordMetaRole(
+                id=str(role.id),
+                name=role.name,
+                color=role.color.value or None,
+                position=role.position,
+            )
+        )
+
+    return DiscordMetaResponse(channels=channels, roles=roles)
+
+
+@router.get(
+    "/dashboard/{guild_id}/discord-meta",
+    response_model=DiscordMetaResponse,
+)
+async def get_dashboard_discord_meta(
+    guild_id: int,
+    discord_admin_id: int = Depends(verify_dashboard_discord_admin),
+):
+    """List guild channels and assignable roles for dashboard pickers."""
+    del discord_admin_id
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot not available")
+
+    async def runner() -> DiscordMetaResponse:
+        return await _fetch_discord_meta_on_bot_loop(guild_id)
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(runner(), bot_instance.loop)
+        return await asyncio.wait_for(asyncio.wrap_future(future), timeout=10.0)
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Discord meta fetch timed out.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"[ERROR] Failed to fetch discord meta for guild {guild_id}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to fetch discord meta") from exc
+
+
 include_agent_routes(
     router,
     get_authenticated_user_id=get_authenticated_user_id,
