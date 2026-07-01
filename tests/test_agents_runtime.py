@@ -186,7 +186,7 @@ async def test_run_agent_session_clears_stale_memory_without_consent(monkeypatch
 @pytest.mark.asyncio
 async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
     import config
-    from agents.memory import clear_local_store, get_active_session, get_user_memory
+    from agents.memory import clear_local_store, get_active_session, get_session_messages, get_user_memory
     from agents.runtime import (
         ActiveAgentSessionError,
         continue_agent_session,
@@ -219,6 +219,13 @@ async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
     assert first.summary == "First reply."
     assert first.turn_count == 1
     assert await get_active_session(user_id, "reflection") is not None
+
+    stored_turns = await get_session_messages(first.session_id)
+    user_rows = [row for row in stored_turns if row.get("role") == "user"]
+    assert user_rows
+    assert user_rows[0]["content"] == "Hello"
+    assert "UNTRUSTED" not in user_rows[0]["content"]
+    assert "[journal_sync]" not in user_rows[0]["content"]
 
     with pytest.raises(ActiveAgentSessionError):
         await start_agent_session(

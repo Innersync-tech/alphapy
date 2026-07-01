@@ -11,6 +11,7 @@ from agents.policy import (
     REQUIRED_POLICY_MARKERS,
     build_agent_system_prompt,
     build_agent_user_message,
+    public_user_message,
 )
 
 
@@ -36,6 +37,16 @@ def test_user_message_marks_context_untrusted() -> None:
     assert "UNTRUSTED" in body
     assert "User request: Hello" in body
     assert "Some reflection text" in body
+
+
+def test_public_user_message_strips_internal_context() -> None:
+    body = build_agent_user_message(
+        context_blob="[journal_sync]\nSecret reflection",
+        user_request="hey",
+    )
+    assert public_user_message(body) == "hey"
+    assert public_user_message("Follow up") == "Follow up"
+    assert public_user_message("") == ""
 
 
 def test_jailbreak_probes_are_documented() -> None:

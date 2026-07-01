@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 import config
 from agents.base import AgentResult
 from agents.memory import get_active_session, get_session_by_id, get_session_messages
+from agents.policy import public_user_message
 from agents.registry import list_agents, resolve_agent
 from agents.runtime import (
     ActiveAgentSessionError,
@@ -81,11 +82,14 @@ def _format_messages(rows: list[dict[str, Any]]) -> list[AgentMessageResponse]:
         role = row.get("role")
         if role not in {"user", "assistant"}:
             continue
+        content = str(row.get("content", ""))
+        if role == "user":
+            content = public_user_message(content)
         formatted.append(
             AgentMessageResponse(
                 turn_index=int(row.get("turn_index", 0)),
                 role=role,
-                content=str(row.get("content", "")),
+                content=content,
             )
         )
     return formatted

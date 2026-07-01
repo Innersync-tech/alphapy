@@ -88,6 +88,21 @@ def build_agent_user_message(*, context_blob: str, user_request: str) -> str:
     return "\n\n".join(parts)
 
 
+_USER_REQUEST_MARKER = "User request:"
+
+
+def public_user_message(content: str) -> str:
+    """Return user-visible turn text; strip internal skill context from stored prompts."""
+    text = content.strip()
+    if not text:
+        return text
+    if _USER_REQUEST_MARKER in text:
+        return text.rsplit(_USER_REQUEST_MARKER, 1)[-1].strip()
+    if "UNTRUSTED" in text or "[agent_profile]" in text or "[journal_sync]" in text:
+        return ""
+    return text
+
+
 # Strings that MUST appear in the system prompt (enforced by tests).
 REQUIRED_POLICY_MARKERS: tuple[str, ...] = (
     "NEVER decrypt",
