@@ -26,8 +26,8 @@ from agents.runtime import (
     start_agent_session,
 )
 from utils.cog_base import AlphaCog
-from utils.db_helpers import get_bot_db_pool
 from utils.core_discord_integration import normalize_http_url
+from utils.db_helpers import get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_embed_text
