@@ -3374,6 +3374,7 @@ async def _resolve_verification_on_bot_loop(
     resolved_by_discord_id: int,
 ) -> None:
     import discord
+
     from gpt.helpers import bot_instance
 
     if bot_instance is None:
