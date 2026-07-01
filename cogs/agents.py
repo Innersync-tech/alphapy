@@ -45,8 +45,8 @@ def _app_agent_home_url() -> str:
     return f"{base.rstrip('/')}/dashboard/agent"
 
 
-def _agent_response_embed(result: AgentResult, *, active_session: bool = False) -> discord.Embed:
-    """Build the /agent start reply: user display name as title, agent type in footer."""
+def _agent_response_embed(result: AgentResult) -> discord.Embed:
+    """Build the /agent reply: user display name as title, agent metadata in footer."""
     agent_name = result.agent_name
     if result.display_name:
         title = safe_embed_text(result.display_name, 256)
@@ -59,8 +59,6 @@ def _agent_response_embed(result: AgentResult, *, active_session: bool = False) 
     if result.skill_blocks:
         skills_used = ", ".join(result.skill_blocks.keys())
         footer_parts.append(f"skills: {skills_used}")
-    if active_session:
-        footer_parts.append(f"App → {_app_agent_home_url()}")
 
     embed = discord.Embed(
         title=title,
@@ -69,6 +67,19 @@ def _agent_response_embed(result: AgentResult, *, active_session: bool = False) 
     )
     embed.set_footer(text=" · ".join(footer_parts))
     return embed
+
+
+def _agent_app_link_view() -> discord.ui.View:
+    """Link button for cross-platform agent chat (footer cannot hold markdown URLs)."""
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Continue in App",
+            url=_app_agent_home_url(),
+            style=discord.ButtonStyle.link,
+        )
+    )
+    return view
 
 
 def _agents_globally_enabled() -> bool:
@@ -176,8 +187,8 @@ class AgentGroup(app_commands.Group):
             )
         except ActiveAgentSessionError:
             await interaction.followup.send(
-                "You already have an active session. Use `/agent continue`, continue in the "
-                f"App ({_app_agent_home_url()}), or `/agent end` to finish.",
+                "You already have an active session. Use `/agent continue` or `/agent end` to finish.",
+                view=_agent_app_link_view(),
                 ephemeral=True,
             )
             return
@@ -196,7 +207,9 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result, active_session=True), ephemeral=True
+            embed=_agent_response_embed(result),
+            view=_agent_app_link_view(),
+            ephemeral=True,
         )
 
     @app_commands.command(name="continue", description="Continue your active agent session")
@@ -261,7 +274,9 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result, active_session=True), ephemeral=True
+            embed=_agent_response_embed(result),
+            view=_agent_app_link_view(),
+            ephemeral=True,
         )
 
     @app_commands.command(name="end", description="End your active agent session")
@@ -364,12 +379,15 @@ class AgentGroup(app_commands.Group):
                 f"{origin_hint}"
                 f"Started: {row.get('started_at', 'unknown')}\n"
                 f"Turns: {turn_count}\n\n"
-                "Discord: `/agent continue` or `/agent end`\n"
-                f"App: {_app_agent_home_url()}"
+                "Discord: `/agent continue` or `/agent end`"
             ),
             color=_AGENT_COLOR,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(
+            embed=embed,
+            view=_agent_app_link_view(),
+            ephemeral=True,
+        )
 
 
 class AgentsCog(AlphaCog):
