@@ -516,3 +516,59 @@ class TestVerificationResolve:
               json={"outcome": "approved"},
           )
       assert response.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# Dashboard discord meta
+# ---------------------------------------------------------------------------
+
+
+class TestDiscordMeta:
+    @patch("api.asyncio.run_coroutine_threadsafe")
+    def test_returns_channels_and_roles(self, mock_threadsafe):
+        from api import DiscordMetaChannel, DiscordMetaResponse, DiscordMetaRole
+
+        meta = DiscordMetaResponse(
+            channels=[
+                DiscordMetaChannel(id="111", name="general", type="text", parent_id=None),
+                DiscordMetaChannel(id="222", name="tickets", type="category", parent_id=None),
+            ],
+            roles=[DiscordMetaRole(id="333", name="Staff", color=16711680, position=5)],
+        )
+        future = Future()
+        future.set_result(meta)
+        mock_threadsafe.return_value = future
+        mock_bot = MagicMock()
+        mock_bot.loop = MagicMock()
+        app = _make_dashboard_app()
+        with patch("gpt.helpers.bot_instance", mock_bot):
+            client = TestClient(app)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/discord-meta")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["channels"]) == 2
+        assert data["channels"][0]["type"] == "text"
+        assert len(data["roles"]) == 1
+        assert data["roles"][0]["name"] == "Staff"
+        mock_threadsafe.assert_called_once()
+
+    def test_returns_503_when_bot_unavailable(self):
+        app = _make_dashboard_app()
+        with patch("gpt.helpers.bot_instance", None):
+            client = TestClient(app)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/discord-meta")
+        assert response.status_code == 503
+
+    @patch("api.asyncio.run_coroutine_threadsafe")
+    def test_returns_400_when_guild_not_found(self, mock_threadsafe):
+        future = Future()
+        future.set_exception(RuntimeError("Guild not found"))
+        mock_threadsafe.return_value = future
+        mock_bot = MagicMock()
+        mock_bot.loop = MagicMock()
+        app = _make_dashboard_app()
+        with patch("gpt.helpers.bot_instance", mock_bot):
+            client = TestClient(app, raise_server_exceptions=False)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/discord-meta")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Guild not found"
