@@ -3527,6 +3527,15 @@ async def resolve_verification_ticket(
     return {"success": True, "outcome": body.outcome, "ticket_id": ticket_id}
 
 
+from agents.http_routes import include_agent_routes
+
+include_agent_routes(
+    router,
+    get_authenticated_user_id=get_authenticated_user_id,
+    require_discord_link=_require_discord_id_for_linked_innersync,
+)
+
+
 app.include_router(router)
 
 

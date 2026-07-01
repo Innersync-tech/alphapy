@@ -161,7 +161,7 @@ class AgentGroup(app_commands.Group):
                 guild_id=guild_id,
                 agent_name=agent_name,
                 user_message=message,
-                metadata={"source": "discord_slash"},
+                channel="discord",
             )
         except ActiveAgentSessionError:
             await interaction.followup.send(
@@ -235,7 +235,7 @@ class AgentGroup(app_commands.Group):
                 guild_id=guild_id,
                 agent_name=agent_name,
                 user_message=message.strip(),
-                metadata={"source": "discord_slash"},
+                channel="discord",
             )
         except NoActiveAgentSessionError:
             await interaction.followup.send(
@@ -286,7 +286,7 @@ class AgentGroup(app_commands.Group):
                 discord_user_id=discord_user_id,
                 guild_id=guild_id,
                 agent_name=agent_name,
-                metadata={"source": "discord_slash"},
+                channel="discord",
             )
         except NoActiveAgentSessionError:
             await interaction.followup.send(

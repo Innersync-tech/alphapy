@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from agents.base import AgentContext, AgentResult
+from agents.channels import AgentChannel, merge_channel_metadata
 from agents.memory import (
     append_session_messages,
     complete_session,
@@ -13,6 +14,7 @@ from agents.memory import (
     get_active_session,
     get_session_messages,
     get_user_memory,
+    patch_session_metadata,
     patch_user_memory,
     strip_sensitive_memory_keys,
     touch_session,
@@ -226,6 +228,26 @@ def _result_from_turn(
     )
 
 
+async def _apply_channel_metadata(
+    session_id: str,
+    *,
+    channel: AgentChannel | None,
+    existing_metadata: dict[str, Any] | None = None,
+    is_start: bool = False,
+    guild_id: int | None = None,
+) -> dict[str, Any]:
+    if channel is None:
+        return dict(existing_metadata or {})
+    merged = merge_channel_metadata(
+        existing_metadata or {},
+        channel=channel,
+        is_start=is_start,
+        guild_id=guild_id,
+    )
+    await patch_session_metadata(session_id, merged)
+    return merged
+
+
 async def start_agent_session(
     *,
     innersync_user_id: str,
@@ -234,6 +256,7 @@ async def start_agent_session(
     agent_name: str,
     user_message: str | None = None,
     metadata: dict[str, Any] | None = None,
+    channel: AgentChannel | None = None,
 ) -> AgentResult:
     """Start a multi-turn session (first turn). Session stays active until /agent end."""
     agent = resolve_agent(agent_name)
@@ -261,12 +284,21 @@ async def start_agent_session(
     )
     prompt = user_message or "Give a short reflection based on the context."
 
+    session_metadata = dict(metadata or {})
+    if channel is not None:
+        session_metadata = merge_channel_metadata(
+            session_metadata,
+            channel=channel,
+            is_start=True,
+            guild_id=guild_id,
+        )
+
     session_id = await create_session(
         innersync_user_id=innersync_user_id,
         discord_user_id=discord_user_id,
         guild_id=guild_id,
         agent_name=agent_name,
-        metadata=metadata,
+        metadata=session_metadata,
     )
 
     ctx = AgentContext(
@@ -276,7 +308,7 @@ async def start_agent_session(
         agent_name=agent_name,
         session_id=session_id,
         memory=tier3,
-        metadata=metadata or {},
+        metadata=session_metadata,
     )
 
     summary, skill_blocks, stored_user = await _run_agent_turn(
@@ -315,6 +347,7 @@ async def continue_agent_session(
     agent_name: str,
     user_message: str,
     metadata: dict[str, Any] | None = None,
+    channel: AgentChannel | None = None,
 ) -> AgentResult:
     """Append a turn to the active session."""
     agent = resolve_agent(agent_name)
@@ -328,6 +361,16 @@ async def continue_agent_session(
         )
 
     session_id = str(active["id"])
+    active_metadata = active.get("metadata") or {}
+    if not isinstance(active_metadata, dict):
+        active_metadata = {}
+    session_metadata = await _apply_channel_metadata(
+        session_id,
+        channel=channel,
+        existing_metadata=active_metadata,
+        is_start=False,
+    )
+
     prior_turns = await get_session_messages(session_id)
     turn_index = max((int(row.get("turn_index", 0)) for row in prior_turns), default=-1) + 1
 
@@ -343,7 +386,7 @@ async def continue_agent_session(
         agent_name=agent_name,
         session_id=session_id,
         memory=tier3,
-        metadata=metadata or {},
+        metadata=session_metadata or dict(metadata or {}),
     )
 
     summary, skill_blocks, stored_user = await _run_agent_turn(
@@ -381,6 +424,7 @@ async def end_agent_session(
     guild_id: int | None,
     agent_name: str,
     metadata: dict[str, Any] | None = None,
+    channel: AgentChannel | None = None,
 ) -> AgentResult:
     """Finalize an active session: distill Tier 2, patch Tier 3, delete ephemeral messages."""
     agent = resolve_agent(agent_name)
@@ -394,6 +438,16 @@ async def end_agent_session(
         )
 
     session_id = str(active["id"])
+    active_metadata = active.get("metadata") or {}
+    if not isinstance(active_metadata, dict):
+        active_metadata = {}
+    session_metadata = await _apply_channel_metadata(
+        session_id,
+        channel=channel,
+        existing_metadata=active_metadata,
+        is_start=False,
+    )
+
     prior_turns = await get_session_messages(session_id)
     turn_count = max((int(row.get("turn_index", 0)) for row in prior_turns), default=-1) + 1
 
@@ -409,7 +463,7 @@ async def end_agent_session(
         agent_name=agent_name,
         session_id=session_id,
         memory=tier3,
-        metadata=metadata or {},
+        metadata=session_metadata or dict(metadata or {}),
     )
 
     skill_blocks = await _build_skill_context(ctx)

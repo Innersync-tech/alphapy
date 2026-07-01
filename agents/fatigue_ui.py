@@ -94,7 +94,7 @@ class FatigueQuickCheckView(discord.ui.View):
                 guild_id=self.guild_id,
                 agent_name=self.agent_name,
                 user_message=self.user_message,
-                metadata={"source": "discord_slash"},
+                channel="discord",
             )
         except ActiveAgentSessionError:
             await interaction.followup.send(
