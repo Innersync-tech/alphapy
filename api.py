@@ -19,6 +19,7 @@ from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response
 
 import config
+from agents.http_routes import include_agent_routes
 from cogs.reminders import (
     create_reminder,
     delete_reminder,
@@ -3526,8 +3527,6 @@ async def resolve_verification_ticket(
 
     return {"success": True, "outcome": body.outcome, "ticket_id": ticket_id}
 
-
-from agents.http_routes import include_agent_routes
 
 include_agent_routes(
     router,
