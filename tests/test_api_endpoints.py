@@ -6,7 +6,8 @@ api.py startup logic. Dependencies (API key, auth, guild admin) are overridden
 via app.dependency_overrides; db_pool is patched at the module level.
 """
 
-from datetime import time
+from concurrent.futures import Future
+from datetime import date, datetime, time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +20,7 @@ from api import (
     require_observability_api_key,
     router,
     verify_api_key,
+    verify_dashboard_discord_admin,
 )
 
 # ---------------------------------------------------------------------------
@@ -417,3 +419,100 @@ class TestGetAutomodRules:
             client = TestClient(app, raise_server_exceptions=False)
             response = client.get(f"/api/dashboard/{GUILD_ID}/automod/rules")
         assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Dashboard verification queue / resolve
+# ---------------------------------------------------------------------------
+
+
+def _verification_queue_row(**kwargs):
+    defaults = {
+        "id": 7,
+        "user_id": DISCORD_USER_ID,
+        "channel_id": 222222222222222222,
+        "status": "manual_review",
+        "ai_reason": "Amount mismatch",
+        "ai_can_verify": False,
+        "ai_needs_manual_review": True,
+        "payment_date": date(2026, 6, 1),
+        "created_at": datetime(2026, 6, 1, 10, 0, 0),
+    }
+    defaults.update(kwargs)
+    return _fake_record(**defaults)
+
+
+def _make_dashboard_app() -> FastAPI:
+    app = make_app()
+    app.dependency_overrides[verify_dashboard_discord_admin] = lambda: DISCORD_USER_ID
+    return app
+
+
+class TestVerificationQueue:
+  def test_returns_503_when_db_unavailable(self):
+      app = _make_dashboard_app()
+      with patch.object(api_module, "db_pool", None):
+          client = TestClient(app)
+          response = client.get(f"/api/dashboard/{GUILD_ID}/verification/queue")
+      assert response.status_code == 503
+
+  def test_returns_queue_without_screenshot_fields(self):
+      pool, conn = _mock_pool(_verification_queue_row())
+      app = _make_dashboard_app()
+      with patch.object(api_module, "db_pool", pool):
+          client = TestClient(app)
+          response = client.get(f"/api/dashboard/{GUILD_ID}/verification/queue")
+      assert response.status_code == 200
+      data = response.json()
+      assert len(data) == 1
+      assert data[0]["id"] == 7
+      assert data[0]["ai_reason"] == "Amount mismatch"
+      assert "screenshot" not in data[0]
+      conn.fetch.assert_awaited_once()
+
+
+class TestVerificationResolve:
+  @patch("api.asyncio.run_coroutine_threadsafe")
+  def test_resolve_approved(self, mock_threadsafe):
+      future = Future()
+      future.set_result(None)
+      mock_threadsafe.return_value = future
+      mock_bot = MagicMock()
+      mock_bot.loop = MagicMock()
+      app = _make_dashboard_app()
+      with patch("gpt.helpers.bot_instance", mock_bot):
+          client = TestClient(app)
+          response = client.post(
+              f"/api/dashboard/{GUILD_ID}/verification/7/resolve",
+              json={"outcome": "approved"},
+          )
+      assert response.status_code == 200
+      assert response.json() == {"success": True, "outcome": "approved", "ticket_id": 7}
+      mock_threadsafe.assert_called_once()
+
+  @patch("api.asyncio.run_coroutine_threadsafe")
+  def test_resolve_rejected_with_reason(self, mock_threadsafe):
+      future = Future()
+      future.set_result(None)
+      mock_threadsafe.return_value = future
+      mock_bot = MagicMock()
+      mock_bot.loop = MagicMock()
+      app = _make_dashboard_app()
+      with patch("gpt.helpers.bot_instance", mock_bot):
+          client = TestClient(app)
+          response = client.post(
+              f"/api/dashboard/{GUILD_ID}/verification/7/resolve",
+              json={"outcome": "rejected", "reason": "Invalid receipt"},
+          )
+      assert response.status_code == 200
+      assert response.json()["outcome"] == "rejected"
+
+  def test_returns_503_when_bot_unavailable(self):
+      app = _make_dashboard_app()
+      with patch("gpt.helpers.bot_instance", None):
+          client = TestClient(app)
+          response = client.post(
+              f"/api/dashboard/{GUILD_ID}/verification/7/resolve",
+              json={"outcome": "approved"},
+          )
+      assert response.status_code == 503

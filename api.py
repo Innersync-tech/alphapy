@@ -3306,6 +3306,226 @@ async def update_automod_settings(
         raise HTTPException(status_code=500, detail="Failed to update auto-mod settings") from exc
 
 
+# ---------------------------------------------------------------------------
+# Verification dashboard (manual review queue)
+# ---------------------------------------------------------------------------
+
+
+class VerificationQueueItem(BaseModel):
+    id: int
+    user_id: int
+    channel_id: int
+    status: str
+    ai_reason: str | None = None
+    ai_can_verify: bool | None = None
+    ai_needs_manual_review: bool | None = None
+    payment_date: str | None = None
+    created_at: datetime | None = None
+
+
+class VerificationResolveRequest(BaseModel):
+    outcome: Literal["approved", "rejected"]
+    reason: str | None = None
+
+
+async def verify_dashboard_discord_admin(
+    guild_id: int,
+    x_discord_user_id: str = Header(..., alias="X-Discord-User-Id"),
+    x_api_key: str | None = Header(None, alias="X-Api-Key"),
+) -> int:
+    """Dashboard service auth: API key + Discord snowflake with guild admin check."""
+    configured_key = getattr(config, "API_KEY", None)
+    if not configured_key or x_api_key != configured_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        discord_id = int(x_discord_user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid Discord user id") from exc
+
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot not available for permission check.")
+
+    loop = bot_instance.loop
+
+    async def runner() -> bool:
+        return await _check_guild_admin_on_bot_loop(discord_id, guild_id)
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(runner(), loop)
+        is_admin = await asyncio.wait_for(asyncio.wrap_future(future), timeout=5.0)
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Permission check timed out.") from exc
+    except Exception as exc:
+        logger.debug(f"Dashboard guild admin check failed: {exc}")
+        raise HTTPException(status_code=403, detail="Could not verify guild admin access.") from exc
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="You do not have admin access to this guild.")
+    return discord_id
+
+
+async def _resolve_verification_on_bot_loop(
+    guild_id: int,
+    ticket_id: int,
+    outcome: Literal["approved", "rejected"],
+    reason: str,
+    resolved_by_discord_id: int,
+) -> None:
+    import discord
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise RuntimeError("Bot not available")
+
+    cog = bot_instance.get_cog("VerificationCog")
+    if cog is None:
+        raise RuntimeError("Verification cog not loaded")
+
+    global db_pool
+    if db_pool is None:
+        raise RuntimeError("Database not available")
+
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT channel_id, user_id, status
+            FROM verification_tickets
+            WHERE id = $1 AND guild_id = $2
+            """,
+            ticket_id,
+            guild_id,
+        )
+    if not row:
+        raise RuntimeError("Verification ticket not found")
+    if str(row["status"]) != "manual_review":
+        raise RuntimeError("Ticket is not awaiting manual review")
+
+    guild = bot_instance.get_guild(guild_id)
+    if guild is None:
+        raise RuntimeError("Guild not found")
+
+    channel_id = int(row["channel_id"])
+    channel = guild.get_channel(channel_id)
+    if channel is None:
+        channel = await guild.fetch_channel(channel_id)
+    if not isinstance(channel, discord.TextChannel):
+        raise RuntimeError("Verification channel not found")
+
+    member = guild.get_member(int(row["user_id"]))
+    if member is None:
+        try:
+            member = await guild.fetch_member(int(row["user_id"]))
+        except Exception:
+            member = None
+
+    resolver = guild.get_member(resolved_by_discord_id)
+    if resolver is None:
+        try:
+            resolver = await bot_instance.fetch_user(resolved_by_discord_id)
+        except Exception:
+            resolver = None
+
+    from cogs.verification import VerificationCog
+
+    await cast(VerificationCog, cog)._resolve_verification(
+        channel=channel,
+        member=member,
+        guild=guild,
+        resolved_by=resolver,
+        outcome=outcome,
+        reason=reason,
+    )
+
+
+@router.get(
+    "/dashboard/{guild_id}/verification/queue",
+    response_model=list[VerificationQueueItem],
+)
+async def get_verification_queue(
+    guild_id: int,
+    discord_admin_id: int = Depends(verify_dashboard_discord_admin),
+):
+    """List verification tickets awaiting manual review (no screenshot content)."""
+    del discord_admin_id
+    global db_pool
+    if db_pool is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, user_id, channel_id, status, ai_reason, ai_can_verify,
+                       ai_needs_manual_review, payment_date, created_at
+                FROM verification_tickets
+                WHERE guild_id = $1 AND status = 'manual_review' AND resolved_at IS NULL
+                ORDER BY created_at ASC
+                """,
+                guild_id,
+            )
+        return [
+            VerificationQueueItem(
+                id=int(row["id"]),
+                user_id=int(row["user_id"]),
+                channel_id=int(row["channel_id"]),
+                status=str(row["status"]),
+                ai_reason=row["ai_reason"],
+                ai_can_verify=row["ai_can_verify"],
+                ai_needs_manual_review=row["ai_needs_manual_review"],
+                payment_date=row["payment_date"].isoformat() if row["payment_date"] else None,
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"[ERROR] Failed to fetch verification queue for guild {guild_id}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to fetch verification queue") from exc
+
+
+@router.post("/dashboard/{guild_id}/verification/{ticket_id}/resolve")
+async def resolve_verification_ticket(
+    guild_id: int,
+    ticket_id: int,
+    body: VerificationResolveRequest,
+    discord_admin_id: int = Depends(verify_dashboard_discord_admin),
+):
+    """Approve or reject a manual verification review (runs on bot event loop)."""
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot not available")
+
+    reason = (body.reason or "").strip()
+
+    async def runner() -> None:
+        await _resolve_verification_on_bot_loop(
+            guild_id,
+            ticket_id,
+            body.outcome,
+            reason,
+            discord_admin_id,
+        )
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(runner(), bot_instance.loop)
+        await asyncio.wait_for(asyncio.wrap_future(future), timeout=30.0)
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Verification resolution timed out.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(
+            f"[ERROR] Failed to resolve verification ticket {ticket_id} for guild {guild_id}: {exc}"
+        )
+        raise HTTPException(status_code=500, detail="Failed to resolve verification") from exc
+
+    return {"success": True, "outcome": body.outcome, "ticket_id": ticket_id}
+
+
 app.include_router(router)
 
 
