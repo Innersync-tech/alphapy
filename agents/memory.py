@@ -357,6 +357,53 @@ async def complete_session(
         response.raise_for_status()
 
 
+async def get_session_by_id(session_id: str) -> dict[str, Any] | None:
+    """Load a session row by primary key."""
+    if not _use_supabase():
+        return _local_sessions.get(session_id)
+
+    rows = await _supabase_get(
+        _SESSIONS_TABLE,
+        {
+            "select": "id,innersync_user_id,discord_user_id,guild_id,agent_name,status,metadata,started_at",
+            "id": f"eq.{session_id}",
+            "limit": 1,
+        },
+    )
+    return rows[0] if rows else None
+
+
+async def patch_session_metadata(session_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    """Merge patch into session metadata and persist."""
+    row = await get_session_by_id(session_id)
+    if not row:
+        raise ValueError(f"Session not found: {session_id}")
+
+    current = row.get("metadata") or {}
+    if not isinstance(current, dict):
+        current = {}
+    merged = {**current, **patch}
+
+    if not _use_supabase():
+        stored = _local_sessions.get(session_id)
+        if stored:
+            stored["metadata"] = merged
+        return merged
+
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_SESSIONS_TABLE}"
+    params = {"id": f"eq.{session_id}"}
+    payload = {"metadata": merged, "updated_at": _now_iso()}
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.patch(
+            url,
+            json=payload,
+            headers=_headers(prefer=["return=minimal"], method="PATCH"),
+            params=params,
+        )
+        response.raise_for_status()
+    return merged
+
+
 async def get_active_session(
     innersync_user_id: str,
     agent_name: str,
