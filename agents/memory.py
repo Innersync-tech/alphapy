@@ -34,6 +34,19 @@ _local_sessions: dict[str, dict[str, Any]] = {}
 _local_memory: dict[str, dict[str, Any]] = {}
 _local_session_messages: dict[str, list[dict[str, Any]]] = {}
 
+_ROLE_SORT_ORDER = {"user": 0, "assistant": 1}
+
+
+def _sort_session_messages(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """User before assistant within each turn (role.asc would reverse that)."""
+    return sorted(
+        rows,
+        key=lambda row: (
+            int(row.get("turn_index", 0)),
+            _ROLE_SORT_ORDER.get(str(row.get("role", "")), 2),
+        ),
+    )
+
 
 # Keys that may contain journal/reflection plaintext — never persist or inject.
 _SENSITIVE_MEMORY_KEYS = frozenset(
@@ -436,18 +449,17 @@ async def get_session_messages(session_id: str) -> list[dict[str, Any]]:
     """Load ordered turn messages for an active session."""
     if not _use_supabase():
         rows = list(_local_session_messages.get(session_id, []))
-        rows.sort(key=lambda r: (int(r.get("turn_index", 0)), r.get("role", "")))
-        return rows
+        return _sort_session_messages(rows)
 
     rows = await _supabase_get(
         _MESSAGES_TABLE,
         {
             "select": "turn_index,role,content,created_at",
             "session_id": f"eq.{session_id}",
-            "order": "turn_index.asc,role.asc",
+            "order": "turn_index.asc",
         },
     )
-    return rows
+    return _sort_session_messages(rows)
 
 
 async def append_session_messages(

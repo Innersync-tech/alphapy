@@ -101,6 +101,22 @@ def _turn_count_from_messages(messages: list[AgentMessageResponse]) -> int:
     return len({message.turn_index for message in messages})
 
 
+async def _active_session_response(
+    result: AgentResult,
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> AgentActiveSessionResponse:
+    messages = _format_messages(await get_session_messages(result.session_id))
+    turn_count = _turn_count_from_messages(messages) or result.turn_count
+    return _session_response(
+        result,
+        status="active",
+        metadata=metadata,
+        messages=messages,
+        turn_count=turn_count,
+    )
+
+
 def _session_response(
     result: AgentResult,
     *,
@@ -197,11 +213,11 @@ def include_agent_routes(
             turn_count=turn_count,
         )
 
-    @api_router.post("/agents/sessions", response_model=AgentSessionResponse, status_code=201)
+    @api_router.post("/agents/sessions", response_model=AgentActiveSessionResponse, status_code=201)
     async def start_agent_session_http(
         body: AgentSessionStartRequest,
         auth_user_id: str = Depends(get_authenticated_user_id),
-    ) -> AgentSessionResponse:
+    ) -> AgentActiveSessionResponse:
         _require_agents_enabled()
         discord_user_id = await require_discord_link(auth_user_id)
 
@@ -236,15 +252,14 @@ def include_agent_routes(
         metadata = (
             session.get("metadata") if session and isinstance(session.get("metadata"), dict) else {}
         )
-        response = _session_response(result, status="active", metadata=metadata)
-        return AgentSessionResponse(**response.model_dump(exclude={"messages"}))
+        return await _active_session_response(result, metadata=metadata)
 
-    @api_router.post("/agents/sessions/{session_id}/turns", response_model=AgentSessionResponse)
+    @api_router.post("/agents/sessions/{session_id}/turns", response_model=AgentActiveSessionResponse)
     async def continue_agent_session_http(
         session_id: str,
         body: AgentSessionTurnRequest,
         auth_user_id: str = Depends(get_authenticated_user_id),
-    ) -> AgentSessionResponse:
+    ) -> AgentActiveSessionResponse:
         _require_agents_enabled()
         discord_user_id = await require_discord_link(auth_user_id)
 
@@ -273,8 +288,7 @@ def include_agent_routes(
         metadata = (
             updated.get("metadata") if updated and isinstance(updated.get("metadata"), dict) else {}
         )
-        response = _session_response(result, status="active", metadata=metadata)
-        return AgentSessionResponse(**response.model_dump(exclude={"messages"}))
+        return await _active_session_response(result, metadata=metadata)
 
     @api_router.post("/agents/sessions/{session_id}/complete", response_model=AgentSessionResponse)
     async def complete_agent_session_http(
