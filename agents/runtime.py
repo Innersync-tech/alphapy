@@ -22,6 +22,7 @@ from agents.memory import (
 from agents.policy import (
     build_agent_system_prompt,
     build_agent_user_message,
+    public_user_message,
 )
 from agents.profile import (
     build_agent_profile_block,
@@ -150,7 +151,7 @@ def _transcript_from_messages(messages: list[dict[str, Any]]) -> tuple[str, str]
         if not content:
             continue
         if role == "user":
-            user_parts.append(content)
+            user_parts.append(public_user_message(content))
         elif role == "assistant":
             assistant_parts.append(content)
     return "\n---\n".join(user_parts)[:2500], "\n---\n".join(assistant_parts)[:2500]
@@ -189,7 +190,7 @@ async def _run_agent_turn(
     if not summary:
         summary = "I could not generate a response right now. Please try again shortly."
 
-    stored_user = messages[-1]["content"]
+    stored_user = safe_prompt(user_message[:2000])
     return summary, skill_blocks, stored_user
 
 
