@@ -85,7 +85,7 @@ class FatigueQuickCheckView(discord.ui.View):
         await self._run_agent_start(interaction)
 
     async def _run_agent_start(self, interaction: discord.Interaction) -> None:
-        from cogs.agents import _agent_response_embed
+        from cogs.agents import _agent_app_link_view, _agent_response_embed
 
         try:
             result = await start_agent_session(
@@ -118,7 +118,9 @@ class FatigueQuickCheckView(discord.ui.View):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result, active_session=True), ephemeral=True
+            embed=_agent_response_embed(result),
+            view=_agent_app_link_view(),
+            ephemeral=True,
         )
 
 

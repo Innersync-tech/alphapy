@@ -1,5 +1,5 @@
 from agents.base import AgentResult
-from cogs.agents import _agent_response_embed
+from cogs.agents import _agent_app_link_view, _agent_response_embed, _app_agent_home_url
 
 
 def test_agent_response_embed_uses_display_name_as_title() -> None:
@@ -16,6 +16,7 @@ def test_agent_response_embed_uses_display_name_as_title() -> None:
     assert "Agent: reflection" in embed.footer.text
     assert "Session a64fdd42" in embed.footer.text
     assert "skills: journal_sync" in embed.footer.text
+    assert "innersync.tech" not in embed.footer.text
 
 
 def test_agent_response_embed_falls_back_to_agent_label_without_display_name() -> None:
@@ -29,3 +30,11 @@ def test_agent_response_embed_falls_back_to_agent_label_without_display_name() -
     assert embed.title == "Reflection"
     assert embed.footer is not None
     assert embed.footer.text.startswith("Agent: reflection")
+
+
+def test_agent_app_link_view_points_to_dashboard_agent() -> None:
+    view = _agent_app_link_view()
+    assert len(view.children) == 1
+    button = view.children[0]
+    assert button.label == "Continue in App"
+    assert button.url == _app_agent_home_url()
