@@ -1052,7 +1052,7 @@ In-memory IP-based sliding window limits:
 
 ## Versioning
 
-Current API version: **3.9.0** (Reflection Loop)
+Current API version: **3.11.0** (Reflection Loop)
 
 Version information is included in health check responses and can be queried via `/api/health`.
 
