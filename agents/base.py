@@ -15,6 +15,7 @@ class AgentContext:
     agent_name: str
     session_id: str | None = None
     memory: dict[str, Any] = field(default_factory=dict)
+    derived_profile: dict[str, Any] = field(default_factory=dict)
     skill_blocks: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 

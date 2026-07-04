@@ -33,9 +33,14 @@ from agents.profile import (
 )
 from agents.registry import resolve_agent
 from agents.tier2 import (
+    SESSION_INSIGHT_SNAPSHOT_KEY,
     TIER2_ROOT_KEY,
+    append_skill_insights,
+    build_blocklist_from_tier0,
+    build_session_insight_snapshot,
     distill_session_profile,
     extract_derived_profile,
+    normalize_derived_profile,
     session_summary_from_profile,
 )
 from gpt.context_loader import _fetch_active_consent_reflection_ids
@@ -309,6 +314,7 @@ async def start_agent_session(
         agent_name=agent_name,
         session_id=session_id,
         memory=tier3,
+        derived_profile=derived_profile,
         metadata=session_metadata,
     )
 
@@ -387,6 +393,7 @@ async def continue_agent_session(
         agent_name=agent_name,
         session_id=session_id,
         memory=tier3,
+        derived_profile=derived_profile,
         metadata=session_metadata or dict(metadata or {}),
     )
 
@@ -456,6 +463,9 @@ async def end_agent_session(
         innersync_user_id,
         agent_name,
     )
+    profile_before = extract_derived_profile(
+        {TIER2_ROOT_KEY: derived_profile} if derived_profile else {}
+    )
 
     ctx = AgentContext(
         innersync_user_id=innersync_user_id,
@@ -464,6 +474,7 @@ async def end_agent_session(
         agent_name=agent_name,
         session_id=session_id,
         memory=tier3,
+        derived_profile=derived_profile,
         metadata=session_metadata or dict(metadata or {}),
     )
 
@@ -480,6 +491,10 @@ async def end_agent_session(
     consent_ids = await _fetch_active_consent_reflection_ids(innersync_user_id)
     tier0_context = skill_blocks.get("journal_sync", "")
     user_transcript, assistant_transcript = _transcript_from_messages(prior_turns)
+    ctx.metadata["user_transcript"] = user_transcript
+    ctx.metadata["assistant_transcript"] = assistant_transcript
+    ctx.metadata["consent_ids"] = sorted(consent_ids)
+    ctx.metadata["prefs"] = prefs
 
     if learn_from_shared_enabled(prefs) and consent_ids and tier0_context.strip():
         merged_profile = await distill_session_profile(
@@ -494,10 +509,44 @@ async def end_agent_session(
         if merged_profile:
             memory_patch[TIER2_ROOT_KEY] = merged_profile
             derived_profile = merged_profile
+            ctx.derived_profile = derived_profile
             session_summary = session_summary_from_profile(merged_profile)
 
     updated_memory = await patch_user_memory(innersync_user_id, agent_name, memory_patch)
+    ctx.derived_profile = extract_derived_profile(updated_memory)
     await _execute_agent_skills(ctx)
+
+    skill_candidates = ctx.metadata.get("skill_insight_candidates")
+    if (
+        isinstance(skill_candidates, list)
+        and skill_candidates
+        and learn_from_shared_enabled(prefs)
+        and consent_ids
+        and tier0_context.strip()
+    ):
+        blocklist = build_blocklist_from_tier0(tier0_context)
+        merged_after_skills = append_skill_insights(
+            ctx.derived_profile,
+            skill_candidates,
+            source_reflection_ids=consent_ids,
+            consent_epoch=ctx.metadata.get("consent_epoch") or "",
+            blocklist=blocklist,
+        )
+        if merged_after_skills != normalize_derived_profile(ctx.derived_profile):
+            skill_patch = {TIER2_ROOT_KEY: merged_after_skills}
+            updated_memory = await patch_user_memory(
+                innersync_user_id,
+                agent_name,
+                skill_patch,
+            )
+            derived_profile = extract_derived_profile(updated_memory)
+            ctx.derived_profile = derived_profile
+            memory_patch[TIER2_ROOT_KEY] = derived_profile
+            session_summary = session_summary_from_profile(derived_profile)
+
+    snapshot = build_session_insight_snapshot(profile_before, derived_profile)
+    if snapshot:
+        memory_patch[SESSION_INSIGHT_SNAPSHOT_KEY] = snapshot
 
     await complete_session(
         session_id,

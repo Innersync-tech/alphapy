@@ -10,6 +10,17 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - (No changes yet)
 
+## [3.12.0] - 2026-07-04
+
+### Added
+- **Reflection dialogue skills** — `inner_critic_dialogue`, `avoidance_processor`, and `chain_breaker_micro` on the `reflection` agent (Tier 2 pattern context + micro-step prompts; optional Tier 2 write-back on `/agent end` when learning is enabled).
+- **Tier 2 skill plumbing** — `AgentContext.derived_profile`, `agents/skill_memory.py`, `append_skill_insights()` in `agents/tier2.py`; end-session ordering: distill → skill execute → optional second patch.
+- **Session insight snapshot** — `agent_sessions.memory_patch.session_insight_snapshot` (up to five insight chips per session for App timeline UI).
+
+### Changed
+- **Agent policy** — dialogue skills must mirror and offer one micro-step; no clinical advice dump.
+- **Docs** — `AGENTS.md`, `docs/alphapy-agents-architecture.md`, skill registry priorities updated.
+
 ## [3.11.0] - 2026-07-04
 
 ### Added
