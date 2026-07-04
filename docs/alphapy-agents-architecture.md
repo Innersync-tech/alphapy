@@ -239,7 +239,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 - [x] Premium tier caps on `/agent start` (free 10/day, monthly 25/day, yearly/lifetime unlimited)
 - [x] Rate limits — `agent_session_usage` (migration 024), `check_and_increment_agent_session_quota()`
 - [x] GDPR — `purge_agent_user_data()` on user delete webhook + `/delete_my_data`
-- [ ] Observability: agent session metrics in telemetry ingest
+- [x] Observability: agent session metrics in telemetry ingest
 
 ### Explicit non-goals (MVP)
 

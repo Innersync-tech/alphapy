@@ -1527,6 +1527,18 @@ async def _persist_telemetry_snapshot(
         f"Grok/LLM errors 24h: {gpt_errors_24h}"
     )
 
+    try:
+        from agents.telemetry import (
+            collect_agent_session_metrics,
+            format_agent_session_telemetry_notes,
+        )
+
+        agent_metrics = await collect_agent_session_metrics()
+        agent_notes = format_agent_session_telemetry_notes(agent_metrics)
+        notes = f"{notes} · {agent_notes}"
+    except Exception as exc:
+        logger.debug("Agent telemetry notes skipped: %s", exc)
+
     # Use Supabase REST API - this is the ONLY way to write telemetry
     # Note: Make sure 'telemetry' schema is exposed in Supabase Studio → Settings → API → Exposed Schemas
     # Send only the essential fields that we have data for, matching the database schema types:
