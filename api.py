@@ -850,6 +850,17 @@ class CommandStats(BaseModel):
     period_days: int
 
 
+class AgentSessionMetricsPayload(BaseModel):
+    """Aggregate /agent session counts for Mind observability (no user content)."""
+
+    enabled: bool
+    active_sessions: int = 0
+    started_24h: int = 0
+    completed_24h: int = 0
+    active_origin_discord: int = 0
+    active_origin_app: int = 0
+
+
 class DashboardMetrics(BaseModel):
     bot: BotMetrics
     gpt: GPTMetrics
@@ -860,6 +871,7 @@ class DashboardMetrics(BaseModel):
     command_usage: CommandStats | None = None
     cache_metrics: CacheMetrics | None = None
     premium_metrics: PremiumMetrics | None = None
+    agent_sessions: AgentSessionMetricsPayload | None = None
 
 
 def _serialize_gpt_events(raw_events) -> list[GPTLogEvent]:
@@ -1825,6 +1837,21 @@ async def get_dashboard_metrics(
     command_stats = await _fetch_command_stats(effective_guild_id)
     cache_metrics = _collect_cache_metrics()
     premium_metrics = _collect_premium_metrics()
+    agent_sessions_payload: AgentSessionMetricsPayload | None = None
+    try:
+        from agents.telemetry import collect_agent_session_metrics
+
+        agent_metrics = await collect_agent_session_metrics()
+        agent_sessions_payload = AgentSessionMetricsPayload(
+            enabled=agent_metrics.agents_enabled,
+            active_sessions=agent_metrics.active_sessions,
+            started_24h=agent_metrics.started_24h,
+            completed_24h=agent_metrics.completed_24h,
+            active_origin_discord=agent_metrics.active_origin_discord,
+            active_origin_app=agent_metrics.active_origin_app,
+        )
+    except Exception as exc:
+        logger.debug("Agent session metrics for dashboard skipped: %s", exc)
 
     # Persist a telemetry snapshot asynchronously; ignore failures.
     asyncio.create_task(_persist_telemetry_snapshot(bot_metrics, gpt_metrics, ticket_stats))
@@ -1840,6 +1867,7 @@ async def get_dashboard_metrics(
         command_usage=command_stats,
         cache_metrics=cache_metrics,
         premium_metrics=premium_metrics,
+        agent_sessions=agent_sessions_payload,
     )
 
 
