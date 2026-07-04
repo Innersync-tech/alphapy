@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Agent session metrics on dashboard API** — optional `agent_sessions` block on `GET /api/dashboard/metrics` and `/api/metrics` (aggregate active/started/completed counts + origin breakdown; no user content). Consumed by Mind Telemetry for live observability.
+- **Agent session metrics in telemetry ingest** — `agents/telemetry.py` appends `agents: …` counts to `telemetry.subsystem_snapshots.notes` on each ingest cycle (Phase 4 observability).
 - **Agent session rate limits** — `agent_session_usage` table (migration 024); `check_and_increment_agent_session_quota()` enforces tier caps on `/agent start` (free: 10/day, monthly: 25/day, yearly/lifetime: unlimited).
 - **`inner_voice` agent skill** — Tier 1 `agent_prefs.inner_voice` (App Settings) injected as untrusted context on `/agent` reflection sessions; registered alongside `journal_sync`.
 - **`fatigue_check` agent skill** — Tier 1 energy self-report (`energy_level`, optional `fatigue_note`, `fatigue_reported_at`); Discord quick check on `/agent start` when report is missing or older than 24h.
@@ -16,7 +18,7 @@ All notable changes to this project will be documented in this file.
 - **Agent memory privacy** — durable `agent_memory` no longer stores journal plaintext previews; consent revoke + bot-sharing toggle purge agent memory for the user.
 
 ### Changed
-- **Agent Phase 4 docs** — `docs/alphapy-agents-architecture.md`, `docs/SECURITY.md`, `docs/agents-safety-guidelines.md`, `AGENTS.md`: GDPR erasure paths, `agent_session_usage` tier caps, quota abuse handling.
+- **Agent Phase 4 docs** — `docs/alphapy-agents-architecture.md`, `docs/SECURITY.md`, `docs/agents-safety-guidelines.md`, `docs/api.md`, `AGENTS.md`: GDPR erasure paths, `agent_session_usage` tier caps, quota abuse handling, Mind-facing `agent_sessions` metrics.
 
 ## [3.10.0] - 2026-06-30
 

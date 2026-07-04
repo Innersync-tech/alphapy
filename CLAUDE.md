@@ -39,7 +39,7 @@ alembic revision --autogenerate -m "description"
 
 ### Entry points
 - **`bot.py`** — initializes the Discord bot, loads cogs via `utils/lifecycle.py` (phased startup: DB → settings → cogs → command sync), and starts background tasks
-- **`api.py`** — FastAPI server for HTTP endpoints (reminders CRUD, dashboard metrics/logs, webhooks from Core-API)
+- **`api.py`** — FastAPI server for HTTP endpoints (reminders CRUD, dashboard metrics/logs including optional `agent_sessions`, webhooks from Core-API)
 - **`config.py`** — all environment variable loading; required vars are `BOT_TOKEN` and `DATABASE_URL`
 
 ### Core layers

@@ -95,7 +95,7 @@ Google Drive credentials: [docs/GOOGLE_CREDENTIALS_SETUP.md](docs/GOOGLE_CREDENT
 ### API
 
 - Health: `GET /api/health`, `GET /api/health/history`
-- Metrics: `GET /api/dashboard/metrics`, `GET /top-commands`
+- Metrics: `GET /api/dashboard/metrics`, `GET /top-commands` (metrics may include optional `agent_sessions` for Mind `/agent` observability)
 - Reminders CRUD: `GET/POST/PUT/DELETE /api/reminders` (API key + `X-User-Id`)
 
 Full reference: [docs/api.md](docs/api.md).

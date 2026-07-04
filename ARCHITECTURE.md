@@ -14,7 +14,7 @@
 - `cogs/premium.py`: tier guard + transfer
 - `cogs/automod.py` + `configuration.py` (`automod_group`): automated content moderation with rule engine
 - `cogs/engagement.py` + `utils/engagement_service.py`: community gamification (challenges, weekly awards, streaks, badges, OG claims)
-- `api.py`: dashboard endpoints + telemetry ingest job (subsystem='alphapy')
+- `api.py`: dashboard endpoints + telemetry ingest job (subsystem='alphapy'; optional `agent_sessions` on metrics + `agents:` counts in snapshot notes)
 - `utils/`: lifecycle, db_helpers, sanitizer, embed_builder, command_tracker, fyi_tips, automod_rules, automod_logging, automod_analytics, engagement_service
 
 ## Command structure
