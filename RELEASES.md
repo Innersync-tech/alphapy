@@ -4,6 +4,25 @@ All notable releases of Alphapy will be documented in this file.
 
 ---
 
+## [3.11.0] - 2026-07-04 - "Phase 4 Observability"
+
+### Minor Release: Agent session limits, skills, GDPR, Mind telemetry
+
+Phase 4 closes the loop on agent privacy, quotas, App-sourced prefs, and platform observability.
+
+#### What's New
+- **Session quotas** — Tier caps on `/agent start` via `agent_session_usage` (migration 024)
+- **`inner_voice` + `fatigue_check` skills** — Tier 1 prefs from App Settings injected on reflection sessions
+- **Mind observability** — Optional `agent_sessions` on dashboard metrics + `agents:` counts in telemetry ingest notes
+- **GDPR** — Full agent memory purge on user delete and `/delete_my_data`
+
+#### PRs
+- [#275](https://github.com/Innersync-tech/alphapy/pull/275) telemetry ingest counts
+- [#276](https://github.com/Innersync-tech/alphapy/pull/276) structured dashboard metrics
+- [#277](https://github.com/Innersync-tech/alphapy/pull/277) docs
+
+---
+
 ## [3.10.0] - 2026-06-30 - "Agent Memory & Conversation"
 
 ### Minor Release: Privacy-safe agent memory (Phases 2.1–2.3)

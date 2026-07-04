@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- (No changes yet)
+
+### Fixed
+- (No changes yet)
+
+## [3.11.0] - 2026-07-04
+
+### Added
 - **Agent session metrics on dashboard API** — optional `agent_sessions` block on `GET /api/dashboard/metrics` and `/api/metrics` (aggregate active/started/completed counts + origin breakdown; no user content). Consumed by Mind Telemetry for live observability.
 - **Agent session metrics in telemetry ingest** — `agents/telemetry.py` appends `agents: …` counts to `telemetry.subsystem_snapshots.notes` on each ingest cycle (Phase 4 observability).
 - **Agent session rate limits** — `agent_session_usage` table (migration 024); `check_and_increment_agent_session_quota()` enforces tier caps on `/agent start` (free: 10/day, monthly: 25/day, yearly/lifetime: unlimited).
