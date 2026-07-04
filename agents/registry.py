@@ -5,7 +5,10 @@ import logging
 from collections.abc import Iterable
 
 from agents.base import AgentSkill, BaseAgent
+from agents.skills.avoidance_processor import AvoidanceProcessorSkill
+from agents.skills.chain_breaker_micro import ChainBreakerMicroSkill
 from agents.skills.fatigue_check import FatigueCheckSkill
+from agents.skills.inner_critic_dialogue import InnerCriticDialogueSkill
 from agents.skills.inner_voice import InnerVoiceSkill
 from agents.skills.journal_sync import JournalSyncSkill
 
@@ -15,13 +18,23 @@ logger = logging.getLogger("alphapy.agents")
 _AGENT_DEFINITIONS: dict[str, dict[str, object]] = {
     "reflection": {
         "description": "Daily journal reflection and pattern awareness.",
-        "skills": ("inner_voice", "fatigue_check", "journal_sync"),
+        "skills": (
+            "inner_voice",
+            "inner_critic_dialogue",
+            "avoidance_processor",
+            "fatigue_check",
+            "chain_breaker_micro",
+            "journal_sync",
+        ),
     },
 }
 
 _SKILL_INSTANCES: dict[str, AgentSkill] = {
     "inner_voice": InnerVoiceSkill(),
+    "inner_critic_dialogue": InnerCriticDialogueSkill(),
+    "avoidance_processor": AvoidanceProcessorSkill(),
     "fatigue_check": FatigueCheckSkill(),
+    "chain_breaker_micro": ChainBreakerMicroSkill(),
     "journal_sync": JournalSyncSkill(),
 }
 

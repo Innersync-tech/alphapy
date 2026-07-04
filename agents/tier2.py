@@ -246,6 +246,71 @@ def session_summary_from_profile(derived: dict[str, Any]) -> str:
     return "Derived patterns: " + "; ".join(labels)[:4000]
 
 
+SESSION_INSIGHT_SNAPSHOT_KEY = "session_insight_snapshot"
+
+
+def append_skill_insights(
+    existing: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    *,
+    source_reflection_ids: frozenset[str],
+    consent_epoch: str,
+    blocklist: set[str] | None = None,
+) -> dict[str, Any]:
+    """Merge skill-produced insight candidates into derived_profile."""
+    if not candidates:
+        return normalize_derived_profile(existing)
+    return merge_derived_profiles(
+        existing,
+        {"insights": candidates},
+        source_reflection_ids=source_reflection_ids,
+        consent_epoch=consent_epoch,
+        blocklist=blocklist or set(),
+    )
+
+
+def build_session_insight_snapshot(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    *,
+    max_items: int = 5,
+) -> list[dict[str, str]]:
+    """Insights added or reinforced between session start profile and final profile."""
+    before_norm = normalize_derived_profile(before)
+    after_norm = normalize_derived_profile(after)
+    before_by_key = {
+        _label_key(str(i.get("label", ""))): i for i in before_norm.get("insights") or []
+    }
+    snapshots: list[dict[str, str]] = []
+    for insight in after_norm.get("insights") or []:
+        if not isinstance(insight, dict):
+            continue
+        label = str(insight.get("label", "")).strip()
+        if len(label) < 8:
+            continue
+        key = _label_key(label)
+        prior = before_by_key.get(key)
+        is_new = prior is None
+        reinforced = False
+        if prior is not None:
+            try:
+                reinforced = float(insight.get("confidence", 0)) > float(prior.get("confidence", 0))
+            except (TypeError, ValueError):
+                reinforced = False
+        if not is_new and not reinforced:
+            continue
+        snapshots.append(
+            {
+                "id": str(insight.get("id", "")),
+                "type": str(insight.get("type", "theme")),
+                "label": label[:MAX_LABEL_LEN],
+            }
+        )
+        if len(snapshots) >= max_items:
+            break
+    return snapshots
+
+
 def _parse_distill_json(raw: str) -> dict[str, Any] | None:
     text = raw.strip()
     if not text:

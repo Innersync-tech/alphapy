@@ -133,6 +133,9 @@ See starter implementation:
 
 - `agents/base.py` — `AgentSkill` protocol, `AgentContext`, `BaseAgent`
 - `agents/skills/inner_voice.py` — optional Tier 1 `inner_voice` pref from App agent settings
+- `agents/skills/inner_critic_dialogue.py` — Tier 2 inner-conflict mirror + micro-prompt dialogue
+- `agents/skills/avoidance_processor.py` — energy-aware avoidance/seal-off vs process; optional Tier 2 write on end
+- `agents/skills/chain_breaker_micro.py` — generational chain-break framing + one daily micro-habit
 - `agents/skills/journal_sync.py` — reflections via `load_user_reflections`, engagement streak
 - `agents/skills/trade_insight.py` — dormant (not exposed in `/agent`)
 - `agents/runtime.py` — gather → prompt → `ask_gpt` → memory patch → `complete_session`
@@ -171,7 +174,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 | `agent_name` | text | e.g. `reflection` |
 | `status` | text | `active`, `completed`, `failed` |
 | `summary` | text nullable | Tier-2-conform distilled labels only (not raw LLM text) |
-| `memory_patch` | jsonb | Delta applied this session |
+| `memory_patch` | jsonb | Delta applied this session; includes optional `session_insight_snapshot` (insight id/type/label chips for App timeline) |
 | `metadata` | jsonb | Source, skill flags |
 | `started_at` / `completed_at` / `updated_at` | timestamptz | Audit |
 
@@ -233,6 +236,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 
 - [x] `journal_sync` skill (reflections opt-in + streaks)
 - [x] `inner_voice` skill — Tier 1 `agent_prefs.inner_voice` (App Settings)
+- [x] `inner_critic_dialogue`, `avoidance_processor`, `chain_breaker_micro` — Tier 2 dialogue skills + session insight snapshot
 - [x] `fatigue_check` skill — energy self-report in App + Discord quick check on `/agent start`
 - [ ] `POST /api/agents/run` on `api.py` (Mind/App trigger)
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh

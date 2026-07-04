@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from agents.tier2 import (
+    append_skill_insights,
     build_blocklist_from_tier0,
+    build_session_insight_snapshot,
     delete_insight_by_id,
     empty_derived_profile,
     merge_derived_profiles,
@@ -123,6 +125,78 @@ def test_delete_insight_by_id() -> None:
     )
     updated = delete_insight_by_id(derived, "x")
     assert updated["insights"] == []
+
+
+def test_append_skill_insights_merges_valid_candidate() -> None:
+    existing = normalize_derived_profile(
+        {
+            "insights": [
+                {
+                    "id": "a",
+                    "type": "theme",
+                    "label": "avoidance when overwhelmed",
+                    "confidence": 0.7,
+                    "source_reflection_ids": ["ref-1"],
+                    "consent_epoch": "2026-06-01T00:00:00Z",
+                    "last_reinforced_at": "2026-06-01T00:00:00Z",
+                }
+            ]
+        }
+    )
+    merged = append_skill_insights(
+        existing,
+        [{"type": "habit", "label": "two minute pause before scrolling", "confidence": 0.75}],
+        source_reflection_ids=frozenset({"ref-1"}),
+        consent_epoch="2026-06-02T00:00:00Z",
+    )
+    assert len(merged["insights"]) == 2
+    types = {item["type"] for item in merged["insights"]}
+    assert types == {"theme", "habit"}
+
+
+def test_build_session_insight_snapshot_new_and_reinforced() -> None:
+    before = normalize_derived_profile(
+        {
+            "insights": [
+                {
+                    "id": "old",
+                    "type": "theme",
+                    "label": "gentle morning routine",
+                    "confidence": 0.6,
+                    "source_reflection_ids": ["r"],
+                    "consent_epoch": "t",
+                    "last_reinforced_at": "t",
+                }
+            ]
+        }
+    )
+    after = normalize_derived_profile(
+        {
+            "insights": [
+                {
+                    "id": "old",
+                    "type": "theme",
+                    "label": "gentle morning routine",
+                    "confidence": 0.85,
+                    "source_reflection_ids": ["r"],
+                    "consent_epoch": "t",
+                    "last_reinforced_at": "t",
+                },
+                {
+                    "id": "new",
+                    "type": "habit",
+                    "label": "single breath before replying",
+                    "confidence": 0.7,
+                    "source_reflection_ids": ["r"],
+                    "consent_epoch": "t",
+                    "last_reinforced_at": "t",
+                },
+            ]
+        }
+    )
+    snapshot = build_session_insight_snapshot(before, after)
+    assert len(snapshot) == 2
+    assert {row["id"] for row in snapshot} == {"old", "new"}
 
 
 def test_session_summary_from_profile() -> None:

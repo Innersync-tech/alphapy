@@ -744,7 +744,7 @@ Add a follow-up turn to your active reflection session.
 ### `/agent end`
 End your active reflection session.
 
-**Behavior:** Runs Tier 2 distill (if learning enabled + active consents), patches Tier 3 memory (`session_count++`), completes the session, deletes ephemeral messages, and emits a Hermit `gpt_command` event.
+**Behavior:** Runs Tier 2 distill (if learning enabled + active consents), runs dialogue skills (`inner_critic_dialogue`, `avoidance_processor`, `chain_breaker_micro`) for optional second Tier 2 patch, stores `session_insight_snapshot` on the session row, patches Tier 3 memory (`session_count++`), completes the session, deletes ephemeral messages, and emits a Hermit `gpt_command` event.
 
 **Permissions:** Linked Innersync users only (ephemeral)
 

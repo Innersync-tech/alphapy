@@ -76,7 +76,9 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Admin config**: `/config agents show`, `/config agents toggle`
 - **Safety policy**: `agents/policy.py` (`AGENT_SAFETY_RULES` + `build_agent_system_prompt()`); see `docs/agents-safety-guidelines.md` and [Innersync-meta AGENT-SAFETY-POLICY](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md)
 - **Agents**: `reflection` (journal sync; trade agents deferred)
-- **Skills**: `inner_voice`, `fatigue_check`, `journal_sync` (`trade_insight` skill file kept dormant for later)
+- **Skills**: `inner_voice`, `inner_critic_dialogue`, `avoidance_processor`, `fatigue_check`, `chain_breaker_micro`, `journal_sync` (`trade_insight` skill file kept dormant for later)
+- **Tier 2 dialogue skills**: mirror inner-conflict patterns + one micro-step; avoidance/chain-break skills may append validated insights on `/agent end` when learning is enabled
+- **Session timeline**: `agent_sessions.memory_patch.session_insight_snapshot` (max 5 insight chips per session for App BFF)
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
 - **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`
