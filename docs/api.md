@@ -242,9 +242,26 @@ Comprehensive dashboard metrics including bot status, Grok/LLM stats, reminders,
     "premium_guild_cache_size": 8,
     "premium_guild_cache_hits": 90,
     "premium_guild_cache_misses": 12
+  },
+  "agent_sessions": {
+    "enabled": true,
+    "active_sessions": 2,
+    "started_24h": 5,
+    "completed_24h": 3,
+    "active_origin_discord": 1,
+    "active_origin_app": 1
   }
 }
 ```
+
+The optional `agent_sessions` block provides aggregate `/agent` session observability for Mind (no message content):
+
+- `enabled`: `ALPHAPY_AGENTS_ENABLED` gate
+- `active_sessions`: rows in `agent_sessions` with `status = active`
+- `started_24h` / `completed_24h`: rolling 24h window counts
+- `active_origin_discord` / `active_origin_app`: breakdown from session `metadata.origin_channel` when sessions are active
+
+Same aggregates are also appended to telemetry ingest `notes` as `agents: …` for Supabase snapshot fallback.
 
 The optional `premium_metrics` block provides observability for the Premium guard:
 

@@ -286,7 +286,7 @@ All `/api/dashboard/*` endpoints use the same authentication method:
 **Query Parameters:**
 - `guild_id` (optional): Filter metrics by guild ID
 
-**Response:** `DashboardMetrics` object with bot, Grok/LLM, reminders, tickets, and infrastructure metrics
+**Response:** `DashboardMetrics` object with bot, Grok/LLM, reminders, tickets, infrastructure metrics, and optional `agent_sessions` (aggregate `/agent` counts for Mind observability — no session content)
 
 #### `/api/dashboard/settings/{guild_id}`
 

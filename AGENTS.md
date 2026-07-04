@@ -178,8 +178,8 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 📊 Agent: Telemetry Ingest Background Job
-- **Path**: `api.py` (`_telemetry_ingest_loop()`)
-- **Purpose**: Periodic push of Alphapy metrics to Supabase for Mind dashboard
+- **Path**: `api.py` (`_telemetry_ingest_loop()`), `agents/telemetry.py`
+- **Purpose**: Periodic push of Alphapy metrics to Supabase for Mind dashboard; append aggregate `/agent` session counts to snapshot `notes`; expose same aggregates as optional `agent_sessions` on `GET /api/dashboard/metrics`
 - **Interval**: 30-60s, subsystem='alphapy'
 
 ---
