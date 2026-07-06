@@ -210,7 +210,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
   - `set_severity` (rule priority management, 1-10)
   - `logs` (with filters: user_id, rule_id, action_type, days)
 - **Status Command**: `/automod status`
-- **Logging**: Comprehensive violation logging with context, appeal system (scaffolding), and performance metrics
+- **Logging**: Violations logged to `automod_logs` and to the guild log channel (`automod.log_channel_id`). Discord embed **Rule** field shows the human-readable rule name (fallback `Rule #{id}`); footer includes `db #{rule_id}` for support. Message content sanitized via `safe_embed_text` (200 chars). Appeal system (scaffolding).
 - **Analytics**: `AutoModAnalytics` service for rule effectiveness and guild overview metrics (low-priority scaffolding)
 - **Integration**: Works with existing premium guard system, settings service, and operational logs
 - **UX improvements**: Auto-mod action params now use fixed slash-command choices (Delete/Warn/Mute/Timeout/Ban), and `rule_id` fields support autocomplete for `delete_rule`, `set_rule_enabled`, `edit_rule`, `set_severity`, and `logs`

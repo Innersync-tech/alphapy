@@ -464,7 +464,7 @@ When enabled, linked members can use [`/agent`](#alphapy-agents). See [configura
 - `/automod add_caps_rule <name> [min_length] [max_ratio] [action]` — Excessive caps rule
 - `/automod add_duplicate_rule <name> [max_duplicates] [action]` — Duplicate message rule
 - `/automod add_regex_rule <name> <patterns> [action]` — Regex rule (premium)
-- `/automod add_ai_rule <name> [action]` — AI-powered content rule (premium)
+- `/automod add_ai_rule <name> <policy> [action] [threshold]` — AI-powered content rule (premium; `policy` required; `threshold` 0.5–1.0, default 0.7)
 - `/automod edit_rule <rule_id> [fields...]` — Edit an existing rule
 - `/automod delete_rule <rule_id>` — Delete a rule
 - `/automod set_rule_enabled <rule_id> <true|false>` — Enable or disable a rule

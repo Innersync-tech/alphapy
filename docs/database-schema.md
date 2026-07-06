@@ -636,7 +636,7 @@ Per-guild content moderation rules. Each rule references one action via FK.
 - `idx_automod_rules_guild_enabled` on `(guild_id, enabled)`
 - `idx_automod_rules_type` on `(rule_type)`
 
-**Notes:** Managed via `/config automod` subcommands. Toggle individual rules with `/config automod set_rule_enabled`.
+**Notes:** Managed via `/automod` slash commands (top-level group, not nested under `/config`). Toggle individual rules with `/automod set_rule_enabled`. Rules can also be managed via the Alphapy Dashboard (`/api/dashboard/{guild_id}/automod/*`).
 
 ---
 
@@ -668,7 +668,7 @@ Audit log of every auto-moderation trigger.
 
 ### `automod_stats`
 
-Daily aggregated statistics per guild per rule, used by `/config automod stats` and dashboard analytics.
+Daily aggregated statistics per guild per rule, populated by internal analytics scaffolding and exposed via `GET /api/dashboard/{guild_id}/automod/stats` (Alphapy Dashboard).
 
 **Columns:**
 - `id` (SERIAL, PRIMARY KEY)

@@ -641,6 +641,19 @@ Delete an auto-moderation rule.
 }
 ```
 
+#### `POST /api/dashboard/{guild_id}/automod/invalidate-cache`
+
+Drop the in-memory AutoMod rules cache for a guild after dashboard direct DB writes (Alphapy Dashboard calls this after create/update/delete rule operations).
+
+**Authentication:** Required (Supabase JWT token + guild admin access)
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
 #### `GET /api/dashboard/{guild_id}/automod/stats`
 
 Get auto-moderation statistics and analytics.
