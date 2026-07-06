@@ -9,7 +9,7 @@ Complete reference for all database tables used by the Alphapy Discord Bot.
 
 ## Overview
 
-The bot uses PostgreSQL for persistent storage. Schema is primarily managed via [Alembic migrations](migrations.md), with some legacy cogs still running idempotent `CREATE TABLE IF NOT EXISTS` safeguards at startup for backward compatibility. All tables support multi-guild architecture via `guild_id` columns where applicable.
+The bot uses PostgreSQL for persistent storage. Schema is primarily managed via [Alembic migrations](../migrations/), with some legacy cogs still running idempotent `CREATE TABLE IF NOT EXISTS` safeguards at startup for backward compatibility. All tables support multi-guild architecture via `guild_id` columns where applicable.
 
 ## Tables
 
@@ -227,7 +227,7 @@ Plaintext reflections received from the App via Core-API webhook. Used for Grok 
 2. Supabase `reflections` — Discord check-ins written by `/growthcheckin` itself (no opt-in required)
 3. Railway `app_reflections` — plaintext from Core-API webhook (last 30 days, no opt-in required)
 
-**Also used by Alphapy Agents** (`journal_sync` skill): opt-in shared reflections via `load_user_reflections` — never encrypted App ciphertext. See [agents-safety-guidelines.md](agents-safety-guidelines.md).
+**Also used by Alphapy Agents** (`journal_sync` skill): opt-in shared reflections via `load_user_reflections` — never encrypted App ciphertext. See [Agent safety guidelines](../agents-safety-guidelines/).
 
 ---
 
@@ -539,7 +539,7 @@ All pools include:
 
 ## Schema Management
 
-All schema changes are managed via Alembic migrations. See [migrations.md](migrations.md) for migration workflow.
+All schema changes are managed via Alembic migrations. See [Migrations guide](../migrations/) for migration workflow.
 
 **Current Migration Head:** `023_alphapy_discord_links`
 

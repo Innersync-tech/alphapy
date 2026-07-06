@@ -9,10 +9,10 @@ Quick checklist and verification steps after adding the bot to a new server.
 
 ## Related docs
 
-- **Multi-guild configuration** (required channels, feature config): [configuration.md](configuration.md)
-- **Reminders** (one-off vs recurring, embed watcher): [AGENTS.md](../AGENTS.md) (EmbedReminderWatcher, ReminderManager)
-- **Ticket system**: [AGENTS.md](../AGENTS.md) and [configuration.md](configuration.md)
-- **Alphapy Agents**: [alphapy-agents-architecture.md](alphapy-agents-architecture.md), [agents-safety-guidelines.md](agents-safety-guidelines.md)
+- **Multi-guild configuration** (required channels, feature config): [Configuration](../configuration/)
+- **Reminders** (one-off vs recurring, embed watcher): [AGENTS.md (GitHub)](https://github.com/Innersync-tech/alphapy/blob/main/AGENTS.md) (EmbedReminderWatcher, ReminderManager)
+- **Ticket system**: [AGENTS.md (GitHub)](https://github.com/Innersync-tech/alphapy/blob/main/AGENTS.md) and [Configuration](../configuration/)
+- **Alphapy Agents**: [Alphapy agents architecture](../alphapy-agents-architecture/), [Agent safety guidelines](../agents-safety-guidelines/)
 
 ## Pre-flight checklist
 
@@ -71,7 +71,7 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment and `/config agents tog
 - [ ] `/agent continue message:Follow up` returns second turn; footer shows turn count
 - [ ] `/agent end` completes session; row in `agent_sessions` has status `completed`
 - [ ] Core `0023` applied: `agent_session_messages` empty after end (ephemeral purge)
-- [ ] Optional: run Matrix A probes from [agents-safety-guidelines.md](agents-safety-guidelines.md)
+- [ ] Optional: run Matrix A probes from [Agent safety guidelines](../agents-safety-guidelines/)
 
 ## Troubleshooting reminders
 

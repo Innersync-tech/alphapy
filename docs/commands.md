@@ -400,7 +400,7 @@ Manually compute and announce weekly awards for the configured award channel.
 - `/config agents show` — Show whether agents are enabled in this server
 - `/config agents toggle <true|false>` — Enable or disable `/agent` for members (requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment)
 
-When enabled, linked members can use [`/agent`](#alphapy-agents). See [configuration.md](./configuration.md) for Railway env vars.
+When enabled, linked members can use [`/agent`](#alphapy-agents). See [Configuration](../configuration/) for Railway env vars.
 
 ---
 
@@ -701,7 +701,7 @@ AI-powered leadership guidance for challenges, team growth, or doubts.
 
 Personal growth agents for linked Innersync users. Requires `/link` and guild enablement via `/config agents toggle true`. Deployment must set `ALPHAPY_AGENTS_ENABLED=true`.
 
-All responses are **ephemeral**. Agents use opt-in shared reflections only — never encrypted App journals. See [agents-safety-guidelines.md](./agents-safety-guidelines.md).
+All responses are **ephemeral**. Agents use opt-in shared reflections only — never encrypted App journals. See [Agent safety guidelines](../agents-safety-guidelines/).
 
 ### `/agent list`
 List available Alphapy agents (currently **reflection** only).

@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Docs** — AutoMod audit (#282): `add_ai_rule` signature (policy + threshold), `/automod` vs `/config automod` references, `automod_stats` API route, Discord log embed Rule field, `POST .../automod/invalidate-cache` in `docs/api.md`.
+- **Docs** — Starlight internal links: replace `.md` suffixes with `../slug/` paths for docs.innersync.tech Deploy Starlight CI.
 
 ## [3.12.0] - 2026-07-04
 
