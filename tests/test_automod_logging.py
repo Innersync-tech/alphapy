@@ -16,7 +16,7 @@ def _make_bot(log_channel_id: int = 999):
     source_channel = MagicMock(spec=discord.TextChannel)
     source_channel.mention = "<#100>"
 
-    settings = MagicMock()
+    settings = MagicMock(spec=["get"])
     settings.get.return_value = log_channel_id
 
     bot = MagicMock()
