@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - (No changes yet)
 
 ### Fixed
-- (No changes yet)
+- **Docs** — AutoMod audit (#282): `add_ai_rule` signature (policy + threshold), `/automod` vs `/config automod` references, `automod_stats` API route, Discord log embed Rule field, `POST .../automod/invalidate-cache` in `docs/api.md`.
 
 ## [3.12.0] - 2026-07-04
 

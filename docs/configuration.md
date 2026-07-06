@@ -221,7 +221,7 @@ Key chosen from a dropdown (e.g. `first_onboarding_done`, `first_guild_join`).
 /automod add_caps_rule <name> [min_length] [max_ratio] [action]
 /automod add_duplicate_rule <name> [max_duplicates] [action]
 /automod add_regex_rule <name> <patterns> [action]    — premium
-/automod add_ai_rule <name> [action]                  — premium
+/automod add_ai_rule <name> <policy> [action] [threshold]  — premium (policy required; threshold 0.5–1.0, default 0.7)
 /automod edit_rule <rule_id> [fields...]
 /automod delete_rule <rule_id>
 /automod set_rule_enabled <rule_id> <true|false>
