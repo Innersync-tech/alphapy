@@ -154,6 +154,7 @@ class AutoModeration(AlphaCog):
             message_id=message.id,
             channel_id=message.channel.id,
             rule_id=rule.get('id') or 0,  # Default to 0 if None
+            rule_name=rule.get('name'),
             action_type=rule.get('action_type') or 'unknown',  # Default to 'unknown' if None
             message_content=message.content,
             context=result.context

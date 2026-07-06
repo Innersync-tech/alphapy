@@ -37,7 +37,7 @@ class AutoModLogger:
     async def log_violation(self, guild_id: int, user_id: int, message_id: int | None,
                            channel_id: int | None, rule_id: int, action_type: str,
                            message_content: str | None = None, ai_analysis: dict | None = None,
-                           context: dict | None = None):
+                           context: dict | None = None, rule_name: str | None = None):
         """Log a rule violation and action taken."""
         try:
             log_entry = {
@@ -68,13 +68,16 @@ class AutoModLogger:
             log.info(f"Auto-mod violation: Guild {guild_id}, User {user_id}, Action: {action_type}, Rule: {rule_id}")
             
             # Log to Discord channel if configured
-            await self._log_to_discord_channel(guild_id, user_id, action_type, rule_id, message_content, channel_id)
+            await self._log_to_discord_channel(
+                guild_id, user_id, action_type, rule_id, message_content, channel_id, rule_name
+            )
             
         except Exception as e:
             log.error(f"Error logging auto-mod violation: {e}")
     
     async def _log_to_discord_channel(self, guild_id: int, user_id: int, action_type: str, rule_id: int, 
-                                    message_content: str | None, channel_id: int | None):
+                                    message_content: str | None, channel_id: int | None,
+                                    rule_name: str | None = None):
         """Log auto-mod violation to Discord log channel."""
         try:
             if not self.bot:
@@ -113,14 +116,15 @@ class AutoModLogger:
             
             embed.add_field(name="User", value=user_mention, inline=True)
             embed.add_field(name="Action", value=action_type.upper(), inline=True)
-            embed.add_field(name="Rule ID", value=str(rule_id), inline=True)
+            rule_display = safe_embed_text(rule_name, 100) if rule_name else f"Rule #{rule_id}"
+            embed.add_field(name="Rule", value=rule_display, inline=True)
             embed.add_field(name="Channel", value=channel_mention, inline=True)
             
             if message_content:
                 content = safe_embed_text(message_content, 200)
                 embed.add_field(name="Message Content", value=f"```{content}```", inline=False)
                 
-            embed.set_footer(text=f"Guild ID: {guild_id}")
+            embed.set_footer(text=f"Guild ID: {guild_id} · db #{rule_id}")
             
             await log_channel.send(embed=embed)
             
