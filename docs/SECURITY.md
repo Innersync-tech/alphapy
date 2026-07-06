@@ -142,7 +142,7 @@ Alphapy uses a **Google service account** for read-only Drive access (`/learn_to
 - **Runtime**: `GOOGLE_CREDENTIALS_JSON` — full service account JSON as one env var (local `.env` or Railway).
 - **Code**: `utils/drive_sync.py` parses `GOOGLE_CREDENTIALS_JSON` at startup; no GCP Secret Manager integration.
 
-See [GOOGLE_CREDENTIALS_SETUP.md](GOOGLE_CREDENTIALS_SETUP.md) for creating the service account and setting Railway variables.
+See [Google credentials setup](../google_credentials_setup/) for creating the service account and setting Railway variables.
 
 ### Disable dormant keys
 

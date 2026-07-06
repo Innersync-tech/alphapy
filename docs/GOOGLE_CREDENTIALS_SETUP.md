@@ -184,4 +184,4 @@ GOOGLE_CREDENTIALS_JSON={"type":"service_account","project_id":"drive-integratio
 
 - [Google Cloud Service Accounts Documentation](https://cloud.google.com/iam/docs/service-accounts)
 - [Google Drive API Documentation](https://developers.google.com/drive/api)
-- [Alphapy Security Guide](SECURITY.md)
+- [Alphapy Security Guide](../security/)
