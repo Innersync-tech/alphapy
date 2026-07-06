@@ -645,7 +645,7 @@ Delete an auto-moderation rule.
 
 Drop the in-memory AutoMod rules cache for a guild after dashboard direct DB writes (Alphapy Dashboard calls this after create/update/delete rule operations).
 
-**Authentication:** Required (Supabase JWT token + guild admin access)
+**Authentication:** Required (`X-Api-Key` + `X-Discord-User-Id` with guild admin access; same as verification queue / discord-meta)
 
 **Response:**
 ```json
