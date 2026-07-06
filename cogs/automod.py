@@ -209,7 +209,15 @@ class AutoModeration(AlphaCog):
     async def _action_warn_user(self, message: discord.Message, config: dict):
         """Send a warning to the user."""
         try:
-            warning_message = config.get('message', "⚠️ Your message has been flagged for violating server rules.")
+            warning_message = None
+            if message.guild:
+                warning_message = self.settings.get(
+                    "automod", "warn_message", guild_id=message.guild.id
+                )
+            if not warning_message:
+                warning_message = config.get(
+                    'message', "⚠️ Your message has been flagged for violating server rules."
+                )
             
             # Send DM to user
             try:

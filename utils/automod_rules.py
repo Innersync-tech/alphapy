@@ -67,6 +67,22 @@ class RuleProcessor:
             "automod_rules_cache_hits": self._cache_hits,
             "automod_rules_cache_misses": self._cache_misses,
         }
+
+    def invalidate_guild_cache(self, guild_id: int) -> None:
+        """Drop cached rules for a guild (dashboard/API writes bypass create_rule cache hooks)."""
+        self._rules_cache.pop(guild_id, None)
+        self._cache_updated.pop(guild_id, None)
+        self._list_rules_cache.pop(guild_id, None)
+        self._list_cache_updated.pop(guild_id, None)
+
+    @staticmethod
+    def _coerce_word_list(words: Any) -> list[str]:
+        """Normalize dashboard string or list word filters to lowercase tokens."""
+        if isinstance(words, str):
+            return [w.strip().lower() for w in words.replace(",", " ").split() if w.strip()]
+        if isinstance(words, list):
+            return [str(w).strip().lower() for w in words if str(w).strip()]
+        return []
         
     async def load_rules(self):
         """Load all rules from database into cache."""
@@ -161,9 +177,45 @@ class RuleProcessor:
     async def evaluate_rule(self, rule: dict, message: discord.Message, user_context: dict[str, Any]) -> RuleResult:
         """Evaluate a single rule against a message."""
         rule_type = rule['rule_type']
-        rule.get('config', {})
-        
+        config = rule.get('config', {}) or {}
+
         try:
+            # Dashboard may store mentions/caps/duplicate as top-level rule_type values.
+            if rule_type == "mentions":
+                rule = {
+                    **rule,
+                    "rule_type": RuleType.CONTENT.value,
+                    "config": {
+                        **config,
+                        "content_type": "mentions",
+                        "max_mentions": config.get("max_mentions", 5),
+                    },
+                }
+                rule_type = RuleType.CONTENT.value
+            elif rule_type == "caps":
+                rule = {
+                    **rule,
+                    "rule_type": RuleType.SPAM.value,
+                    "config": {
+                        **config,
+                        "spam_type": "caps",
+                        "min_length": config.get("min_length", 10),
+                        "max_caps_ratio": config.get("max_caps_ratio", 0.7),
+                    },
+                }
+                rule_type = RuleType.SPAM.value
+            elif rule_type == "duplicate":
+                rule = {
+                    **rule,
+                    "rule_type": RuleType.SPAM.value,
+                    "config": {
+                        **config,
+                        "spam_type": "duplicate",
+                        "max_duplicates": config.get("max_duplicates", 3),
+                    },
+                }
+                rule_type = RuleType.SPAM.value
+
             if rule_type == RuleType.SPAM.value:
                 return await self._evaluate_spam_rule(rule, message, user_context)
             elif rule_type == RuleType.CONTENT.value:
@@ -248,9 +300,9 @@ class RuleProcessor:
         content_lower = message.content.lower()
         
         if content_type == 'bad_words':
-            # Check for bad words
-            bad_words = config.get('words', [])
-            found_words = [word for word in bad_words if word.lower() in content_lower]
+            # Check for bad words (dashboard may store a single string)
+            bad_words = self._coerce_word_list(config.get('words', []))
+            found_words = [word for word in bad_words if word in content_lower]
             
             if found_words:
                 return RuleResult(
@@ -322,7 +374,9 @@ class RuleProcessor:
     async def _evaluate_regex_rule(self, rule: dict, message: discord.Message) -> RuleResult:
         """Evaluate regex-based rules."""
         config = rule.get('config', {})
-        patterns = config.get('patterns', [])
+        patterns = list(config.get('patterns', []) or [])
+        if not patterns and config.get('pattern'):
+            patterns = [config['pattern']]
         
         for pattern_str in patterns:
             try:
@@ -443,11 +497,7 @@ Be conservative - only flag clear violations."""
                     RETURNING id
                 """, guild_id, rule_type, name, json.dumps(config), action_id, created_by, is_premium)
                 
-                # Clear cache for this guild so reads refresh immediately.
-                self._rules_cache.pop(guild_id, None)
-                self._cache_updated.pop(guild_id, None)
-                self._list_rules_cache.pop(guild_id, None)
-                self._list_cache_updated.pop(guild_id, None)
+                self.invalidate_guild_cache(guild_id)
                     
                 return rule_id
                 
@@ -562,10 +612,7 @@ Be conservative - only flag clear violations."""
                         guild_id,
                     )
 
-            self._rules_cache.pop(guild_id, None)
-            self._cache_updated.pop(guild_id, None)
-            self._list_rules_cache.pop(guild_id, None)
-            self._list_cache_updated.pop(guild_id, None)
+            self.invalidate_guild_cache(guild_id)
             return True
         except Exception as e:
             log.error(f"Error deleting auto-mod rule {rule_id} for guild {guild_id}: {e}")
@@ -637,10 +684,7 @@ Be conservative - only flag clear violations."""
                         guild_id,
                     )
 
-            self._rules_cache.pop(guild_id, None)
-            self._cache_updated.pop(guild_id, None)
-            self._list_rules_cache.pop(guild_id, None)
-            self._list_cache_updated.pop(guild_id, None)
+            self.invalidate_guild_cache(guild_id)
             return True
         except Exception as e:
             log.error(f"Error updating auto-mod rule {rule_id} for guild {guild_id}: {e}")

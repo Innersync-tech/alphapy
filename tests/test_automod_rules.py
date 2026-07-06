@@ -128,3 +128,39 @@ def test_rule_crud_with_mocked_db(monkeypatch):
         assert conn.execute.await_count >= 4
 
     asyncio.run(run())
+
+
+def test_content_rule_accepts_dashboard_word_string():
+    async def run() -> None:
+        processor = RuleProcessor(bot=None)
+        rule = {
+            "id": 3,
+            "rule_type": RuleType.CONTENT.value,
+            "config": {"content_type": "bad_words", "words": "try"},
+        }
+        hit = await processor.evaluate_rule(rule, cast(discord.Message, DummyMessage("please try this")), {})
+        miss = await processor.evaluate_rule(rule, cast(discord.Message, DummyMessage("hello")), {})
+        assert hit.triggered is True
+        assert miss.triggered is False
+
+    asyncio.run(run())
+
+
+def test_dashboard_legacy_rule_types():
+    async def run() -> None:
+        processor = RuleProcessor(bot=None)
+
+        mentions_rule = {"id": 4, "rule_type": "mentions", "config": {"max_mentions": 2}}
+        mentions_msg = DummyMessage("hello", mentions=4)
+        mentions_result = await processor.evaluate_rule(
+            mentions_rule, cast(discord.Message, mentions_msg), {}
+        )
+        assert mentions_result.triggered is True
+
+        caps_rule = {"id": 5, "rule_type": "caps", "config": {}}
+        caps_result = await processor.evaluate_rule(
+            caps_rule, cast(discord.Message, DummyMessage("THIS IS ALMOST ALL CAPS")), {}
+        )
+        assert caps_result.triggered is True
+
+    asyncio.run(run())

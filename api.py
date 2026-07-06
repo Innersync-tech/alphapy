@@ -2761,6 +2761,19 @@ class OperationalLogsResponse(BaseModel):
 # Auto-Moderation Management Endpoints (Web Configuration Interface)
 # ---------------------------------------------------------------------------
 
+def _invalidate_automod_rules_cache(guild_id: int) -> None:
+    """Tell the running bot to drop in-memory AutoMod rules for this guild."""
+    try:
+        from gpt.helpers import bot_instance
+
+        cog = bot_instance.get_cog("AutoModeration") if bot_instance else None
+        processor = getattr(cog, "rule_processor", None) if cog else None
+        if processor and hasattr(processor, "invalidate_guild_cache"):
+            processor.invalidate_guild_cache(guild_id)
+    except Exception as exc:
+        logger.debug(f"AutoMod cache invalidation skipped for guild {guild_id}: {exc}")
+
+
 class AutoModRule(BaseModel):
     id: int | None = None
     guild_id: int
@@ -2960,6 +2973,7 @@ async def create_automod_rule(
                 rule_dict = dict(row)
                 rule_dict['config'] = json.loads(rule_dict['config'])
                 rule_dict['action_config'] = json.loads(rule_dict['action_config'])
+                _invalidate_automod_rules_cache(guild_id)
                 return AutoModRule(**rule_dict)
             else:
                 raise HTTPException(status_code=500, detail="Failed to create rule")
@@ -3069,6 +3083,7 @@ async def update_automod_rule(
                 import json
                 rule_dict['config'] = json.loads(rule_dict['config'])
                 rule_dict['action_config'] = json.loads(rule_dict['action_config'])
+                _invalidate_automod_rules_cache(guild_id)
                 return AutoModRule(**rule_dict)
             else:
                 raise HTTPException(status_code=404, detail="Rule not found")
@@ -3078,6 +3093,17 @@ async def update_automod_rule(
     except Exception as exc:
         logger.error(f"[ERROR] Failed to update auto-mod rule {rule_id} for guild {guild_id}: {exc}")
         raise HTTPException(status_code=500, detail="Failed to update auto-mod rule") from exc
+
+
+@router.post("/dashboard/{guild_id}/automod/invalidate-cache")
+async def invalidate_automod_rules_cache(
+    guild_id: int,
+    auth_user_id: str = Depends(get_authenticated_user_id),
+):
+    """Drop cached AutoMod rules after dashboard direct DB writes."""
+    await verify_guild_admin_access(guild_id, auth_user_id)
+    _invalidate_automod_rules_cache(guild_id)
+    return {"success": True}
 
 
 @router.delete("/dashboard/{guild_id}/automod/rules/{rule_id}")
@@ -3122,7 +3148,8 @@ async def delete_automod_rule(
                     guild_id,
                     action_id,
                 )
-            
+
+            _invalidate_automod_rules_cache(guild_id)
             return {"success": True}
             
     except HTTPException:
