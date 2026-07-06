@@ -74,7 +74,7 @@ def test_discord_log_embed_shows_rule_name_and_db_id_footer():
         )
 
         log_channel.send.assert_awaited_once()
-        embed = log_channel.send.await_args.args[0]
+        embed = log_channel.send.await_args.kwargs["embed"]
         assert isinstance(embed, discord.Embed)
         fields = {field.name: field.value for field in embed.fields}
         assert fields["Rule"] == "pompen regel"
@@ -98,7 +98,7 @@ def test_discord_log_embed_falls_back_to_rule_id_without_name():
             rule_name=None,
         )
 
-        embed = log_channel.send.await_args.args[0]
+        embed = log_channel.send.await_args.kwargs["embed"]
         fields = {field.name: field.value for field in embed.fields}
         assert fields["Rule"] == "Rule #7"
         assert embed.footer.text == "Guild ID: 1 · db #7"
