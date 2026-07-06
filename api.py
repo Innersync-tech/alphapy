@@ -3095,17 +3095,6 @@ async def update_automod_rule(
         raise HTTPException(status_code=500, detail="Failed to update auto-mod rule") from exc
 
 
-@router.post("/dashboard/{guild_id}/automod/invalidate-cache")
-async def invalidate_automod_rules_cache(
-    guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id),
-):
-    """Drop cached AutoMod rules after dashboard direct DB writes."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
-    _invalidate_automod_rules_cache(guild_id)
-    return {"success": True}
-
-
 @router.delete("/dashboard/{guild_id}/automod/rules/{rule_id}")
 async def delete_automod_rule(
     guild_id: int,
@@ -3432,6 +3421,17 @@ async def verify_dashboard_discord_admin(
     if not is_admin:
         raise HTTPException(status_code=403, detail="You do not have admin access to this guild.")
     return discord_id
+
+
+@router.post("/dashboard/{guild_id}/automod/invalidate-cache")
+async def invalidate_automod_rules_cache(
+    guild_id: int,
+    discord_admin_id: int = Depends(verify_dashboard_discord_admin),
+):
+    """Drop cached AutoMod rules after dashboard direct DB writes."""
+    del discord_admin_id
+    _invalidate_automod_rules_cache(guild_id)
+    return {"success": True}
 
 
 async def _resolve_verification_on_bot_loop(

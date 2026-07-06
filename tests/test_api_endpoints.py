@@ -519,6 +519,22 @@ class TestVerificationResolve:
 
 
 # ---------------------------------------------------------------------------
+# AutoMod cache invalidation
+# ---------------------------------------------------------------------------
+
+
+class TestAutomodInvalidateCache:
+    def test_invalidate_cache_success(self):
+        app = _make_dashboard_app()
+        with patch.object(api_module, "_invalidate_automod_rules_cache") as mock_invalidate:
+            client = TestClient(app)
+            response = client.post(f"/api/dashboard/{GUILD_ID}/automod/invalidate-cache")
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
+        mock_invalidate.assert_called_once_with(GUILD_ID)
+
+
+# ---------------------------------------------------------------------------
 # Dashboard discord meta
 # ---------------------------------------------------------------------------
 
