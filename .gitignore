@@ -11,7 +11,7 @@ venv/
 # Log files
 *.log
 bot.log.*
-
+node_modules/
 .windsurf/
 .cursor/
 platform_context.md
