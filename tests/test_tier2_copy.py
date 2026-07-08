@@ -1,6 +1,6 @@
 """Tests for Tier-2 copy polish and user_messages rollout."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import discord
 import pytest
@@ -140,9 +140,12 @@ async def test_leadership_challenge_select_generic_error():
     interaction.guild = MagicMock(id=2)
     interaction.response.defer = AsyncMock()
     interaction.followup.send = AsyncMock()
-    select.values = ["burnout"]
 
-    with patch("cogs.leadership.ask_gpt", side_effect=RuntimeError("fail")):
+    with (
+        patch.object(ChallengeSelect, "values", new_callable=PropertyMock) as mock_values,
+        patch("cogs.leadership.ask_gpt", side_effect=RuntimeError("fail")),
+    ):
+        mock_values.return_value = ["burnout"]
         await select.callback(interaction)
 
     interaction.followup.send.assert_awaited_once_with(ERR_GENERIC, ephemeral=True)
