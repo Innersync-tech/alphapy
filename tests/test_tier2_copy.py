@@ -41,7 +41,7 @@ async def test_verification_panel_post_guild_only():
     interaction.guild = None
     interaction.response.send_message = AsyncMock()
 
-    with patch("cogs.verification.validate_admin", return_value=(True, None)):
+    with patch("utils.validators.validate_admin", return_value=(True, None)):
         await cog.verification_panel_post(interaction, channel=None)
 
     interaction.response.send_message.assert_awaited_once_with(ERR_GUILD_ONLY, ephemeral=True)
