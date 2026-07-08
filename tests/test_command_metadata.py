@@ -5,8 +5,8 @@ from types import SimpleNamespace
 from utils.command_metadata import (
     find_enable_disable_pair,
     format_command_pair,
-    get_category_for_command,
     get_category_for_cog,
+    get_category_for_command,
     is_admin_command,
 )
 
