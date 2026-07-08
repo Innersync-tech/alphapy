@@ -26,6 +26,7 @@ from utils.innersync_identity import (
 )
 from utils.logger import logger
 from utils.sanitizer import safe_embed_text
+from utils.user_messages import ERR_DB
 
 _LINK_RATELIMIT: dict[int, list[float]] = defaultdict(list)
 _LINK_WINDOW_SEC = 60.0
@@ -55,10 +56,7 @@ async def link_slash(interaction: discord.Interaction) -> None:
 
     pool = get_bot_db_pool(interaction.client)
     if pool is None:
-        await interaction.response.send_message(
-            "The bot database is not available. Try again later.",
-            ephemeral=True,
-        )
+        await interaction.response.send_message(ERR_DB, ephemeral=True)
         return
 
     existing = await get_innersync_id_for_discord(
@@ -85,9 +83,8 @@ async def link_slash(interaction: discord.Interaction) -> None:
             embed=EmbedBuilder.info(
                 title="Link unavailable",
                 description=(
-                    "The link service is not available right now. "
-                    "If this keeps happening, ask a server admin to confirm **CORE_API_URL** and "
-                    "**ALPHAPY_SERVICE_KEY** are set and that Core exposes the Discord link session endpoint."
+                    "Linking is temporarily unavailable. "
+                    "Try again later or contact support@innersync.tech if this persists."
                 ),
             ),
             ephemeral=True,
@@ -120,10 +117,7 @@ async def link_slash(interaction: discord.Interaction) -> None:
 async def unlink_slash(interaction: discord.Interaction) -> None:
     pool = get_bot_db_pool(interaction.client)
     if pool is None:
-        await interaction.response.send_message(
-            "The bot database is not available. Try again later.",
-            ephemeral=True,
-        )
+        await interaction.response.send_message(ERR_DB, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)

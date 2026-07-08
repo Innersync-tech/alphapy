@@ -64,10 +64,8 @@ async def close_http_client() -> None:
 
 
 def premium_required_message(feature_name: str) -> str:
-    """Return a short Mockingbird-style message when a non-premium user hits a gated feature."""
-    return (
-        f"{feature_name} is premium. Powerful enough? Get power with /premium."
-    )
+    """Return a short message when a non-premium user hits a gated feature."""
+    return f"{feature_name} needs Premium. Run `/premium` to upgrade."
 
 
 def _cache_ttl_seconds() -> int:

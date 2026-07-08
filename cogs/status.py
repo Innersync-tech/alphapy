@@ -15,7 +15,7 @@ from utils.command_metadata import (
     HIDDEN_COMMANDS,
     find_enable_disable_pair,
     format_command_pair,
-    get_category_for_cog,
+    get_category_for_command,
     is_admin_command,
 )
 from utils.database_helpers import DatabaseManager
@@ -94,6 +94,48 @@ async def release_cmd(interaction: discord.Interaction):
 async def health_cmd(interaction: discord.Interaction):
     embed = await _build_health_embed(interaction)
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@app_commands.command(name="help", description="Quick guide to the most useful commands")
+async def help_cmd(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Alphapy — quick help",
+        description="Raw and direct. Here is what most members use.",
+        color=discord.Color.dark_grey(),
+    )
+    embed.add_field(
+        name="Get started",
+        value=(
+            "`/link` — connect Discord to your Innersync profile\n"
+            "Complete onboarding via the server panel when you join"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Daily",
+        value=(
+            "`/growthcheckin` — goal, blocker, feeling → Grok responds\n"
+            "`/add_reminder` — schedule one-off or recurring reminders\n"
+            "`/agent start` — reflection agent (requires `/link`)"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Support & premium",
+        value=(
+            "`/ticket` — open a support ticket\n"
+            "`/premium` — plans, limits, checkout"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="More",
+        value="`/commands` — full command list · `/innersync` — platform links",
+        inline=False,
+    )
+    embed.set_footer(text="docs.innersync.tech · /innersync for links")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 @app_commands.command(name="commands", description="List all available bot commands")
 @app_commands.describe(
@@ -188,12 +230,13 @@ async def commands_list_cmd(
                     full_path=full_path,
                     has_checks=bool(command.checks),
                     default_permissions=default_perms,
-                    description=command.description
+                    description=command.description,
+                    has_permission_checks=_command_has_permission_checks(command),
                 )
-                
+
                 # Get category name using centralized function
                 cog_name = command_to_cog.get(command.name, "Other")
-                category = get_category_for_cog(cog_name)
+                category = get_category_for_command(cog_name, full_path)
                 
                 cmd_info = {
                     "name": command.name,
@@ -545,10 +588,20 @@ async def setup(bot: commands.Bot):
     bot.tree.add_command(innersync_cmd)
     bot.tree.add_command(release_cmd)
     bot.tree.add_command(health_cmd)
+    bot.tree.add_command(help_cmd)
     bot.tree.add_command(commands_list_cmd)
     bot.tree.add_command(command_stats_cmd)
 
 # ------------------ HELPER FUNCTIONS ------------------ #
+
+def _command_has_permission_checks(command: app_commands.Command) -> bool:
+    """True when checks include admin/owner gates — not rate-limit cooldowns."""
+    for check in command.checks:
+        if hasattr(check, "rate") and hasattr(check, "per"):
+            continue
+        return True
+    return False
+
 
 def _format_timedelta(ts: datetime) -> str:
     if ts.tzinfo is None:

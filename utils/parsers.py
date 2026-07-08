@@ -151,15 +151,15 @@ def format_days_for_display(days_list: list[str]) -> str:
     Returns:
         str: Comma-separated day names
     """
-    day_names_nl = {
-        "0": "Maandag",
-        "1": "Dinsdag",
-        "2": "Woensdag",
-        "3": "Donderdag",
-        "4": "Vrijdag",
-        "5": "Zaterdag",
-        "6": "Zondag"
+    day_names_en = {
+        "0": "Monday",
+        "1": "Tuesday",
+        "2": "Wednesday",
+        "3": "Thursday",
+        "4": "Friday",
+        "5": "Saturday",
+        "6": "Sunday",
     }
-    
-    day_names = [day_names_nl.get(day, f"Day {day}") for day in days_list if day in day_names_nl]
-    return ", ".join(sorted(day_names, key=lambda x: list(day_names_nl.values()).index(x) if x in day_names_nl.values() else 999))
+
+    day_names = [day_names_en.get(day, f"Day {day}") for day in days_list if day in day_names_en]
+    return ", ".join(sorted(day_names, key=lambda x: list(day_names_en.values()).index(x) if x in day_names_en.values() else 999))

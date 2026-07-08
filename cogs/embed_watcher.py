@@ -26,7 +26,7 @@ from utils.embed_parser import (
 )
 from utils.logger import logger
 from utils.parsers import format_days_for_display, parse_days_string
-from utils.sanitizer import safe_embed_text
+from utils.validators import validate_admin
 from utils.timezone import BRUSSELS_TZ
 
 # All logging timestamps in this module use Brussels time for clarity.
@@ -615,6 +615,9 @@ class EmbedReminderWatcher(AlphaCog):
                 await log_channel.send(embed=db_log_embed)
             else:
                 logger.warning("⚠️ Could not find log channel for confirmation.")
+
+            from utils.fyi_tips import send_fyi_if_first
+            await send_fyi_if_first(self.bot, guild_id, "first_reminder_watcher")
         except (pg_exceptions.ConnectionDoesNotExistError, pg_exceptions.InterfaceError, ConnectionResetError) as conn_err:
             logger.warning(f"Database connection error in store_parsed_reminder: {conn_err}")
             if getattr(self, "_db_manager", None) and self._db_manager._pool:
@@ -631,8 +634,12 @@ class EmbedReminderWatcher(AlphaCog):
         except Exception as e:
             logger.exception(f"[ERROR] Reminder insert failed: {e}")
 
-    @app_commands.command(name="debug_parse_embed", description="Parse the last embed in the channel for testing.")
+    @app_commands.command(name="debug_parse_embed", description="(Admin) Parse the last embed in the channel.")
     async def debug_parse_embed(self, interaction: discord.Interaction) -> None:
+        is_admin, err = await validate_admin(interaction, raise_on_fail=False)
+        if not is_admin:
+            await interaction.response.send_message(err or "❌ Administrator access required.", ephemeral=True)
+            return
         await interaction.response.defer(ephemeral=True)
         if not interaction.guild:
             await interaction.followup.send("⚠️ This command only works in servers.")
@@ -649,7 +656,7 @@ class EmbedReminderWatcher(AlphaCog):
                 if parsed:
                     response = (
                         f"🧠 **Parsed data:**\n"
-                        f"📅 Datum: `{parsed['datetime']}`\n"
+                        f"📅 Date: `{parsed['datetime']}`\n"
                         f"⏰ Reminder Time: `{parsed['reminder_time']}`\n"
                         f"📍 Location: `{parsed.get('location', '-')}`"
                     )

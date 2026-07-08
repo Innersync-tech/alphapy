@@ -56,7 +56,7 @@ class StartOnboardingButton(discord.ui.Button):
             await rules_view.load_rules(bot)
             if not rules_view.rules:
                 await interaction.response.send_message(
-                    "⚠️ No onboarding rules are configured yet. Please contact a server admin.",
+                    "⚠️ No onboarding rules configured. Ask an admin to run `/onboarding add_rule`.",
                     ephemeral=True,
                 )
                 # Log to configured log channel (via /config system set_log_channel)

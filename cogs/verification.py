@@ -251,7 +251,7 @@ class VerificationCog(AlphaCog):
         if not category_id or not verified_role_id:
             await interaction.response.send_message(
                 "⚠️ Verification is not fully configured yet. "
-                "Please set `verification.category_id` and `verification.verified_role_id` via the config system.",
+                "Set a verification category and verified role first (`/verification set_category`, `/verification set_verified_role`).",
                 ephemeral=True,
             )
             return

@@ -154,7 +154,7 @@ Keep your response under 250 words. End with a complete sentence.
             log_gpt_error(error_type=error_type, user_id=interaction.user.id, guild_id=guild_id)
             try:
                 await interaction.response.send_message(
-                    "❌ Something went wrong while processing your check-in. Please try again later.",
+                    "❌ Check-in failed. Try again — if it persists, run `/gptstatus`.",
                     ephemeral=True,
                 )
             except Exception:
@@ -288,9 +288,14 @@ Keep your response under 250 words. End with a complete sentence.
                     logger.debug("Failed to log growth check-in to Railway: %s", exc)
 
             asyncio.create_task(_log_checkin_to_railway())
+
+            if guild_id:
+                from utils.fyi_tips import send_fyi_if_first
+
+                await send_fyi_if_first(interaction.client, guild_id, "first_growthcheckin")
         except Exception:
             await interaction.followup.send(
-                "❌ Something went wrong while processing your check-in. Please try again later.",
+                "❌ Check-in failed. Try again — if it persists, run `/gptstatus`.",
                 ephemeral=True,
             )
 
@@ -522,7 +527,7 @@ class GrowthCheckin(commands.Cog):
 
     @app_commands.command(
         name="growthcheckin",
-        description="Reflect on your goals, obstacles, and how you feel.",
+        description="Reflect on your goals, obstacles, and how you feel. Grok responds.",
     )
     @app_checks.cooldown(2, 300.0, key=lambda i: (i.guild.id, i.user.id) if i.guild else i.user.id)
     async def growthcheckin(self, interaction: discord.Interaction):
@@ -542,7 +547,7 @@ class GrowthCheckin(commands.Cog):
             )
             if not user_id:
                 await interaction.followup.send(
-                    "No Innersync profile linked to your account. Complete a `/growthcheckin` first.",
+                    "No Innersync profile linked to your account. Link first with `/link`, then run `/growthcheckin`.",
                     ephemeral=True,
                 )
                 return
