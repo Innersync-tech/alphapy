@@ -96,6 +96,15 @@ def test_build_fyi_embed_all_phase1_keys_have_content():
         assert embed is not None, f"Missing embed for {key}"
 
 
+def test_build_fyi_embed_phase2_keys_have_content():
+    phase2 = {"first_invite_leaderboard", "first_growthcheckin"}
+    for key in phase2:
+        assert key in FYI_KEYS
+        assert key in FYI_CONTENT
+        embed = _build_fyi_embed(key)
+        assert embed is not None, f"Missing embed for {key}"
+
+
 # --- send_fyi_if_first (async, mocked) ---
 
 
