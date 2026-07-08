@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - (No changes yet)
 
+### Changed
+- **Repo hygiene (P0)** — replace mistaken Next.js `package.json` / lockfile with minimal `pyright` devDependency; CI runs `npm ci` before typecheck.
+
 ### Fixed
 - (No changes yet)
 
