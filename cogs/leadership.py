@@ -7,12 +7,12 @@ from discord.app_commands import checks as app_checks
 from discord.ext import commands
 
 from gpt.helpers import ask_gpt, log_gpt_error
-from utils.user_messages import ERR_GENERIC
 from utils.logger import logger
 from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
 )
+from utils.user_messages import ERR_GENERIC
 
 metrics_logger = logging.getLogger(__name__)
 
