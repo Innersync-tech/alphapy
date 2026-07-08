@@ -23,9 +23,9 @@ async def test_growth_keep_private_copy():
     channel = MagicMock(spec=discord.TextChannel)
     view = GrowthShareView("goal", "obstacle", "feeling", "reply", channel)
     interaction = AsyncMock()
-    button = MagicMock()
+    private_btn = next(child for child in view.children if getattr(child, "label", None) == "Keep private")
 
-    await view.keep_private(interaction, button)
+    await private_btn.callback(interaction)
 
     interaction.response.edit_message.assert_awaited_once()
     content = interaction.response.edit_message.await_args.kwargs["content"]
