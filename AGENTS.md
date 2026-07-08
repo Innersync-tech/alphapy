@@ -187,7 +187,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🛡️ Agent: AutoModeration
-- **Path**: `cogs/automod.py`, `cogs/configuration.py`, `utils/automod_rules.py`, `utils/automod_logging.py`, `utils/automod_analytics.py`
+- **Path**: `cogs/automod.py`, `cogs/configuration.py`, `utils/automod_rules.py`, `utils/automod_logging.py`
 - **Purpose**: Automated content moderation with configurable rules and actions
 - **Triggers**: `on_message` → rule evaluation → action execution
 - **Storage**: PostgreSQL (automod_rules, automod_actions, automod_logs, automod_stats, automod_user_history)
@@ -211,7 +211,6 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
   - `logs` (with filters: user_id, rule_id, action_type, days)
 - **Status Command**: `/automod status`
 - **Logging**: Violations logged to `automod_logs` and to the guild log channel (`automod.log_channel_id`). Discord embed **Rule** field shows the human-readable rule name (fallback `Rule #{id}`); footer includes `db #{rule_id}` for support. Message content sanitized via `safe_embed_text` (200 chars). Appeal system (scaffolding).
-- **Analytics**: `AutoModAnalytics` service for rule effectiveness and guild overview metrics (low-priority scaffolding)
 - **Integration**: Works with existing premium guard system, settings service, and operational logs
 - **UX improvements**: Auto-mod action params now use fixed slash-command choices (Delete/Warn/Mute/Timeout/Ban), and `rule_id` fields support autocomplete for `delete_rule`, `set_rule_enabled`, `edit_rule`, `set_severity`, and `logs`
 - **Caching**: `RuleProcessor.list_rules()` now has TTL-backed per-guild cache (separate from active-rules cache), and create/update/delete paths invalidate both caches immediately
