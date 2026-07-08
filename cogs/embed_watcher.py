@@ -26,8 +26,9 @@ from utils.embed_parser import (
 )
 from utils.logger import logger
 from utils.parsers import format_days_for_display, parse_days_string
-from utils.validators import validate_admin
+from utils.sanitizer import safe_embed_text
 from utils.timezone import BRUSSELS_TZ
+from utils.validators import validate_admin
 
 # All logging timestamps in this module use Brussels time for clarity.
 

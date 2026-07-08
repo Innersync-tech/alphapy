@@ -22,7 +22,6 @@ from utils.logger import log_database_event, log_guild_action, log_with_guild, l
 from utils.parsers import format_days_for_display, parse_days_string, parse_time_string
 from utils.sanitizer import safe_embed_text
 from utils.timezone import BRUSSELS_TZ
-from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
 from utils.validators import validate_admin
 
 # All logging timestamps in this module use Brussels time for clarity.
