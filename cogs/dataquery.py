@@ -6,8 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-import config
-from utils.db_helpers import acquire_safe, is_pool_healthy
+from utils.database_helpers import DatabaseManager
+from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.validators import requires_owner
 
 
@@ -15,14 +15,15 @@ class DataQuery(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("dataquery", {"DATABASE_URL": config.DATABASE_URL})
+        self._db_manager = DatabaseManager("dataquery", bot=bot)
 
     async def setup_database(self):
         """Create database connection and table if not present."""
-        self.db = await self._db_manager.ensure_pool()
-        assert self.db is not None
-        async with self._db_manager.connection() as connection:
+        pool = get_bot_db_pool(self.bot)
+        if not is_pool_healthy(pool):
+            raise RuntimeError("Shared database pool not available")
+        self.db = pool
+        async with acquire_safe(self.db) as connection:
             await connection.execute("""
                 CREATE TABLE IF NOT EXISTS onboarding (
                     id SERIAL PRIMARY KEY,

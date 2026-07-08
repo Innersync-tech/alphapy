@@ -18,17 +18,14 @@ from utils.command_metadata import (
     get_category_for_command,
     is_admin_command,
 )
-from utils.database_helpers import DatabaseManager
-from utils.db_helpers import acquire_safe, is_pool_healthy
+from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.logger import get_gpt_status_logs, logger
 from utils.timezone import BRUSSELS_TZ
 from utils.validators import validate_admin
 from version import CODENAME, __version__
 
-# Database for command_stats (shared across status commands)
-_status_db = DatabaseManager("status", {"DATABASE_URL": getattr(config, "DATABASE_URL", "")})
-
+# Database for command_stats (shared bot pool via interaction.client)
 BOOT_TIME = datetime.now(BRUSSELS_TZ)
 
 # ------------------ SLASH COMMAND ------------------ #
@@ -461,12 +458,11 @@ async def command_stats_cmd(
     
     await interaction.response.defer(ephemeral=True)
 
-    try:
-        pool = await _status_db.ensure_pool()
-    except Exception as e:
+    pool = get_bot_db_pool(interaction.client)
+    if not is_pool_healthy(pool):
         await interaction.followup.send(
-            f"❌ Failed to connect to database: {e}",
-            ephemeral=True
+            "❌ Database not available.",
+            ephemeral=True,
         )
         return
 
@@ -563,13 +559,6 @@ async def command_stats_cmd(
             ephemeral=True
         )
     except (pg_exceptions.ConnectionDoesNotExistError, pg_exceptions.InterfaceError, ConnectionResetError):
-        # Connection error - reset pool and try to reconnect next time
-        if _status_db._pool:
-            try:
-                await _status_db._pool.close()
-            except Exception:
-                pass
-            _status_db._pool = None
         await interaction.followup.send(
             "❌ Database connection error. Please try again in a moment.",
             ephemeral=True
@@ -710,10 +699,10 @@ async def _build_health_embed(interaction: discord.Interaction) -> discord.Embed
             pass
 
     db_ok = "✅"
-    # Use existing pool if available, otherwise quick direct connection check
-    if is_pool_healthy(_status_db._pool):
+    pool = get_bot_db_pool(bot)
+    if is_pool_healthy(pool):
         try:
-            async with acquire_safe(_status_db._pool) as conn:
+            async with acquire_safe(pool) as conn:
                 await conn.fetchval("SELECT 1")
         except Exception:
             db_ok = "🛑"

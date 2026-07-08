@@ -12,7 +12,7 @@ from asyncpg import exceptions as pg_exceptions
 from discord import app_commands
 from discord.ext import commands
 
-import config
+from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.logger import logger
@@ -158,8 +158,7 @@ class DeleteMyDataCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("delete_my_data", {"DATABASE_URL": config.DATABASE_URL or ""})
+        self._db_manager = DatabaseManager("delete_my_data", bot=bot)
         self.bot.loop.create_task(self._setup())
 
     async def _setup(self) -> None:
@@ -170,12 +169,6 @@ class DeleteMyDataCog(commands.Cog):
             self.db = None
 
     async def cog_unload(self) -> None:
-        if self._db_manager._pool:
-            try:
-                await self._db_manager._pool.close()
-            except Exception:
-                pass
-            self._db_manager._pool = None
         self.db = None
 
     @app_commands.command(

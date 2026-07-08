@@ -621,12 +621,6 @@ class EmbedReminderWatcher(AlphaCog):
             await send_fyi_if_first(self.bot, guild_id, "first_reminder_watcher")
         except (pg_exceptions.ConnectionDoesNotExistError, pg_exceptions.InterfaceError, ConnectionResetError) as conn_err:
             logger.warning(f"Database connection error in store_parsed_reminder: {conn_err}")
-            if getattr(self, "_db_manager", None) and self._db_manager._pool:
-                try:
-                    await self._db_manager._pool.close()
-                except Exception:
-                    pass
-                self._db_manager._pool = None
             self.db = None
             raise
         except RuntimeError as e:

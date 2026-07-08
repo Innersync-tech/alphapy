@@ -6,7 +6,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-import config
+from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe
 from utils.logger import logger
 
@@ -15,13 +15,12 @@ class ImportData(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("importdata", {"DATABASE_URL": getattr(config, "DATABASE_URL", "")})
+        self._db_manager = DatabaseManager("importdata", bot=bot)
 
     async def setup_database(self):
-        self.db = await self._db_manager.ensure_pool()
-        assert self.db is not None
-        async with self._db_manager.connection() as conn:
+        pool = await self._db_manager.ensure_pool()
+        self.db = pool
+        async with acquire_safe(pool) as conn:
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS onboarding (
                     user_id BIGINT PRIMARY KEY,

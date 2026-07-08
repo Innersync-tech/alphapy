@@ -12,8 +12,8 @@ operational analytics data that is not required for the primary service.
 import asyncpg
 from discord.ext import commands
 
-import config
 from utils.background_tasks import BackgroundTask
+from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe
 from utils.logger import logger
 
@@ -27,10 +27,7 @@ class RetentionCleanupCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager(
-            "retention_cleanup", {"DATABASE_URL": config.DATABASE_URL or ""}
-        )
+        self._db_manager = DatabaseManager("retention_cleanup", bot=bot)
         self._task: BackgroundTask | None = None
         self.bot.loop.create_task(self._setup())
 
@@ -53,12 +50,6 @@ class RetentionCleanupCog(commands.Cog):
     async def cog_unload(self) -> None:
         if self._task:
             await self._task.stop()
-        if self._db_manager._pool:
-            try:
-                await self._db_manager._pool.close()
-            except Exception:
-                pass
-            self._db_manager._pool = None
         self.db = None
 
     async def _run_cleanup(self) -> None:

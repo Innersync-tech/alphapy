@@ -7,11 +7,7 @@ from asyncpg import exceptions as pg_exceptions
 from discord import app_commands
 from discord.ext import commands
 
-try:
-    import config_local as config  # type: ignore
-except ImportError:
-    import config  # type: ignore
-
+from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.logger import logger
@@ -57,8 +53,7 @@ class FAQ(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("faq", {"DATABASE_URL": config.DATABASE_URL})
+        self._db_manager = DatabaseManager("faq", bot=bot)
         self.bot.loop.create_task(self._setup_db())
 
     async def _setup_db(self) -> None:
@@ -81,22 +76,10 @@ class FAQ(commands.Cog):
             logger.info("FAQ: DB ready")
         except Exception as e:
             logger.error(f"FAQ: DB init error: {e}")
-            if getattr(self, "_db_manager", None) and self._db_manager._pool:
-                try:
-                    await self._db_manager._pool.close()
-                except Exception:
-                    pass
-                self._db_manager._pool = None
             self.db = None
 
     async def cog_unload(self):
-        """Called when the cog is unloaded - close the database pool."""
-        if getattr(self, "_db_manager", None) and self._db_manager._pool:
-            try:
-                await self._db_manager._pool.close()
-            except Exception:
-                pass
-            self._db_manager._pool = None
+        """Called when the cog is unloaded."""
         self.db = None
 
     async def _fetch_entries(self) -> list[asyncpg.Record]:
