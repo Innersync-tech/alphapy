@@ -108,7 +108,7 @@ async def test_reminder_list_guild_only():
     interaction.guild = None
     interaction.response.send_message = AsyncMock()
 
-    await cog.reminder_list(interaction)
+    await cog.reminder_list.callback(cog, interaction)
 
     interaction.response.send_message.assert_awaited_once_with(ERR_GUILD_ONLY, ephemeral=True)
 
@@ -125,7 +125,7 @@ async def test_reminder_edit_db_unavailable():
     cog._is_enabled = MagicMock(return_value=True)
     cog._ensure_connection = AsyncMock(return_value=False)
 
-    await cog.reminder_edit(interaction, reminder_id=1)
+    await cog.reminder_edit.callback(cog, interaction, reminder_id=1)
 
     interaction.response.send_message.assert_awaited_once_with(ERR_DB, ephemeral=True)
 
