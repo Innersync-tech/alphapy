@@ -21,6 +21,8 @@ except ImportError:
     import config  # type: ignore
 
 if True:
+    from utils.database_helpers import DatabaseManager
+    from utils.db_helpers import acquire_safe, is_pool_healthy
     from utils.premium_guard import (
         get_active_premium_guild,
         get_premium_status,
@@ -101,8 +103,10 @@ class TermsAcceptanceView(discord.ui.View):
 
 async def _save_terms_acceptance(cog: 'PremiumCog', user_id: int, accepted_by: int) -> None:
     """Save terms acceptance to database for GDPR compliance. Uses cog's shared pool."""
+    if not is_pool_healthy(cog.db):
+        raise RuntimeError("Database pool not available")
     try:
-        async with cog._db_manager.connection() as conn:
+        async with acquire_safe(cog.db) as conn:
             await conn.execute(
                 "INSERT INTO terms_acceptance (user_id, accepted_at, version) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING",
                 user_id, datetime.utcnow(), CURRENT_TERMS_VERSION
@@ -115,8 +119,10 @@ async def _save_terms_acceptance(cog: 'PremiumCog', user_id: int, accepted_by: i
 
 async def _has_accepted_terms(cog: 'PremiumCog', user_id: int) -> bool:
     """Check if user has accepted current terms version. Uses cog's shared pool."""
+    if not is_pool_healthy(cog.db):
+        return False
     try:
-        async with cog._db_manager.connection() as conn:
+        async with acquire_safe(cog.db) as conn:
             result = await conn.fetchval(
                 "SELECT 1 FROM terms_acceptance WHERE user_id = $1 AND version = $2",
                 user_id, CURRENT_TERMS_VERSION
@@ -376,12 +382,11 @@ class PremiumCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("premium", {"DATABASE_URL": config.DATABASE_URL or ""})
+        self._db_manager = DatabaseManager("premium", bot=bot)
         self.bot.loop.create_task(self._connect_database())
 
     async def _connect_database(self) -> None:
-        """Initialize database connection pool for premium features."""
+        """Bind to the shared bot database pool for premium features."""
         try:
             self.db = await self._db_manager.ensure_pool()
             logger.info("Premium cog: Database pool created")

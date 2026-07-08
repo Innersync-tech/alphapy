@@ -5,12 +5,8 @@ from asyncpg import exceptions as pg_exceptions
 from discord import app_commands
 from discord.ext import commands
 
-try:
-    import config_local as config  # type: ignore
-except ImportError:
-    import config  # type: ignore
-
 from utils.csv_helpers import create_csv_buffer, create_discord_file_from_buffer
+from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
 from utils.logger import logger
 from utils.validators import validate_admin
@@ -20,25 +16,18 @@ class Exports(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("exports", {"DATABASE_URL": config.DATABASE_URL})
+        self._db_manager = DatabaseManager("exports", bot=bot)
         self.bot.loop.create_task(self._setup())
 
     async def _setup(self) -> None:
         try:
             self.db = await self._db_manager.ensure_pool()
         except Exception as e:
-            logger.error(f"Exports: DB pool creation error: {e}")
+            logger.error(f"Exports: DB pool bind error: {e}")
             self.db = None
 
     async def cog_unload(self):
-        """Called when the cog is unloaded - close the database pool."""
-        if self._db_manager._pool:
-            try:
-                await self._db_manager._pool.close()
-            except Exception:
-                pass
-            self._db_manager._pool = None
+        """Called when the cog is unloaded."""
         self.db = None
 
     @app_commands.command(name="export_tickets", description="Export tickets as CSV (admin)")

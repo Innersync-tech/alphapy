@@ -9,13 +9,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-try:
-    import config_local as config  # type: ignore
-except ImportError:
-    import config  # type: ignore
-
 from gpt.helpers import ask_gpt_vision
 from utils.cog_base import AlphaCog
+from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.logger import log_database_event, log_guild_action, log_with_guild, logger
@@ -35,8 +31,7 @@ class VerificationCog(AlphaCog):
     def __init__(self, bot: commands.Bot):
         super().__init__(bot)
         self.db: asyncpg.Pool | None = None
-        from utils.database_helpers import DatabaseManager
-        self._db_manager = DatabaseManager("verification", {"DATABASE_URL": getattr(config, "DATABASE_URL", "")})
+        self._db_manager = DatabaseManager("verification", bot=bot)
 
         # Start async setup without blocking the event loop
         self.bot.loop.create_task(self.setup_db())
@@ -57,16 +52,11 @@ class VerificationCog(AlphaCog):
     async def setup_db(self) -> None:
         """Initialize database pool and ensure verification_tickets table exists."""
         try:
-            dsn = getattr(config, "DATABASE_URL", None) or ""
-            if not dsn:
-                logger.warning("VerificationCog: DATABASE_URL not set, skipping pool creation")
-                return
-
             pool = await self._db_manager.ensure_pool()
             self.db = pool
-            log_database_event("DB_CONNECTED", details="Verification database pool created")
+            log_database_event("DB_CONNECTED", details="Verification using shared bot database pool")
 
-            async with self._db_manager.connection() as conn:
+            async with acquire_safe(pool) as conn:
                 await conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS verification_tickets (
@@ -105,21 +95,9 @@ class VerificationCog(AlphaCog):
         except Exception as e:
             log_database_event("DB_INIT_ERROR", details=f"VerificationCog setup failed: {e}")
             logger.error(f"VerificationCog: DB init error: {e}")
-            if getattr(self, "_db_manager", None) and self._db_manager._pool:
-                try:
-                    await self._db_manager._pool.close()
-                except Exception:
-                    pass
-                self._db_manager._pool = None
             self.db = None
 
     async def cog_unload(self) -> None:
-        if getattr(self, "_db_manager", None) and self._db_manager._pool:
-            try:
-                await self._db_manager._pool.close()
-            except Exception:
-                pass
-            self._db_manager._pool = None
         self.db = None
 
     # ----- Settings helpers -----

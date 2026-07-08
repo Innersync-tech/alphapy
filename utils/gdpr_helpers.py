@@ -9,8 +9,7 @@ import asyncpg
 import discord
 from discord.ext import commands
 
-import config
-from utils.db_helpers import is_pool_healthy
+from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.logger import logger
 
 # ---------------------------------------------------------------------------
@@ -63,35 +62,14 @@ def build_gdpr_text(guild_name: str) -> str:
 # GDPR acceptance storage
 # ---------------------------------------------------------------------------
 
-_gdpr_db = None  # DatabaseManager | None
-
-
-def _get_gdpr_db():
-    global _gdpr_db
-    if _gdpr_db is None:
-        from utils.database_helpers import DatabaseManager
-        _gdpr_db = DatabaseManager("gdpr", {"DATABASE_URL": getattr(config, "DATABASE_URL", "")})
-    return _gdpr_db
-
-
-async def _ensure_gdpr_pool() -> asyncpg.Pool | None:
-    """Ensure the GDPR database pool is initialized."""
-    try:
-        return await _get_gdpr_db().ensure_pool()
-    except Exception as e:
-        logger.error(f"GDPR: Failed to create database pool: {e}")
-        return None
-
-
-async def store_gdpr_acceptance(user_id: int, guild_id: int) -> None:
+async def store_gdpr_acceptance(user_id: int, guild_id: int, bot: commands.Bot) -> None:
     """Store GDPR acceptance in PostgreSQL, scoped to a guild."""
-    pool = await _ensure_gdpr_pool()
+    pool = get_bot_db_pool(bot)
     if not is_pool_healthy(pool):
         logger.warning(f"GDPR: Database pool not available for user {user_id}")
         return
-    db = _get_gdpr_db()
     try:
-        async with db.connection() as conn:
+        async with acquire_safe(pool) as conn:
             await conn.execute(
                 """
                 INSERT INTO gdpr_acceptance (user_id, guild_id, accepted, timestamp)
@@ -104,12 +82,6 @@ async def store_gdpr_acceptance(user_id: int, guild_id: int) -> None:
         logger.info(f"GDPR acceptance saved for user {user_id} in guild {guild_id}")
     except (asyncpg.exceptions.ConnectionDoesNotExistError, asyncpg.exceptions.InterfaceError, ConnectionResetError) as conn_err:
         logger.warning(f"Database connection error saving GDPR acceptance: {conn_err}")
-        if db._pool:
-            try:
-                await db._pool.close()
-            except Exception:
-                pass
-            db._pool = None
     except Exception as e:
         logger.exception(f"Error saving GDPR acceptance for user {user_id}: {e}")
 
@@ -130,7 +102,7 @@ class GDPRButton(discord.ui.Button):
                 "⚠️ GDPR functionality is currently disabled.", ephemeral=True
             )
             return
-        await store_gdpr_acceptance(interaction.user.id, interaction.guild_id)
+        await store_gdpr_acceptance(interaction.user.id, interaction.guild_id, self.bot)
 
         # Assign acceptance role if configured
         role_id = self._get_acceptance_role_id(interaction.guild_id)

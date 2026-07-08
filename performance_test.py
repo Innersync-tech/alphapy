@@ -26,17 +26,18 @@ async def test_database_performance():
     print("🗄️  Testing Database Performance...")
 
     try:
-        from utils.database_helpers import DatabaseManager
+        from utils.db_helpers import acquire_safe, close_all_pools, create_db_pool
 
-        manager = DatabaseManager("perf_test", {"DATABASE_URL": config.DATABASE_URL or ""})
+        dsn = config.DATABASE_URL or ""
+        if not dsn:
+            print("❌ DATABASE_URL not set")
+            return
 
-        # Test connection pool creation
         start_time = time.time()
-        pool = await manager.ensure_pool()
+        pool = await create_db_pool(dsn, "perf_test", min_size=1, max_size=5)
         pool_time = (time.time() - start_time) * 1000
         print(f"✅ Database connection: {pool_time:.1f}ms")
 
-        # Test simple queries (uses acquire_safe via manager.connection())
         queries = [
             ("COUNT tables", "SELECT COUNT(*) FROM information_schema.tables"),
             ("COUNT reminders", "SELECT COUNT(*) FROM reminders"),
@@ -46,12 +47,12 @@ async def test_database_performance():
 
         for name, query in queries:
             start_time = time.time()
-            async with manager.connection() as conn:
+            async with acquire_safe(pool) as conn:
                 result = await conn.fetchval(query)
             query_time = (time.time() - start_time) * 1000
             print(f"✅ {name}: {query_time:.1f}ms (result: {result})")
 
-        await pool.close()
+        await close_all_pools()
         print("✅ Database tests completed")
 
     except ImportError:
