@@ -114,11 +114,6 @@ def get_cached_strategy_packet(user_id: int) -> dict[str, Any] | None:
     return packet if isinstance(packet, dict) else None
 
 
-def invalidate_hermit_cache(user_id: int) -> None:
-    with _cache_lock:
-        _cache.pop(user_id, None)
-
-
 def record_prompt_usage(applied: bool) -> None:
     global _stats_prompt_applied, _stats_prompt_omitted
     with _cache_lock:

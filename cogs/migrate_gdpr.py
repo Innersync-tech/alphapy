@@ -1,3 +1,5 @@
+"""One-shot SQLite → Postgres GDPR migration (`!migrate_gdpr`). Not loaded in lifecycle."""
+
 import sqlite3
 from datetime import datetime
 

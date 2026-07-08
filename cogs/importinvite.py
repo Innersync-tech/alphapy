@@ -1,3 +1,5 @@
+"""One-shot invite leaderboard import (`!import_invites`). Not loaded in lifecycle."""
+
 import re
 
 import asyncpg

@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 - **Dead code (P1)** — orphan modules `utils/response_helpers.py`, `utils/checks.py`, `utils/automod_analytics.py`; legacy `POST /webhooks/reflections` (use `POST /webhooks/app-reflections` via Core-API).
+- **Dead code (P2)** — `bot_only.py`; unittest modules under `cogs/test_*.py` (moved `test_reminders_repo` → `tests/`); dev prefix cog `cogs/test_automod.py`; legacy migration cogs unloaded from lifecycle (`importdata`, `importinvite`, `migrate_gdpr`); unused `csv_helpers` temp-file helpers, `slash_utils.is_owner_or_admin`, `config.ROLE_ID`, `hermit_context.invalidate_hermit_cache`.
 
 ### Fixed
 - (No changes yet)

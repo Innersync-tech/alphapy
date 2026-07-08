@@ -1,4 +1,5 @@
-# test_reminders_repo.py
+"""Tests for legacy reminder repository helpers in cogs.reminders."""
+
 import asyncio
 import unittest
 from typing import Any
@@ -36,10 +37,8 @@ class FakeConn:
 
     async def fetch(self, query: str, *params):
         (uid,) = params
-        # Test function: return reminders for the user (no hardcoded admin ID)
-        result = [r for r in self.rows if r["created_by"] == uid]
-        # Emuleer ORDER BY time (niet strikt nodig voor test invariants)
-        return result
+        return [r for r in self.rows if r["created_by"] == uid]
+
 
 class TestRemindersRepo(unittest.TestCase):
     def setUp(self):
@@ -97,6 +96,3 @@ class TestRemindersRepo(unittest.TestCase):
             rows = await get_reminders_for_user(self.conn, "u1")
             self.assertEqual(len(rows), 0)
         asyncio.run(scenario())
-
-if __name__ == "__main__":
-    unittest.main()

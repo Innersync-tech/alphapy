@@ -1,3 +1,5 @@
+"""One-shot onboarding embed import (`!import_onboarding`). Not loaded in lifecycle."""
+
 import json
 
 import asyncpg

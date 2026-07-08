@@ -3,7 +3,6 @@ CSV export utilities for consistent file generation and Discord file handling.
 """
 import csv
 import io
-import os
 from typing import Any
 
 import discord
@@ -30,23 +29,3 @@ def create_discord_file_from_buffer(buf: io.StringIO, filename: str) -> discord.
     # Create bytes buffer for Discord
     bytes_buf = io.BytesIO(content.encode('utf-8'))
     return discord.File(bytes_buf, filename=filename)
-
-
-def create_temp_csv_file(rows: list[dict[str, Any]], filename: str, fieldnames: list[str] | None = None) -> str:
-    """Create a temporary CSV file (legacy method - prefer buffer method)."""
-    if not fieldnames:
-        fieldnames = list(rows[0].keys()) if rows else []
-    with open(filename, "w", newline="", encoding="utf-8") as csvfile:
-        csv_writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        csv_writer.writeheader()
-        csv_writer.writerows(rows)
-    return filename
-
-
-def cleanup_temp_file(filename: str) -> None:
-    """Clean up temporary CSV file."""
-    try:
-        if os.path.exists(filename):
-            os.remove(filename)
-    except Exception:
-        pass  # Ignore cleanup errors
