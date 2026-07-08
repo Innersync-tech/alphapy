@@ -57,9 +57,9 @@ async def test_verification_start_button_guild_only():
     interaction.guild = None
     interaction.response.defer = AsyncMock()
     interaction.followup.send = AsyncMock()
-    button = MagicMock()
+    start_btn = next(child for child in view.children if getattr(child, "custom_id", None) == "verification_start_btn")
 
-    await view.start_verification(interaction, button)
+    await start_btn.callback(interaction)
 
     interaction.followup.send.assert_awaited_once_with(ERR_GUILD_ONLY, ephemeral=True)
 
