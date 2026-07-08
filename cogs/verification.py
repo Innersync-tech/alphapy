@@ -22,6 +22,7 @@ from utils.logger import log_database_event, log_guild_action, log_with_guild, l
 from utils.premium_guard import guild_has_premium
 from utils.sanitizer import safe_embed_text, safe_prompt
 from utils.timezone import BRUSSELS_TZ
+from utils.user_messages import ERR_GUILD_ONLY
 
 
 class VerificationCog(AlphaCog):
@@ -229,7 +230,7 @@ class VerificationCog(AlphaCog):
             return
 
         if not interaction.guild:
-            await interaction.response.send_message("❌ This command only works in a server.", ephemeral=True)
+            await interaction.response.send_message(ERR_GUILD_ONLY, ephemeral=True)
             return
 
         target = channel or cast(discord.TextChannel, interaction.channel)
@@ -259,10 +260,10 @@ class VerificationCog(AlphaCog):
         embed = discord.Embed(
             title="✅ Verify your access",
             description=(
-                "This server uses verification to gate access. To unlock the verified role and full access:\n\n"
-                "1. Click **Start verification**.\n"
-                "2. Upload a clear screenshot of your payment or confirmation (for this server's products, events, or access).\n"
-                "3. Our AI will review it and either auto-verify you or forward it to the team."
+                "Unlock the verified role in three steps:\n\n"
+                "1. Tap **Start verification**.\n"
+                "2. Upload a clear payment screenshot (name visible if possible).\n"
+                "3. Get auto-approved or wait for team review."
             ),
             color=discord.Color.green(),
             timestamp=datetime.now(BRUSSELS_TZ),
@@ -284,7 +285,7 @@ class VerificationCog(AlphaCog):
 
         if not interaction.guild:
             await interaction.response.send_message(
-                "❌ This command only works in a server.",
+                ERR_GUILD_ONLY,
                 ephemeral=True,
             )
             return
@@ -1048,7 +1049,7 @@ class VerificationPanelView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
 
         if not interaction.guild:
-            await interaction.followup.send("❌ This button only works in a server.", ephemeral=True)
+            await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
             return
 
         if not await guild_has_premium(interaction.guild.id):

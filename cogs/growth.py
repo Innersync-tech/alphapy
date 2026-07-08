@@ -102,7 +102,10 @@ class GrowthShareView(discord.ui.View):
 
     @discord.ui.button(label="Keep private", style=discord.ButtonStyle.danger, emoji="🔒")
     async def keep_private(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="Your check-in stays private. 🔒", view=None)
+        await interaction.response.edit_message(
+            content="Your check-in stays private — nothing is posted to the growth channel.",
+            view=None,
+        )
         self.stop()
 
 
@@ -159,7 +162,7 @@ Keep your response under 250 words. End with a complete sentence.
                 )
             except Exception:
                 await interaction.followup.send(
-                    "❌ Something went wrong while processing your check-in. Please try again later.",
+                    "❌ Check-in failed. Try again — if it persists, run `/gptstatus`.",
                     ephemeral=True,
                 )
             return
@@ -527,7 +530,7 @@ class GrowthCheckin(commands.Cog):
 
     @app_commands.command(
         name="growthcheckin",
-        description="Reflect on your goals, obstacles, and how you feel. Grok responds.",
+        description="Name your goal, blocker, and feeling. Grok responds.",
     )
     @app_checks.cooldown(2, 300.0, key=lambda i: (i.guild.id, i.user.id) if i.guild else i.user.id)
     async def growthcheckin(self, interaction: discord.Interaction):

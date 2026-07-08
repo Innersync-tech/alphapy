@@ -12,6 +12,7 @@ from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
 )
+from utils.user_messages import ERR_GENERIC
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +35,13 @@ class LearnTopic(commands.Cog):
             log_gpt_error(error_type=error_type, user_id=interaction.user.id, guild_id=guild_id)
             try:
                 await interaction.response.send_message(
-                    "❌ Something went wrong while processing your request. Please try again later.",
+                    ERR_GENERIC,
                     ephemeral=True,
                 )
             except Exception:
                 # If response is already used, try followup as fallback
                 await interaction.followup.send(
-                    "❌ Something went wrong while processing your request. Please try again later.",
+                    ERR_GENERIC,
                     ephemeral=True,
                 )
             return

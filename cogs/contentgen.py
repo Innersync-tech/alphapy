@@ -11,6 +11,7 @@ from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
 )
+from utils.user_messages import ERR_GENERIC
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ Avoid clichés.
             asyncio.create_task(_store_caption_insight())
         except Exception:
             # ask_gpt() already logs all its errors internally, so we don't log again
-            await interaction.followup.send("❌ Couldn't generate the caption. Try again later.", ephemeral=True)
+            await interaction.followup.send(ERR_GENERIC, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(ContentGen(bot))

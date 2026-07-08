@@ -12,6 +12,7 @@ from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
 )
+from utils.user_messages import ERR_GENERIC
 
 metrics_logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class ChallengeSelect(discord.ui.Select):
         except Exception as e:
             logger.exception(f"Unhandled Grok error (ChallengeSelect) by {interaction.user}: {e}")
             # ask_gpt() already logs errors internally
-            await interaction.followup.send("❌ Something went wrong. Please try again later.", ephemeral=True)
+            await interaction.followup.send(ERR_GENERIC, ephemeral=True)
 
 class AskQuestionButton(discord.ui.Button):
     def __init__(self, bot):
