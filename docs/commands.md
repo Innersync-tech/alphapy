@@ -820,7 +820,7 @@ Check the status of the Grok/LLM API.
 ### `/version`
 Show bot version and codename.
 
-**Response:** Current version (e.g., `3.12.0 — Reflection Loop`)
+**Response:** Current version (e.g., `3.12.1 — Reflection Loop`)
 
 ---
 

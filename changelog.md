@@ -8,8 +8,27 @@ All notable changes to this project will be documented in this file.
 - (No changes yet)
 
 ### Fixed
-- **Docs** — AutoMod audit (#282): `add_ai_rule` signature (policy + threshold), `/automod` vs `/config automod` references, `automod_stats` API route, Discord log embed Rule field, `POST .../automod/invalidate-cache` in `docs/api.md`.
-- **Docs** — Starlight internal links: replace `.md` suffixes with `../slug/` paths for docs.innersync.tech Deploy Starlight CI.
+- (No changes yet)
+
+## [3.12.1] - 2026-07-08
+
+### Added
+- **`/help`** — curated discovery embed (get started, daily commands, support, premium, link to `/commands`).
+- **Live session management** — `/edit_live_session` and `/delete_live_session` for preset reminders (`name` + fixed message).
+- **`utils/user_messages.py`** — shared user-facing error strings (`ERR_GUILD_ONLY`, `ERR_DB`, `ERR_GENERIC`); rolled out to tickets, agents, and identity cogs.
+- **FYI Phase 2** — auto tips for first growth check-in, invite leaderboard, Grok call, and embed-watcher reminder.
+
+### Changed
+- **Tier-1 copy pass** — onboarding, reminders, tickets, growth, agents, Innersync identity, and premium: shorter, direct English tone.
+- **`/commands`** — cooldown checks no longer hide public commands as admin-only; category overrides for status and Innersync commands; removed stale enable/disable pair metadata.
+- **Reminder display** — English weekday names in lists and parser output.
+- **Premium UX** — slash description and embed copy; `premium_required_message` uses feature name + `/premium` CTA.
+
+### Fixed
+- **Language violations** — Dutch strings in configuration, parsers, reminders, and embed-watcher debug output.
+- **Broken UX refs** — onboarding toggle hint; growth history points to `/link` before `/growthcheckin`.
+- **Debug leaks** — `/add_reminder` no longer appends embed parse dump to user success; agents disabled message hides env var names.
+- **Docs** — AutoMod audit (#282): AI rule signature, invalidate-cache route, log embed rule name; Starlight internal link paths for docs.innersync.tech CI.
 
 ## [3.12.0] - 2026-07-04
 
