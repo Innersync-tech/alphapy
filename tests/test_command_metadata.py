@@ -1,8 +1,7 @@
 """Tests for command list metadata helpers."""
 
-from types import SimpleNamespace
-
 import discord
+from types import SimpleNamespace
 
 from utils.command_metadata import (
     find_enable_disable_pair,
