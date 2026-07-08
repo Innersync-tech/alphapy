@@ -259,8 +259,8 @@ async def _create_checkout_url(tier: str, guild_id: int, user_id: int) -> str | 
 async def _build_premium_embed_and_view(guild_id: int, user_id: int, guild_name: str | None = None) -> tuple[discord.Embed, discord.ui.View]:
     """Build the premium info embed and checkout buttons view. Reused after terms acceptance."""
     embed = discord.Embed(
-        title="⚡ Premium — real power",
-        description="Powerful enough? Get the full stack.",
+        title="Premium",
+        description="More Grok, image reminders, live sessions, spicy growth mode.",
         color=discord.Color.blue(),
         timestamp=datetime.now(BRUSSELS_TZ),
     )
@@ -294,7 +294,8 @@ async def _build_premium_embed_and_view(guild_id: int, user_id: int, guild_name:
     how_it_works = (
         "Premium applies to **one server**.\n"
         "Pay once → choose where you want full Mockingbird power, vision verification, and image reminders.\n"
-        "Want to switch servers later? Use `/premium_transfer` in the server you want, or ask us (dashboard coming later)."
+        "Want to switch servers later? Use `/premium_transfer` in the server you want, "
+        "or visit pricing.alphapy.innersync.tech."
     )
     if guild_id != 0 and guild_name:
         how_it_works += f"\n\n**This purchase will apply Premium to this server** ({guild_name})."
@@ -472,7 +473,7 @@ class PremiumCog(commands.Cog):
 
     @app_commands.command(
         name="premium",
-        description="See Premium pricing and features. Powerful enough?",
+        description="See plans, limits, and checkout.",
     )
     async def premium(self, interaction: discord.Interaction) -> None:
         # Check if user has accepted terms

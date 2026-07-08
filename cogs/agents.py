@@ -31,6 +31,7 @@ from utils.db_helpers import get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_embed_text
+from utils.user_messages import ERR_GENERIC
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,11 @@ def _agent_app_link_view() -> discord.ui.View:
     return view
 
 
+_AGENTS_UNAVAILABLE_MSG = (
+    "Agents aren't available right now. Try again later or contact support."
+)
+
+
 def _agents_globally_enabled() -> bool:
     return getattr(config, "ALPHAPY_AGENTS_ENABLED", False)
 
@@ -93,14 +99,10 @@ class AgentGroup(app_commands.Group):
         super().__init__(name="agent", description="Run personal Alphapy agents")
         self.cog = cog
 
-    @app_commands.command(name="list", description="List available Alphapy agents")
+    @app_commands.command(name="list", description="Reflection agent — journal sync with optional App context")
     async def list_cmd(self, interaction: discord.Interaction) -> None:
         if not _agents_globally_enabled():
-            await interaction.response.send_message(
-                "Agents are not enabled on this deployment. "
-                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
             return
 
         lines = []
@@ -127,11 +129,7 @@ class AgentGroup(app_commands.Group):
         cog = self.cog
         agent_name = "reflection"
         if not _agents_globally_enabled():
-            await interaction.response.send_message(
-                "Agents are not enabled on this deployment. "
-                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
             return
 
         guild_id = interaction.guild_id
@@ -201,9 +199,7 @@ class AgentGroup(app_commands.Group):
             return
         except Exception as exc:
             logger.exception("Agent session failed: %s", exc)
-            await interaction.followup.send(
-                "Something went wrong running the agent.", ephemeral=True
-            )
+            await interaction.followup.send(ERR_GENERIC, ephemeral=True)
             return
 
         await interaction.followup.send(
@@ -224,11 +220,7 @@ class AgentGroup(app_commands.Group):
         cog = self.cog
         agent_name = "reflection"
         if not _agents_globally_enabled():
-            await interaction.response.send_message(
-                "Agents are not enabled on this deployment. "
-                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
             return
 
         guild_id = interaction.guild_id
@@ -284,11 +276,7 @@ class AgentGroup(app_commands.Group):
         cog = self.cog
         agent_name = "reflection"
         if not _agents_globally_enabled():
-            await interaction.response.send_message(
-                "Agents are not enabled on this deployment. "
-                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
             return
 
         guild_id = interaction.guild_id
@@ -337,15 +325,11 @@ class AgentGroup(app_commands.Group):
         embed.set_footer(text=embed.footer.text + " · ended")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="status", description="Show your active reflection agent session")
+    @app_commands.command(name="status", description="Show your active agent session")
     async def status_cmd(self, interaction: discord.Interaction) -> None:
         agent_name = "reflection"
         if not _agents_globally_enabled():
-            await interaction.response.send_message(
-                "Agents are not enabled on this deployment. "
-                "Set `ALPHAPY_AGENTS_ENABLED=true` on the bot service.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
             return
 
         resolved = await self.cog._resolve_user(interaction)
@@ -356,7 +340,7 @@ class AgentGroup(app_commands.Group):
         row = await get_active_session(innersync_id, agent_name)
         if not row:
             await interaction.response.send_message(
-                "No active session for the reflection agent.", ephemeral=True
+                f"No active session for the **{agent_name}** agent.", ephemeral=True
             )
             return
 
@@ -373,8 +357,9 @@ class AgentGroup(app_commands.Group):
             label = "Discord" if origin_channel == "discord" else "Innersync App"
             origin_hint = f"Started on: **{label}**\n"
 
+        active_agent = str(row.get("agent_name") or agent_name)
         embed = discord.Embed(
-            title="Active session: reflection",
+            title=f"Active session: {active_agent}",
             description=(
                 f"{origin_hint}"
                 f"Started: {row.get('started_at', 'unknown')}\n"

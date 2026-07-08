@@ -96,7 +96,7 @@ class LearnTopic(commands.Cog):
                         await asyncio.sleep(keepalive_interval)
                         try:
                             await interaction.edit_original_response(
-                                content="⏳ Still generating your answer…"
+                                content="Still working on it…"
                             )
                         except Exception:
                             return

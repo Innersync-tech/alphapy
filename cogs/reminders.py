@@ -26,6 +26,18 @@ from utils.validators import validate_admin
 
 # All logging timestamps in this module use Brussels time for clarity.
 
+LIVE_SESSION_NAME = "Live session"
+LIVE_SESSION_MESSAGE = "Live session starting now!"
+
+
+def is_live_session_row(row: asyncpg.Record | dict[str, Any] | None) -> bool:
+    """True when the reminder row is a live-session preset."""
+    if not row:
+        return False
+    name = row["name"] if isinstance(row, asyncpg.Record) else row.get("name")
+    message = row["message"] if isinstance(row, asyncpg.Record) else row.get("message")
+    return name == LIVE_SESSION_NAME and message == LIVE_SESSION_MESSAGE
+
 
 class ReminderRepoConnection(Protocol):
     async def fetch(self, query: str, *args: Any, timeout: float | None = ...) -> list[asyncpg.Record]: ...
@@ -159,7 +171,7 @@ class ReminderCog(AlphaCog):
     async def _handle_connection_lost(self, error: Exception) -> None:
         logger.warning(f"Reminder DB connection lost (shared pool will self-heal): {error}")
 
-    @app_commands.command(name="add_reminder", description="Schedule a recurring or one-off reminder via form or message link.")
+    @app_commands.command(name="add_reminder", description="Schedule a one-off or recurring reminder.")
     @app_checks.cooldown(5, 60.0, key=lambda i: (i.guild.id, i.user.id) if i.guild else i.user.id)  # 5 per minute per guild+user
     @app_commands.describe(
         name="Name of the reminder",
@@ -190,7 +202,7 @@ class ReminderCog(AlphaCog):
             return
 
         if not self._is_enabled(interaction.guild.id):
-            await interaction.followup.send("⚠️ Reminders are currently disabled.", ephemeral=True)
+            await interaction.followup.send("Reminders are off in this server. Ask an admin to enable them.", ephemeral=True)
             return
 
         # Tier-based reminder limit (free users: max 10 active reminders)
@@ -412,10 +424,11 @@ class ReminderCog(AlphaCog):
         from utils.fyi_tips import send_fyi_if_first
         await send_fyi_if_first(self.bot, guild_id, "first_reminder")
 
-        debug_str = "\n".join(debug_info) if debug_info else "ℹ️ No extra info extracted from embed."
+        if debug_info:
+            logger.debug("add_reminder embed parse info: %s", debug_info)
         await interaction.followup.send(
-            f"✅ Reminder **'{name}'** added to {channel.mention}.\n{debug_str}",
-            ephemeral=True
+            f"✅ Reminder **'{name}'** added to {channel.mention}.",
+            ephemeral=True,
         )
 
     @app_commands.command(
@@ -445,7 +458,7 @@ class ReminderCog(AlphaCog):
             return
 
         if not self._is_enabled(interaction.guild.id):
-            await interaction.followup.send("⚠️ Reminders are currently disabled.", ephemeral=True)
+            await interaction.followup.send("Reminders are off in this server. Ask an admin to enable them.", ephemeral=True)
             return
 
         resolved_image_url: str | None = (image.url if image else None) or (image_url.strip() if image_url and image_url.strip() else None)
@@ -509,7 +522,7 @@ class ReminderCog(AlphaCog):
         guild_id = interaction.guild.id
         channel_id = int(channel.id)
         created_by = int(interaction.user.id)
-        name = "Live session"
+        name = LIVE_SESSION_NAME
 
         if not self.db:
             await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
@@ -525,7 +538,7 @@ class ReminderCog(AlphaCog):
                     reminder_time=reminder_time_obj,
                     call_time=call_time_obj,
                     days=days_list,
-                    message="Live session starting now!",
+                    message=LIVE_SESSION_MESSAGE,
                     created_by=created_by,
                     image_url=resolved_image_url,
                 )
@@ -542,11 +555,200 @@ class ReminderCog(AlphaCog):
             return
 
         await interaction.followup.send(
-            f"✅ **Live session** reminder added to {channel.mention} at **{time}** on **{days}**. Message: \"Live session starting now!\"",
+            f"Live session set — {channel.mention} at **{time}** ({days}).",
             ephemeral=True,
         )
 
-    @app_commands.command(name="reminder_list", description="📋 View your active reminders")
+    @app_commands.command(
+        name="edit_live_session",
+        description="Edit an existing live-session preset reminder.",
+    )
+    @app_commands.describe(
+        live_session_id="ID of the live session reminder",
+        days="Days of the week (e.g. mon,wed,fri)",
+        time="Session start time in HH:MM format",
+        channel="Target channel",
+        image_url="(Premium) New image URL",
+        image="(Premium) New image attachment",
+        clear_image="Set true to remove the current image",
+    )
+    async def edit_live_session(
+        self,
+        interaction: discord.Interaction,
+        live_session_id: int,
+        days: str | None = None,
+        time: str | None = None,
+        channel: discord.TextChannel | None = None,
+        image_url: str | None = None,
+        image: discord.Attachment | None = None,
+        clear_image: bool = False,
+    ) -> None:
+        await interaction.response.defer(thinking=True, ephemeral=True)
+
+        if not interaction.guild:
+            await interaction.followup.send("❌ This command only works in a server.", ephemeral=True)
+            return
+        if not self._is_enabled(interaction.guild.id):
+            await interaction.followup.send("Reminders are off in this server. Ask an admin to enable them.", ephemeral=True)
+            return
+        if not await self._ensure_connection() or not self.db:
+            await interaction.followup.send("⛔ Database not connected. Please try again later.", ephemeral=True)
+            return
+
+        guild_id = interaction.guild.id
+        user_id = interaction.user.id
+        is_admin, _ = await validate_admin(interaction, raise_on_fail=False)
+
+        try:
+            async with acquire_safe(self.db) as conn:
+                if is_admin:
+                    row = await reminder_repo.get_by_id(conn, guild_id, live_session_id)
+                else:
+                    row = await reminder_repo.get_by_id_for_user(
+                        conn, guild_id, live_session_id, user_id
+                    )
+        except Exception:
+            logger.exception("Error fetching live session for edit")
+            await interaction.followup.send("❌ Failed to load live session. Please try again.", ephemeral=True)
+            return
+
+        if not row or not is_live_session_row(row):
+            await interaction.followup.send(
+                f"No live session found with ID `{live_session_id}` or you don't have permission to edit it.",
+                ephemeral=True,
+            )
+            return
+
+        _UNCHANGED = object()
+        image_update: str | None | object = _UNCHANGED
+        if clear_image:
+            image_update = None
+        elif image or (image_url and image_url.strip()):
+            image_update = (image.url if image else None) or image_url.strip()
+            if image_update:
+                from utils.premium_guard import is_premium, premium_required_message
+                if not await is_premium(interaction.user.id, guild_id):
+                    await interaction.followup.send(
+                        premium_required_message("Live session presets with images"),
+                        ephemeral=True,
+                    )
+                    return
+
+        current_call_time = row.get("call_time") or row.get("time")
+        if hasattr(current_call_time, "strftime"):
+            time_str = current_call_time.strftime("%H:%M")
+        else:
+            time_str = str(current_call_time)[:5] if current_call_time else "00:00"
+
+        if time:
+            time_obj = parse_time_string(time)
+            if time_obj is None:
+                await interaction.followup.send("❌ Invalid time format. Use HH:MM (e.g., 19:30).", ephemeral=True)
+                return
+            time_str = time
+
+        time_obj = parse_time_string(time_str)
+        if time_obj is None:
+            await interaction.followup.send("❌ Invalid time on existing reminder.", ephemeral=True)
+            return
+
+        days_list = list(row["days"]) if row.get("days") else []
+        if days:
+            days_list = parse_days_string(days)
+            if not days_list:
+                await interaction.followup.send("❌ Invalid days. Use e.g. mon,wed,fri.", ephemeral=True)
+                return
+
+        channel_id = int(channel.id) if channel else int(row["channel_id"])
+        reminder_offset = self._get_reminder_offset(guild_id)
+        event_dt = datetime.combine(datetime.now(BRUSSELS_TZ).date(), time_obj)
+        reminder_dt = event_dt - timedelta(minutes=reminder_offset)
+        reminder_time_obj = reminder_dt.time()
+        call_time_obj = time_obj
+
+        final_image: str | None = row.get("image_url")
+        if image_update is not _UNCHANGED:
+            final_image = image_update  # type: ignore[assignment]
+
+        try:
+            async with acquire_safe(self.db) as conn:
+                await reminder_repo.update_live_session(
+                    conn,
+                    guild_id,
+                    live_session_id,
+                    reminder_time=reminder_time_obj,
+                    call_time=call_time_obj,
+                    days=days_list,
+                    channel_id=channel_id,
+                    image_url=final_image,
+                )
+        except Exception:
+            logger.exception("Error updating live session")
+            await interaction.followup.send("❌ Failed to update live session. Please try again.", ephemeral=True)
+            return
+
+        ch = channel or self.bot.get_channel(channel_id)
+        ch_mention = ch.mention if isinstance(ch, discord.TextChannel) else f"<#{channel_id}>"
+        await interaction.followup.send(
+            f"✅ Live session **#{live_session_id}** updated — {ch_mention} at **{time_obj.strftime('%H:%M')}**.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="delete_live_session",
+        description="Delete an existing live-session preset reminder.",
+    )
+    @app_commands.describe(live_session_id="ID of the live session reminder")
+    async def delete_live_session(
+        self,
+        interaction: discord.Interaction,
+        live_session_id: int,
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        if not interaction.guild:
+            await interaction.followup.send("❌ This command only works in a server.", ephemeral=True)
+            return
+        if not self._is_enabled(interaction.guild.id):
+            await interaction.followup.send("Reminders are off in this server. Ask an admin to enable them.", ephemeral=True)
+            return
+        if not await self._ensure_connection() or not self.db:
+            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            return
+
+        guild_id = interaction.guild.id
+        user_id = interaction.user.id
+        is_admin, _ = await validate_admin(interaction, raise_on_fail=False)
+
+        try:
+            async with acquire_safe(self.db) as conn:
+                if is_admin:
+                    row = await reminder_repo.get_by_id(conn, guild_id, live_session_id)
+                else:
+                    row = await reminder_repo.get_by_id_for_user(
+                        conn, guild_id, live_session_id, user_id
+                    )
+                if not row or not is_live_session_row(row):
+                    await interaction.followup.send(
+                        f"No live session found with ID `{live_session_id}` or you don't have permission to delete it.",
+                        ephemeral=True,
+                    )
+                    return
+                if is_admin:
+                    await reminder_repo.delete(conn, guild_id, live_session_id)
+                else:
+                    await reminder_repo.delete_for_user(conn, guild_id, live_session_id, user_id)
+        except Exception:
+            logger.exception("Error deleting live session")
+            await interaction.followup.send("❌ Failed to delete live session. Please try again.", ephemeral=True)
+            return
+
+        await interaction.followup.send(
+            f"🗑️ Live session **#{live_session_id}** deleted.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="reminder_list", description="View your active reminders")
     async def reminder_list(self, interaction: discord.Interaction) -> None:
         if not interaction.guild:
             await interaction.response.send_message("❌ This command only works in a server.", ephemeral=True)
@@ -694,7 +896,7 @@ class ReminderCog(AlphaCog):
             logger.exception("Error fetching reminders")
             await interaction.followup.send("⚠️ Failed to fetch reminders. Please try again.", ephemeral=True)
 
-    @app_commands.command(name="reminder_delete", description="🗑️ Delete a reminder by ID")
+    @app_commands.command(name="reminder_delete", description="Delete a reminder by ID")
     @app_commands.describe(reminder_id="The ID of the reminder you want to delete")
     async def reminder_delete(self, interaction: discord.Interaction, reminder_id: int) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -1322,7 +1524,7 @@ class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
         
         self.days_input = discord.ui.TextInput(
             label="Days (comma-separated)",
-            placeholder="e.g., ma,di,wo or leave empty",
+            placeholder="e.g. mon,wed,fri or leave empty",
             default=current_days,
             max_length=50,
             required=False

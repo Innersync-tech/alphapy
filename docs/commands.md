@@ -759,6 +759,43 @@ Show your active reflection agent session, if any.
 
 ---
 
+## Premium
+
+### `/premium`
+See plans, limits, and checkout options.
+
+**Response:** Embed with tier comparison, feature list, and checkout buttons (when `PREMIUM_CHECKOUT_URL` is configured).
+
+**Permissions:** Public
+
+---
+
+### `/my_premium`
+Check your Premium status and expiry in this server.
+
+**Response:** Current tier, limits, and transfer hint if applicable.
+
+**Permissions:** Public (guild context)
+
+---
+
+### `/premium_check`
+Check if a user has Premium in this guild (admin).
+
+**Parameters:**
+- `member` (required): Discord member to check
+
+**Permissions:** Administrator
+
+---
+
+### `/premium_transfer`
+Move your active Premium subscription to this server.
+
+**Permissions:** Public (must own an active subscription)
+
+---
+
 ## System
 
 ### `/innersync`
@@ -783,21 +820,30 @@ Check the status of the Grok/LLM API.
 ### `/version`
 Show bot version and codename.
 
-**Response:** Current version (e.g., "3.11.0 - Reflection Loop")
+**Response:** Current version (e.g., `3.12.0 — Reflection Loop`)
 
 ---
 
 ### `/release`
 Show release notes for the current version.
 
-**Response:** Release notes from `RELEASES.md`
+**Response:** Release notes from GitHub Releases API, with fallback to `changelog.md` in the repo.
 
 ---
 
 ### `/health`
 Show system status and configuration.
 
-**Response:** Bot status, database status, guild count, and configuration overview.
+**Response:** Database connectivity, reminders/invites/GDPR module toggles, uptime, and optional memory/CPU metrics when `psutil` is available.
+
+---
+
+### `/help`
+Quick guide to the most useful member commands.
+
+**Response:** Curated ephemeral embed: get started (`/link`), daily commands (`/growthcheckin`, `/add_reminder`, `/agent`), support (`/ticket`), premium (`/premium`), and pointer to `/commands` for the full list.
+
+**Permissions:** Public
 
 ---
 

@@ -93,7 +93,7 @@ class Configuration(AlphaCog):
     )
     fyi_group = app_commands.Group(
         name="fyi",
-        description="Contextual FYI tips (admin testing)",
+        description="Contextual FYI tips for admins",
         default_permissions=_admin_perms,
         guild_only=True,
     )
@@ -199,7 +199,7 @@ class Configuration(AlphaCog):
         else:
             await interaction.response.send_message(f"❌ Could not clear `{key}`.", ephemeral=True)
 
-    @fyi_group.command(name="send", description="Force-send an FYI now (testing)")
+    @fyi_group.command(name="send", description="Send a one-off FYI tip to the log channel (admin)")
     @app_commands.choices(key=[app_commands.Choice(name=k, value=k) for k in sorted(FYI_TIPS_KEYS)])
     @requires_admin()
     async def fyi_send(
@@ -657,8 +657,8 @@ class Configuration(AlphaCog):
     )
     @app_commands.choices(
         variant=[
-            app_commands.Choice(name="Met inviter", value="with"),
-            app_commands.Choice(name="Zonder inviter", value="without"),
+            app_commands.Choice(name="With inviter", value="with"),
+            app_commands.Choice(name="Without inviter", value="without"),
         ]
     )
     async def invites_set_template(
@@ -734,7 +734,7 @@ class Configuration(AlphaCog):
                 f"`reminders.default_channel_id` reset to default by {interaction.user.mention}.",
                 interaction.guild.id,
             )
-    @reminders_group.command(name="set_everyone", description="Sta @everyone mentions toe of niet")
+    @reminders_group.command(name="set_everyone", description="Allow or disallow @everyone in reminders")
     @requires_admin()
     async def reminders_set_everyone(
         self,
@@ -744,9 +744,9 @@ class Configuration(AlphaCog):
         await interaction.response.defer(ephemeral=True)
         assert interaction.guild is not None  # Guaranteed by @requires_admin()
         await self.settings.set("reminders", "allow_everyone_mentions", allow, interaction.guild.id, interaction.user.id)
-        status = "allowed" if allow else "uitgeschakeld"
+        status = "allowed" if allow else "disabled"
         await interaction.followup.send(
-            f"✅ @everyone is nu {status} voor reminders.",
+            f"✅ @everyone is now {status} for reminders.",
             ephemeral=True,
         )
         await self._send_audit_log(
@@ -1431,6 +1431,10 @@ class Configuration(AlphaCog):
         )
         if success:
             await interaction.followup.send(f"✅ Rule added at position {rule_order}.", ephemeral=True)
+            if not thumbnail_url and not image_url:
+                from utils.fyi_tips import send_fyi_if_first
+
+                await send_fyi_if_first(self.bot, interaction.guild.id, "first_add_rule_no_image")
             await self._send_audit_log(
                 "📝 Onboarding",
                 f"Rule '{title}' added at position {rule_order} by {interaction.user.mention}.",
@@ -1522,16 +1526,16 @@ class Configuration(AlphaCog):
         # Check if onboarding is enabled for this guild
         enabled = self.settings.get("onboarding", "enabled", interaction.guild.id)
         if not enabled:
-            await interaction.response.send_message("⚠️ Onboarding is not enabled for this server. Enable it first with `/onboarding enable`.", ephemeral=True)
+            await interaction.response.send_message("⚠️ Onboarding is not enabled for this server. Enable it with `/onboarding toggle true`.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
 
         embed = EmbedBuilder.success(
             title=f"Welcome to {interaction.guild.name}!",
-            description="To get started and learn about our community, click the button below to begin the onboarding process."
+            description="Tap below. Answer a few questions. You're in.",
         )
-        embed.set_footer(text="Complete the onboarding to gain access to the full server!")
+        embed.set_footer(text="Finish onboarding to unlock the server.")
 
         view = StartOnboardingView()
         await target.send(embed=embed, view=view)

@@ -196,6 +196,8 @@ class InviteTracker(AlphaCog):
             name = member.display_name if member else f"User {row['user_id']}"
             embed.add_field(name=f"{idx}. {name}", value=f"Invites: {row['invite_count']}", inline=False)
         await interaction.response.send_message(embed=embed)
+        from utils.fyi_tips import send_fyi_if_first
+        await send_fyi_if_first(self.bot, interaction.guild.id, "first_invite_leaderboard")
 
     @app_commands.command(name="setinvites", description="Set a user's invite count manually.")
     @app_commands.checks.has_permissions(manage_guild=True)

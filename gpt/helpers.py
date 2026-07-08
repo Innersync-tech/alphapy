@@ -435,6 +435,10 @@ async def ask_gpt(messages, user_id=None, model: str | None = None, guild_id: in
 
         # Log success with the actual model used (updates current_model in status logs)
         log_gpt_success(user_id=user_id, tokens_used=tokens, latency_ms=int(latency), guild_id=guild_id, model=resolved_model)
+        if guild_id and bot_instance is not None:
+            from utils.fyi_tips import send_fyi_if_first
+
+            asyncio.create_task(send_fyi_if_first(bot_instance, guild_id, "first_gpt"))
         return response.choices[0].message.content
 
     except Exception as e:

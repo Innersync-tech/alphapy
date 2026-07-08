@@ -283,6 +283,51 @@ async def update_fields(
         )
 
 
+async def update_live_session(
+    conn: Any,
+    guild_id: int,
+    reminder_id: int,
+    reminder_time: time,
+    call_time: time,
+    days: list[str],
+    channel_id: int,
+    image_url: str | None,
+) -> None:
+    """Update a live-session preset (fixed name and message)."""
+    await conn.execute(
+        """
+        UPDATE reminders
+        SET time = $1, call_time = $2, days = $3, channel_id = $4, image_url = $5,
+            name = $6, message = $7
+        WHERE id = $8 AND guild_id = $9
+        """,
+        reminder_time,
+        call_time,
+        days or [],
+        channel_id,
+        image_url,
+        "Live session",
+        "Live session starting now!",
+        reminder_id,
+        guild_id,
+    )
+
+
+async def delete_for_user(
+    conn: Any,
+    guild_id: int,
+    reminder_id: int,
+    user_id: int,
+) -> None:
+    """Delete a reminder owned by the given user."""
+    await conn.execute(
+        "DELETE FROM reminders WHERE id = $1 AND guild_id = $2 AND created_by = $3",
+        reminder_id,
+        guild_id,
+        user_id,
+    )
+
+
 async def autocomplete_all(
     conn: Any,
     guild_id: int,

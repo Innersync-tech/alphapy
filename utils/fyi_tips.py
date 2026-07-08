@@ -15,7 +15,7 @@ FYI_SCOPE = "fyi"
 LAST_SENT_KEY = "_last_sent_at"
 FYI_COOLDOWN_SECONDS = 24 * 3600  # 24 hours
 
-# All known FYI keys (Phase 1 and Phase 2). Phase 1 triggers are wired; Phase 2 are for /fyi send only until unlocked.
+# All known FYI keys. Phase 1 and Phase 2 triggers are wired in cogs / gpt helpers.
 FYI_KEYS = frozenset({
     "first_guild_join",
     "first_onboarding_done",
@@ -58,7 +58,7 @@ FYI_CONTENT: dict[str, dict[str, str]] = {
     },
     "first_ticket": {
         "title": "🎫 FYI: Tickets",
-        "description": "Staff can claim and close tickets from the buttons in the ticket channel. Use `/ticketbot` commands to adjust ticket category or panel settings.",
+        "description": "Staff can claim and close tickets from the buttons in the ticket channel.",
         "footer": "Use the ticket channel buttons to claim or close.",
     },
     "first_gpt": {
@@ -73,8 +73,8 @@ FYI_CONTENT: dict[str, dict[str, str]] = {
     },
     "first_growthcheckin": {
         "title": "🌱 FYI: Growth check-in",
-        "description": "Responses are stored for follow-up. You can run `/growthcheckin` again anytime.",
-        "footer": "Responses are saved for processing.",
+        "description": "Members can share to the growth channel or keep responses private. Run `/growth set_channel` to configure sharing.",
+        "footer": "Use /growthcheckin anytime.",
     },
     "first_add_rule_no_image": {
         "title": "📜 FYI: Onboarding rules",

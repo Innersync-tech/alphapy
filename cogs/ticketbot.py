@@ -16,6 +16,7 @@ from discord.ext import commands, tasks
 from utils.cog_base import AlphaCog
 from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
+from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
 from utils.validators import validate_admin
 
 try:
@@ -248,7 +249,7 @@ class TicketBot(AlphaCog):
         - Logs to `WATCHER_LOG_CHANNEL`
         """
         if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            await interaction.response.send_message(ERR_GUILD_ONLY, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
 
@@ -258,7 +259,7 @@ class TicketBot(AlphaCog):
                 await self.setup_db()
             except Exception as e:
                 logger.error(f"❌ TicketBot: DB connect error: {e}")
-                await interaction.followup.send("❌ Database is not available. Please try again later.")
+                await interaction.followup.send(ERR_DB)
                 return
 
         user = interaction.user
@@ -278,12 +279,12 @@ class TicketBot(AlphaCog):
                     description.strip(),
                 )
         except RuntimeError:
-            await interaction.followup.send("❌ Database not available. Please try again later.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
         except (pg_exceptions.ConnectionDoesNotExistError, pg_exceptions.InterfaceError, ConnectionResetError) as conn_err:
             self.db = None
             logger.warning(f"Database connection error: {conn_err}")
-            await interaction.followup.send("❌ Database connection error. Please try again later.")
+            await interaction.followup.send(ERR_DB)
             return
         except Exception as e:
             logger.exception("🚨 TicketBot: insert failed")
@@ -309,7 +310,7 @@ class TicketBot(AlphaCog):
         # Confirmation embed to the user (ephemeral followup) using EmbedBuilder
         confirm = EmbedBuilder.success(
             title="🎟️ Ticket created",
-            description="Your ticket has been created successfully."
+            description="Ticket open. Check your new channel.",
         )
         confirm.timestamp = created_at
         confirm.add_field(name="Ticket ID", value=str(ticket_id), inline=True)
@@ -459,7 +460,7 @@ class TicketBot(AlphaCog):
                 await self.setup_db()
             except Exception as e:
                 logger.error(f"❌ TicketBot: DB connect error: {e}")
-                await interaction.followup.send("❌ Database is not available. Please try again later.")
+                await interaction.followup.send(ERR_DB)
                 return
         # Reuse existing flow by calling the command internals
         user = interaction.user
