@@ -91,17 +91,17 @@ class TestFormatDaysForDisplay:
     
     def test_format_days_for_display(self):
         """Test day formatting for display."""
-        assert format_days_for_display(["0", "1", "2"]) == "Maandag, Dinsdag, Woensdag"
-        assert format_days_for_display(["5", "6"]) == "Zaterdag, Zondag"
+        assert format_days_for_display(["0", "1", "2"]) == "Monday, Tuesday, Wednesday"
+        assert format_days_for_display(["5", "6"]) == "Saturday, Sunday"
         assert format_days_for_display([]) == ""
     
     def test_format_days_for_display_sorted(self):
         """Test that days are sorted correctly."""
         result = format_days_for_display(["6", "0", "3"])
-        # Should be sorted: Maandag, Donderdag, Zondag
-        assert "Maandag" in result
-        assert "Donderdag" in result
-        assert "Zondag" in result
+        # Should be sorted: Monday, Thursday, Sunday
+        assert "Monday" in result
+        assert "Thursday" in result
+        assert "Sunday" in result
 
 
 class TestParseRelativeDate:
