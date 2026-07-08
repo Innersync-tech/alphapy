@@ -42,7 +42,7 @@ async def test_verification_panel_post_guild_only():
     interaction.response.send_message = AsyncMock()
 
     with patch("utils.validators.validate_admin", return_value=(True, None)):
-        await cog.verification_panel_post(interaction, channel=None)
+        await cog.verification_panel_post.callback(cog, interaction, channel=None)
 
     interaction.response.send_message.assert_awaited_once_with(ERR_GUILD_ONLY, ephemeral=True)
 
@@ -76,7 +76,7 @@ async def test_contentgen_uses_generic_error_on_failure():
     style = MagicMock(value="punchy")
 
     with patch("cogs.contentgen.ask_gpt", side_effect=RuntimeError("boom")):
-        await cog.create_caption(interaction, topic="discipline", style=style)
+        await cog.create_caption.callback(cog, interaction, topic="discipline", style=style)
 
     interaction.followup.send.assert_awaited_once_with(ERR_GENERIC, ephemeral=True)
 
@@ -93,7 +93,7 @@ async def test_learn_topic_defer_failure_uses_generic_error():
     interaction.response.send_message = AsyncMock()
 
     with patch("cogs.learn.log_gpt_error"):
-        await cog.learn_topic(interaction, topic="RSI")
+        await cog.learn_topic.callback(cog, interaction, topic="RSI")
 
     interaction.response.send_message.assert_awaited_once_with(ERR_GENERIC, ephemeral=True)
 
