@@ -3,28 +3,9 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Modal, TextInput
 
-import config
 from utils.logger import logger
 from utils.validators import validate_admin
 
-
-# Combined check function
-def is_owner_or_admin():
-    async def predicate(interaction: discord.Interaction) -> bool:
-        # Get application info to determine owner
-        app_info = await interaction.client.application_info()
-        if interaction.user.id == app_info.owner.id:
-            return True
-        # Check if user is in extra OWNER_IDS
-        if interaction.user.id in config.OWNER_IDS:
-            return True
-        # Check if user has admin role (if they are a Member)
-        if isinstance(interaction.user, discord.Member):
-            admin_role = discord.utils.get(interaction.user.roles, id=config.ADMIN_ROLE_ID)
-            if admin_role is not None:
-                return True
-        return False
-    return app_commands.check(predicate)
 
 class CustomSlashCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):

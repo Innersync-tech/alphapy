@@ -4,12 +4,7 @@ Tests for CSV export helpers used by exports cog and others.
 
 import io
 
-from utils.csv_helpers import (
-    cleanup_temp_file,
-    create_csv_buffer,
-    create_discord_file_from_buffer,
-    create_temp_csv_file,
-)
+from utils.csv_helpers import create_csv_buffer, create_discord_file_from_buffer
 
 
 class TestCreateCsvBuffer:
@@ -64,23 +59,3 @@ class TestCreateDiscordFileFromBuffer:
         f = create_discord_file_from_buffer(buf, "out.csv")
         data = f.fp.read()
         assert b"caf" in data or b"caf" in data
-
-
-class TestCreateTempCsvFile:
-    """Tests for create_temp_csv_file and cleanup_temp_file."""
-
-    def test_creates_file_with_content(self, tmp_path):
-        path = tmp_path / "export.csv"
-        create_temp_csv_file([{"a": 1, "b": 2}], str(path))
-        assert path.exists()
-        content = path.read_text(encoding="utf-8")
-        assert "a" in content and "b" in content
-
-    def test_cleanup_removes_file(self, tmp_path):
-        path = tmp_path / "cleanup.csv"
-        path.write_text("x")
-        cleanup_temp_file(str(path))
-        assert not path.exists()
-
-    def test_cleanup_nonexistent_does_not_raise(self):
-        cleanup_temp_file("/nonexistent/path/file.csv")

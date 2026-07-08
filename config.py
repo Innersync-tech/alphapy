@@ -17,8 +17,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Legacy - kept for backwards comp
 GROK_API_KEY = os.getenv("GROK_API_KEY")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "grok").strip().lower()  # "grok" or "openai"
 
-ROLE_ID = int(os.getenv("ROLE_ID", "0"))  # Legacy - no longer used in multi-guild setup
-
 # Database & API security
 DATABASE_URL = os.getenv("DATABASE_URL")
 API_KEY = os.getenv("API_KEY")
