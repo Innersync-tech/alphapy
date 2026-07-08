@@ -40,7 +40,6 @@ from webhooks.discord_link import router as discord_link_webhook_router
 from webhooks.founder import router as founder_webhook_router
 from webhooks.legal_update import router as legal_update_webhook_router
 from webhooks.premium_invalidate import router as premium_invalidate_webhook_router
-from webhooks.reflections import router as reflections_webhook_router
 from webhooks.revoke_reflection import router as revoke_reflection_webhook_router
 from webhooks.supabase import router as supabase_webhook_router
 
@@ -314,7 +313,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(supabase_webhook_router)
-app.include_router(reflections_webhook_router)
 app.include_router(app_reflections_webhook_router)
 app.include_router(revoke_reflection_webhook_router)
 app.include_router(premium_invalidate_webhook_router)

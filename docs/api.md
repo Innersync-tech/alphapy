@@ -920,24 +920,7 @@ Deletes a previously stored reflection when the user revokes consent in the App.
 
 **Response:** `200` with `{"status": "deleted", "count": 1}` (or `count: 0` if no row matched).
 
-### `POST /webhooks/reflections`
-
-Receives `reflection.created` lifecycle events from App/Core integrations.
-
-**Headers:** `X-Webhook-Signature` (validated when a reflections webhook secret is configured)
-
-**Request body (example):**
-```json
-{
-  "event": "reflection.created",
-  "user_id": "uuid",
-  "reflection_id": "uuid",
-  "date": "YYYY-MM-DD",
-  "timestamp": "ISO8601"
-}
-```
-
-**Response:** `200` with `{"status": "ok"}` for accepted events.
+> **Note:** Legacy `POST /webhooks/reflections` (`reflection.created` events) was removed. App reflection sync uses `POST /webhooks/app-reflections` via Core-API.
 
 ### `POST /webhooks/supabase/auth`
 

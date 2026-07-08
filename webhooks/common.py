@@ -83,15 +83,6 @@ def get_app_reflections_secret() -> str | None:
     )
 
 
-def get_reflections_webhook_secret() -> str | None:
-    """Secret for reflections webhook (reflection.created events)."""
-    import config
-
-    return getattr(config, "WEBHOOK_SECRET", None) or getattr(
-        config, "SUPABASE_WEBHOOK_SECRET", None
-    )
-
-
 def get_premium_invalidate_secret() -> str | None:
     """Secret for premium-invalidate webhook (Core notifies on subscription change)."""
     import config
@@ -142,7 +133,6 @@ def get_discord_link_webhook_secret() -> str | None:
 __all__ = [
     "validate_webhook_signature",
     "get_app_reflections_secret",
-    "get_reflections_webhook_secret",
     "get_premium_invalidate_secret",
     "get_founder_webhook_secret",
     "get_legal_update_webhook_secret",
