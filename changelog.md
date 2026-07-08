@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - (No changes yet)
 
+### Changed
+- **Tier-2 copy (P2)** — verification panel steps, growth check-in description and private-share copy; `user_messages` rollout to reminders, growth errors, learn, leadership, contentgen.
+
 ### Fixed
 - (No changes yet)
 

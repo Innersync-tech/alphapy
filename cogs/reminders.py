@@ -22,6 +22,7 @@ from utils.logger import log_database_event, log_guild_action, log_with_guild, l
 from utils.parsers import format_days_for_display, parse_days_string, parse_time_string
 from utils.sanitizer import safe_embed_text
 from utils.timezone import BRUSSELS_TZ
+from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
 from utils.validators import validate_admin
 
 # All logging timestamps in this module use Brussels time for clarity.
@@ -198,7 +199,7 @@ class ReminderCog(AlphaCog):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         if not interaction.guild:
-            await interaction.followup.send("This command only works in a server.", ephemeral=True)
+            await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
             return
 
         if not self._is_enabled(interaction.guild.id):
@@ -248,7 +249,7 @@ class ReminderCog(AlphaCog):
                 return
 
         if not await self._ensure_connection():
-            await interaction.followup.send("⛔ Database not connected. Please try again later.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         origin_channel_id = origin_message_id = event_time = None
@@ -370,7 +371,7 @@ class ReminderCog(AlphaCog):
             time_obj = reminder_time_obj  # Reminder tijd (1 uur eerder)
 
         if not self.db:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         guild_id = interaction.guild.id
@@ -401,7 +402,7 @@ class ReminderCog(AlphaCog):
                     ts_list.append(now_ts)
                     self._image_reminder_timestamps[rkey] = ts_list[-config.IMAGE_REMINDER_RATE_LIMIT_COUNT:]
         except RuntimeError:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
         except Exception:
             logger.exception("Error creating reminder")
@@ -454,7 +455,7 @@ class ReminderCog(AlphaCog):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         if not interaction.guild:
-            await interaction.followup.send("❌ This command only works in a server.", ephemeral=True)
+            await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
             return
 
         if not self._is_enabled(interaction.guild.id):
@@ -482,7 +483,7 @@ class ReminderCog(AlphaCog):
                 return
 
         if not await self._ensure_connection():
-            await interaction.followup.send("⛔ Database not connected. Please try again later.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         if channel is None:
@@ -525,7 +526,7 @@ class ReminderCog(AlphaCog):
         name = LIVE_SESSION_NAME
 
         if not self.db:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         try:
@@ -586,13 +587,13 @@ class ReminderCog(AlphaCog):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         if not interaction.guild:
-            await interaction.followup.send("❌ This command only works in a server.", ephemeral=True)
+            await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
             return
         if not self._is_enabled(interaction.guild.id):
             await interaction.followup.send("Reminders are off in this server. Ask an admin to enable them.", ephemeral=True)
             return
         if not await self._ensure_connection() or not self.db:
-            await interaction.followup.send("⛔ Database not connected. Please try again later.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         guild_id = interaction.guild.id
@@ -707,13 +708,13 @@ class ReminderCog(AlphaCog):
         await interaction.response.defer(ephemeral=True)
 
         if not interaction.guild:
-            await interaction.followup.send("❌ This command only works in a server.", ephemeral=True)
+            await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
             return
         if not self._is_enabled(interaction.guild.id):
             await interaction.followup.send("Reminders are off in this server. Ask an admin to enable them.", ephemeral=True)
             return
         if not await self._ensure_connection() or not self.db:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         guild_id = interaction.guild.id
@@ -751,17 +752,17 @@ class ReminderCog(AlphaCog):
     @app_commands.command(name="reminder_list", description="View your active reminders")
     async def reminder_list(self, interaction: discord.Interaction) -> None:
         if not interaction.guild:
-            await interaction.response.send_message("❌ This command only works in a server.", ephemeral=True)
+            await interaction.response.send_message(ERR_GUILD_ONLY, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
         if not self._is_enabled(interaction.guild.id):
             await interaction.followup.send("Reminders are currently disabled.", ephemeral=True)
             return
         if not await self._ensure_connection():
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
         if not self.db:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
         user_id = interaction.user.id
         channel_id = getattr(interaction.channel, "id", 0)
@@ -771,7 +772,7 @@ class ReminderCog(AlphaCog):
         guild_id = interaction.guild.id
         try:
             if not self.db:
-                await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+                await interaction.followup.send(ERR_DB, ephemeral=True)
                 return
             async with acquire_safe(self.db) as conn:
                 if is_admin:
@@ -901,17 +902,17 @@ class ReminderCog(AlphaCog):
     async def reminder_delete(self, interaction: discord.Interaction, reminder_id: int) -> None:
         await interaction.response.defer(ephemeral=True)
         if not interaction.guild:
-            await interaction.followup.send("This command only works in a server.", ephemeral=True)
+            await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
             return
         if not self._is_enabled(interaction.guild.id):
             await interaction.followup.send("Reminders are currently disabled.", ephemeral=True)
             return
         if not await self._ensure_connection():
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         if not self.db:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         guild_id = interaction.guild.id
@@ -925,7 +926,7 @@ class ReminderCog(AlphaCog):
 
                 await reminder_repo.delete(conn, guild_id, reminder_id)
         except RuntimeError:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
         except Exception:
             logger.exception("Error deleting reminder")
@@ -939,17 +940,17 @@ class ReminderCog(AlphaCog):
     @app_commands.describe(reminder_id="The ID of the reminder to edit")
     async def reminder_edit(self, interaction: discord.Interaction, reminder_id: int) -> None:
         if not interaction.guild:
-            await interaction.response.send_message("❌ This command only works in a server.", ephemeral=True)
+            await interaction.response.send_message(ERR_GUILD_ONLY, ephemeral=True)
             return
         if not self._is_enabled(interaction.guild.id):
             await interaction.response.send_message("⚠️ Reminders are currently disabled.", ephemeral=True)
             return
         if not await self._ensure_connection():
-            await interaction.response.send_message("⛔ Database not connected. Please try again later.", ephemeral=True)
+            await interaction.response.send_message(ERR_DB, ephemeral=True)
             return
 
         if not self.db:
-            await interaction.response.send_message("⛔ Database not connected.", ephemeral=True)
+            await interaction.response.send_message(ERR_DB, ephemeral=True)
             return
 
         guild_id = interaction.guild.id
@@ -964,7 +965,7 @@ class ReminderCog(AlphaCog):
                 else:
                     row = await reminder_repo.get_by_id_for_user(conn, guild_id, reminder_id, user_id)
         except RuntimeError:
-            await interaction.response.send_message("⛔ Database not connected. Please try again later.", ephemeral=True)
+            await interaction.response.send_message(ERR_DB, ephemeral=True)
             return
         except Exception:
             logger.exception("Error fetching reminder for edit")
@@ -1555,11 +1556,11 @@ class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
         await interaction.response.defer(ephemeral=True)
 
         if not await self.cog._ensure_connection():
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         if not self.cog.db:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
 
         # Validate and parse time
@@ -1643,7 +1644,7 @@ class EditReminderModal(discord.ui.Modal, title="Edit Reminder"):
                     channel_id=channel_id if channel_id else None,
                 )
         except RuntimeError:
-            await interaction.followup.send("⛔ Database not connected.", ephemeral=True)
+            await interaction.followup.send(ERR_DB, ephemeral=True)
             return
         except Exception:
             logger.exception("Error updating reminder")
