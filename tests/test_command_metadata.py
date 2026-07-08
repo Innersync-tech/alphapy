@@ -1,6 +1,5 @@
 """Tests for command list metadata helpers."""
 
-import discord
 from types import SimpleNamespace
 
 from utils.command_metadata import (
@@ -56,7 +55,7 @@ class TestIsAdminCommand:
         )
 
     def test_administrator_default_permissions(self):
-        perms = discord.Permissions(administrator=True)
+        perms = SimpleNamespace(administrator=True)
         assert (
             is_admin_command(
                 "reminders",
