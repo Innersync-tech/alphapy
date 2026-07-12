@@ -19,6 +19,7 @@ from agents.memory import (
     strip_sensitive_memory_keys,
     touch_session,
 )
+from agents.pattern_loader import load_pattern_context
 from agents.policy import (
     build_agent_system_prompt,
     build_agent_user_message,
@@ -31,7 +32,6 @@ from agents.profile import (
     load_agent_prefs,
     tier3_memory_patch,
 )
-from agents.pattern_loader import load_pattern_context
 from agents.registry import resolve_agent
 from agents.tier2 import (
     SESSION_INSIGHT_SNAPSHOT_KEY,

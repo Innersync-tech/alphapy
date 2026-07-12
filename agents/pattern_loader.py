@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from agents.profile import learn_from_shared_enabled
 from utils.supabase_client import (
@@ -43,7 +43,7 @@ async def _fetch_pattern_nodes(innersync_user_id: str, limit: int = 5) -> list[d
 async def load_pattern_context(
     innersync_user_id: str,
     prefs: dict[str, Any],
-) -> Optional[str]:
+) -> str | None:
     """
     Load Tier-2-safe pattern summaries when user opted into learning from patterns.
     Falls back to learn_from_shared for backward compatibility.
