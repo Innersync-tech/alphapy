@@ -31,6 +31,7 @@ from agents.profile import (
     load_agent_prefs,
     tier3_memory_patch,
 )
+from agents.pattern_loader import load_pattern_context
 from agents.registry import resolve_agent
 from agents.tier2 import (
     SESSION_INSIGHT_SNAPSHOT_KEY,
@@ -92,6 +93,7 @@ def _assemble_prompt(
     prefs: dict[str, str | bool],
     tier3: dict[str, Any],
     derived_profile: dict[str, Any] | None = None,
+    pattern_context: str | None = None,
 ) -> str:
     parts: list[str] = []
     profile_block = build_agent_profile_block(
@@ -101,6 +103,8 @@ def _assemble_prompt(
     )
     if profile_block.strip():
         parts.append("[agent_profile]\n" + safe_prompt(profile_block[:1500]))
+    if pattern_context and pattern_context.strip():
+        parts.append(safe_prompt(pattern_context[:1500]))
     for name, body in sorted(skill_blocks.items()):
         parts.append(f"[{name}]\n{safe_prompt(body[:2500])}")
     return "\n\n".join(parts)
@@ -174,11 +178,13 @@ async def _run_agent_turn(
 ) -> tuple[str, dict[str, str], str]:
     skill_blocks = await _build_skill_context(ctx)
     ctx.skill_blocks = skill_blocks
+    pattern_context = await load_pattern_context(ctx.innersync_user_id, prefs)
     context_blob = _assemble_prompt(
         skill_blocks,
         prefs=prefs,
         tier3=tier3,
         derived_profile=derived_profile,
+        pattern_context=pattern_context,
     )
     messages = _build_llm_messages(
         context_blob=context_blob,
