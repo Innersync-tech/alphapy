@@ -535,6 +535,16 @@ async def on_ready():
         StartupManager._mark_startup_complete()
         logger.info(f"{bot.user} is online! ✅")
         log_operational_event(EventType.BOT_READY, f"{bot.user} is online", guild_id=None)
+
+        from utils.command_sync import sync_guild_only_commands_for_all_guilds
+
+        batch = await sync_guild_only_commands_for_all_guilds(bot, sync_type="first_ready")
+        logger.info(
+            "Post-connect guild sync: %s synced, %s skipped (%s guilds)",
+            batch.synced_count,
+            batch.skipped_count,
+            batch.guild_count,
+        )
     elif StartupManager.consume_disconnect_seen():
         # Actual reconnect - we saw on_disconnect before this on_ready. Discord.py can fire
         # on_ready multiple times during initial connection; only run reconnect_phase after
@@ -547,6 +557,20 @@ async def on_ready():
 
 
 set_bot_instance(bot)  # This also starts the Grok retry queue task
+
+
+@bot.event
+async def on_interaction(interaction: discord.Interaction) -> None:
+    """Diagnostic: log inbound Discord interactions (slash, buttons, etc.)."""
+    command = interaction.command
+    command_name = command.qualified_name if command else None
+    logger.info(
+        "Interaction received: type=%s command=%s user=%s guild=%s",
+        interaction.type.name,
+        command_name or "-",
+        interaction.user.id,
+        interaction.guild_id,
+    )
 
 
 @bot.event
