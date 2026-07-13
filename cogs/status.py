@@ -89,8 +89,16 @@ async def release_cmd(interaction: discord.Interaction):
 
 @app_commands.command(name="health", description="Show configuration and system status")
 async def health_cmd(interaction: discord.Interaction):
-    embed = await _build_health_embed(interaction)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.defer(ephemeral=True)
+    try:
+        embed = await _build_health_embed(interaction)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+    except Exception:
+        logger.exception("health_cmd failed")
+        await interaction.followup.send(
+            "Could not load health status. Please try again later.",
+            ephemeral=True,
+        )
 
 
 @app_commands.command(name="help", description="Quick guide to the most useful commands")

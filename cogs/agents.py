@@ -140,13 +140,15 @@ class AgentGroup(app_commands.Group):
             )
             return
 
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
         resolved = await cog._resolve_user(interaction)
         if resolved is None:
             return
         innersync_id, discord_user_id = resolved
 
         if resolve_agent(agent_name) is None:
-            await interaction.response.send_message("Unknown agent.", ephemeral=True)
+            await interaction.followup.send("Unknown agent.", ephemeral=True)
             return
 
         try:
@@ -163,7 +165,7 @@ class AgentGroup(app_commands.Group):
                 agent_name=agent_name,
                 user_message=message,
             )
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "**Quick energy check-in** — How is your energy right now? "
                 "This helps your reflection agent pace the session. "
                 "You can also set this in Innersync App → Settings → Agent memory.",
@@ -171,8 +173,6 @@ class AgentGroup(app_commands.Group):
                 ephemeral=True,
             )
             return
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
             result = await start_agent_session(
@@ -231,11 +231,6 @@ class AgentGroup(app_commands.Group):
             )
             return
 
-        resolved = await cog._resolve_user(interaction)
-        if resolved is None:
-            return
-        innersync_id, discord_user_id = resolved
-
         if not message.strip():
             await interaction.response.send_message(
                 "Please provide a message for the agent.", ephemeral=True
@@ -243,6 +238,11 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
+
+        resolved = await cog._resolve_user(interaction)
+        if resolved is None:
+            return
+        innersync_id, discord_user_id = resolved
 
         try:
             result = await continue_agent_session(
@@ -287,12 +287,12 @@ class AgentGroup(app_commands.Group):
             )
             return
 
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
         resolved = await cog._resolve_user(interaction)
         if resolved is None:
             return
         innersync_id, discord_user_id = resolved
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
             result = await end_agent_session(
@@ -332,6 +332,8 @@ class AgentGroup(app_commands.Group):
             await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
             return
 
+        await interaction.response.defer(ephemeral=True)
+
         resolved = await self.cog._resolve_user(interaction)
         if resolved is None:
             return
@@ -339,7 +341,7 @@ class AgentGroup(app_commands.Group):
 
         row = await get_active_session(innersync_id, agent_name)
         if not row:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"No active session for the **{agent_name}** agent.", ephemeral=True
             )
             return
@@ -368,7 +370,7 @@ class AgentGroup(app_commands.Group):
             ),
             color=_AGENT_COLOR,
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed,
             view=_agent_app_link_view(),
             ephemeral=True,
@@ -391,12 +393,18 @@ class AgentsCog(AlphaCog):
             return True
         return self.settings_helper.get_bool("agents", "enabled", guild_id, fallback=False)
 
+    async def _send_ephemeral(self, interaction: discord.Interaction, content: str) -> None:
+        if interaction.response.is_done():
+            await interaction.followup.send(content, ephemeral=True)
+        else:
+            await interaction.response.send_message(content, ephemeral=True)
+
     async def _resolve_user(self, interaction: discord.Interaction) -> tuple[str, int] | None:
         pool = get_bot_db_pool(self.bot)
         if pool is None:
-            await interaction.response.send_message(
+            await self._send_ephemeral(
+                interaction,
                 "Agent service is temporarily unavailable.",
-                ephemeral=True,
             )
             return None
 
@@ -407,9 +415,9 @@ class AgentsCog(AlphaCog):
             allow_profile_fallback=False,
         )
         if not innersync_id:
-            await interaction.response.send_message(
+            await self._send_ephemeral(
+                interaction,
                 "Link your Innersync account first with `/link`, then try again.",
-                ephemeral=True,
             )
             return None
         return innersync_id, discord_user_id
