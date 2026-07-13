@@ -295,7 +295,7 @@ Example:
 - Check `/system show` to verify settings
 
 ### Bot not responding to embeds/announcements
-- Verify `/config embedwatcher set_announcements` is set to the correct channel
+- Verify `/embedwatcher set_announcements` is set to the correct channel
 - Ensure bot has read permissions in that channel
 
 ### Import commands failing

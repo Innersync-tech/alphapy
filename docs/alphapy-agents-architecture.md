@@ -76,13 +76,16 @@ Hermit daily job (optional) reads events → re-pushes strategic context for pow
 
 **Hermes stays** the strategic layer for founders/power users. **Alphapy agents** are the productized, multi-tenant executor loop for all linked users.
 
-Future API path (same runtime):
+Future API path (shipped — same runtime as Discord `/agent`):
 
 ```
-POST /api/agents/{agent}/run  (API key + user JWT via Core)
-        │
-        └── run_agent_session(...)  # shared with Discord cog
+POST /api/agents/sessions              → start (201)
+GET  /api/agents/sessions/active         → active session + message history
+POST /api/agents/sessions/{id}/turns     → continue
+POST /api/agents/sessions/{id}/complete  → end + Hermit event
 ```
+
+Registered in `agents/http_routes.py`. Requires Supabase JWT + `/link` (Discord snowflake). See [API Reference](../api/#agent-sessions).
 
 ### Module layout (starter code)
 
@@ -91,6 +94,7 @@ alphapy/agents/
   base.py          AgentContext, AgentSkill protocol
   registry.py      Agent definitions + skill wiring
   memory.py        Supabase sessions + memory (in-memory fallback)
+  pattern_loader.py  Tier-2 pattern context from agent_graph_nodes (learn_from_patterns)
   runtime.py       Closed-loop orchestration
   skills/
     journal_sync.py
@@ -115,7 +119,7 @@ cogs/agents.py     /agent list|start|continue|end|status
 - Global: `ALPHAPY_AGENTS_ENABLED=true`
 - Per guild: `/config agents toggle true` (SettingsService, default `false`)
 - User: `/link` required (`get_innersync_id_for_discord`)
-- Quota: `ask_gpt` daily limit (existing `gpt_usage`)
+- Quota: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (not `gpt_usage`)
 
 **Adding a new agent:**
 
@@ -162,6 +166,10 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 4. `emit_hermit_event(gpt_command)` fires on **end**, not on start
 
 `run_agent_session(finalize=True)` remains for tests — start + end in one call.
+
+### Pattern learning (agent graph)
+
+When `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`), `agents/pattern_loader.py` fetches up to five `agent_graph_nodes` rows (`node_type=pattern`) and injects a `[learned_patterns]` block into the runtime prompt. Tier-2-safe summaries only — no encrypted journal text.
 
 ### `agent_sessions`
 
@@ -238,7 +246,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 - [x] `inner_voice` skill — Tier 1 `agent_prefs.inner_voice` (App Settings)
 - [x] `inner_critic_dialogue`, `avoidance_processor`, `chain_breaker_micro` — Tier 2 dialogue skills + session insight snapshot
 - [x] `fatigue_check` skill — energy self-report in App + Discord quick check on `/agent start`
-- [ ] `POST /api/agents/run` on `api.py` (Mind/App trigger)
+- [x] `POST /api/agents/sessions` (+ turns/complete) in `agents/http_routes.py` (Mind/App trigger)
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh
 - [x] Premium tier caps on `/agent start` (free 10/day, monthly 25/day, yearly/lifetime unlimited)
 - [x] Rate limits — `agent_session_usage` (migration 024), `check_and_increment_agent_session_quota()`
