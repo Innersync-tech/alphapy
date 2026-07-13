@@ -11,7 +11,6 @@ import time
 from discord.ext import commands
 
 import config
-from utils.command_sync import SyncResult
 from utils.db_helpers import close_all_pools
 from utils.logger import logger
 from utils.operational_logs import EventType, log_operational_event
@@ -172,8 +171,6 @@ class StartupManager:
         logger.info("🔄 Phase 4: Command Sync...")
         
         from utils.command_sync import detect_guild_only_commands, safe_sync, should_sync_global
-        
-        # Sync global commands once (if needed)
         if should_sync_global():
             global_result = await safe_sync(self.bot, guild=None, force=False)
             if global_result.success:
@@ -183,59 +180,11 @@ class StartupManager:
         else:
             logger.debug("  ⏸️ Global sync skipped (cooldown)")
         
-        # Sync guild-only commands for existing guilds (parallel for speed)
-        has_guild_only = detect_guild_only_commands(self.bot)
-        if has_guild_only:
-            logger.info("  🔄 Syncing guild-only commands for existing guilds...")
-            # Run guild syncs in parallel for faster startup
-            sync_tasks = [safe_sync(self.bot, guild=guild, force=False) for guild in self.bot.guilds]
-            results = await asyncio.gather(*sync_tasks, return_exceptions=True)
-            
-            synced_count = 0
-            skipped_count = 0
-            for i, result in enumerate(results):
-                guild = self.bot.guilds[i]
-                if isinstance(result, Exception):
-                    logger.error(f"  ❌ Sync error for {guild.name}: {result}")
-                    skipped_count += 1
-                    log_operational_event(
-                        EventType.GUILD_SYNC,
-                        f"Sync failed: {str(result)[:200]}",
-                        guild_id=guild.id,
-                        details={"error": str(result)[:500], "sync_type": "startup"}
-                    )
-                elif isinstance(result, SyncResult):
-                    # Type narrowing: result is SyncResult here
-                    if result.success:
-                        synced_count += 1
-                        log_operational_event(
-                            EventType.GUILD_SYNC,
-                            f"Commands synced: {result.command_count} commands",
-                            guild_id=guild.id,
-                            details={"command_count": result.command_count, "sync_type": "startup"}
-                        )
-                    else:
-                        skipped_count += 1
-                        if result.cooldown_remaining:
-                            logger.debug(f"  ⏸️ Skipped sync for {guild.name} (cooldown)")
-                            log_operational_event(
-                                EventType.GUILD_SYNC,
-                                "Sync skipped: cooldown active",
-                                guild_id=guild.id,
-                                details={"cooldown_remaining": result.cooldown_remaining, "sync_type": "startup"}
-                            )
-                        else:
-                            log_operational_event(
-                                EventType.GUILD_SYNC,
-                                f"Sync failed: {result.error}",
-                                guild_id=guild.id,
-                                details={"error": result.error, "sync_type": "startup"}
-                            )
-                else:
-                    # Unexpected type
-                    logger.warning(f"  ⚠️ Unexpected result type for {guild.name}: {type(result)}")
-                    skipped_count += 1
-            logger.info(f"  ✅ Guild syncs completed: {synced_count} synced, {skipped_count} skipped")
+        # Guild-only commands require bot.guilds; sync runs in on_ready after gateway connect.
+        if detect_guild_only_commands(self.bot):
+            logger.info(
+                "  ⏸️ Guild-only command sync deferred until gateway connect (on_ready)"
+            )
         else:
             logger.debug("  ℹ️ No guild-only commands detected")
         
@@ -369,7 +318,7 @@ class StartupManager:
         logger.info("🔄 Reconnect phase: Resyncing commands...")
         logger.info("  😄 haha bot dropped the call, morgen lachen we er weer mee")
         
-        from utils.command_sync import detect_guild_only_commands, safe_sync
+        from utils.command_sync import safe_sync, sync_guild_only_commands_for_all_guilds
         
         # After a disconnect, commands may not be available until synced
         # Sync global commands first (if needed and not on cooldown)
@@ -382,61 +331,9 @@ class StartupManager:
         else:
             logger.warning(f"  ⚠️ Global sync failed: {global_result.error}")
         
-        # Sync guild-only commands for all guilds (if we have them)
-        synced_count = 0
-        skipped_count = 0
-        has_guild_only = detect_guild_only_commands(bot)
-        if has_guild_only:
-            logger.info(f"  🔄 Resyncing guild-only commands for {len(bot.guilds)} guilds...")
-            sync_tasks = [safe_sync(bot, guild=guild, force=False) for guild in bot.guilds]
-            results = await asyncio.gather(*sync_tasks, return_exceptions=True)
-
-            for i, result in enumerate(results):
-                guild = bot.guilds[i]
-                if isinstance(result, Exception):
-                    logger.warning(f"  ⚠️ Sync error for {guild.name}: {result}")
-                    skipped_count += 1
-                    log_operational_event(
-                        EventType.GUILD_SYNC,
-                        f"Sync failed: {str(result)[:200]}",
-                        guild_id=guild.id,
-                        details={"error": str(result)[:500], "sync_type": "reconnect"}
-                    )
-                elif isinstance(result, SyncResult):
-                    # Type narrowing: result is SyncResult here
-                    if result.success:
-                        synced_count += 1
-                        log_operational_event(
-                            EventType.GUILD_SYNC,
-                            f"Commands synced: {result.command_count} commands",
-                            guild_id=guild.id,
-                            details={"command_count": result.command_count, "sync_type": "reconnect"}
-                        )
-                    else:
-                        skipped_count += 1
-                        if result.cooldown_remaining:
-                            logger.debug(f"  ⏸️ Skipped sync for {guild.name} (cooldown)")
-                            log_operational_event(
-                                EventType.GUILD_SYNC,
-                                "Sync skipped: cooldown active",
-                                guild_id=guild.id,
-                                details={"cooldown_remaining": result.cooldown_remaining, "sync_type": "reconnect"}
-                            )
-                        else:
-                            log_operational_event(
-                                EventType.GUILD_SYNC,
-                                f"Sync failed: {result.error}",
-                                guild_id=guild.id,
-                                details={"error": result.error, "sync_type": "reconnect"}
-                            )
-                else:
-                    # Unexpected type
-                    logger.warning(f"  ⚠️ Unexpected result type for {guild.name}: {type(result)}")
-                    skipped_count += 1
-
-            logger.info(f"  ✅ Guild syncs completed: {synced_count} synced, {skipped_count} skipped")
-        else:
-            logger.debug("  ℹ️ No guild-only commands detected")
+        batch = await sync_guild_only_commands_for_all_guilds(bot, sync_type="reconnect")
+        synced_count = batch.synced_count
+        skipped_count = batch.skipped_count
 
         logger.info("✅ Reconnect phase complete: Commands should be available now")
 

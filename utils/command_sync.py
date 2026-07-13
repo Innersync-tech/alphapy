@@ -11,6 +11,7 @@ Features:
 - Rate limit protection
 """
 
+import asyncio
 import time
 from dataclasses import dataclass
 
@@ -18,6 +19,7 @@ import discord
 from discord.ext import commands
 
 from utils.logger import logger
+from utils.operational_logs import EventType, log_operational_event
 
 # Cooldown tracking: {key: last_sync_timestamp}
 # Keys: "global" for global syncs, guild.id for per-guild syncs
@@ -42,6 +44,15 @@ class SyncResult:
     error: str | None = None
     cooldown_remaining: float | None = None
     sync_type: str = "unknown"  # "global" or "guild"
+
+
+@dataclass
+class GuildSyncBatchResult:
+    """Aggregate result of syncing guild-only commands across all guilds."""
+
+    synced_count: int
+    skipped_count: int
+    guild_count: int
 
 
 def _get_cooldown_key(guild: discord.Guild | None) -> str:
@@ -208,6 +219,89 @@ async def safe_sync(
             error=error_msg,
             sync_type=sync_type
         )
+
+
+async def sync_guild_only_commands_for_all_guilds(
+    bot: commands.Bot,
+    *,
+    sync_type: str = "post_connect",
+    force: bool = False,
+) -> GuildSyncBatchResult:
+    """
+    Sync guild-only slash commands for every guild the bot is in.
+
+    Must run after the gateway connects (``on_ready``), when ``bot.guilds`` is populated.
+    """
+    guilds = list(bot.guilds)
+    if not detect_guild_only_commands(bot):
+        logger.debug("ℹ️ No guild-only commands detected")
+        return GuildSyncBatchResult(0, 0, len(guilds))
+
+    if not guilds:
+        logger.info(
+            "⏸️ Guild-only command sync deferred: bot.guilds is empty (sync_type=%s)",
+            sync_type,
+        )
+        return GuildSyncBatchResult(0, 0, 0)
+
+    logger.info(
+        "🔄 Syncing guild-only commands for %s guild(s) (sync_type=%s)...",
+        len(guilds),
+        sync_type,
+    )
+    sync_tasks = [safe_sync(bot, guild=guild, force=force) for guild in guilds]
+    results = await asyncio.gather(*sync_tasks, return_exceptions=True)
+
+    synced_count = 0
+    skipped_count = 0
+    for guild, result in zip(guilds, results, strict=True):
+        if isinstance(result, Exception):
+            logger.warning("  ⚠️ Sync error for %s: %s", guild.name, result)
+            skipped_count += 1
+            log_operational_event(
+                EventType.GUILD_SYNC,
+                f"Sync failed: {str(result)[:200]}",
+                guild_id=guild.id,
+                details={"error": str(result)[:500], "sync_type": sync_type},
+            )
+            continue
+        if not isinstance(result, SyncResult):
+            logger.warning("  ⚠️ Unexpected result type for %s: %s", guild.name, type(result))
+            skipped_count += 1
+            continue
+        if result.success:
+            synced_count += 1
+            log_operational_event(
+                EventType.GUILD_SYNC,
+                f"Commands synced: {result.command_count} commands",
+                guild_id=guild.id,
+                details={"command_count": result.command_count, "sync_type": sync_type},
+            )
+            continue
+        skipped_count += 1
+        if result.cooldown_remaining:
+            logger.debug("  ⏸️ Skipped sync for %s (cooldown)", guild.name)
+            log_operational_event(
+                EventType.GUILD_SYNC,
+                "Sync skipped: cooldown active",
+                guild_id=guild.id,
+                details={"cooldown_remaining": result.cooldown_remaining, "sync_type": sync_type},
+            )
+        else:
+            log_operational_event(
+                EventType.GUILD_SYNC,
+                f"Sync failed: {result.error}",
+                guild_id=guild.id,
+                details={"error": result.error, "sync_type": sync_type},
+            )
+
+    logger.info(
+        "  ✅ Guild syncs completed: %s synced, %s skipped (%s guilds)",
+        synced_count,
+        skipped_count,
+        len(guilds),
+    )
+    return GuildSyncBatchResult(synced_count, skipped_count, len(guilds))
 
 
 def should_sync_global() -> bool:
