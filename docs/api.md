@@ -19,6 +19,8 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 - **Auto-Moderation**: Complete auto-moderation rule management with analytics (`/api/dashboard/{guild_id}/automod/*`)
 - **Onboarding Management**: Questions, rules, and flow configuration (`/api/dashboard/{guild_id}/onboarding/*`)
 - **Reminder Management**: User-facing reminder CRUD operations (requires Supabase JWT subject match)
+- **Agent Sessions**: Cross-platform `/agent` REST API for App/Mind (requires Supabase JWT + Discord link)
+- **Verification Queue**: Dashboard manual-review tickets (requires dashboard Discord admin auth)
 - **Exports**: CSV export endpoints for tickets and FAQ
 - **Webhooks**: Incoming webhooks from Core-API and GitHub Actions; validated via `X-Webhook-Signature` (includes app-reflections, discord-link, premium-invalidate, founder, legal-update)
 
@@ -654,6 +656,50 @@ Drop the in-memory AutoMod rules cache for a guild after dashboard direct DB wri
 }
 ```
 
+#### `GET /api/dashboard/{guild_id}/verification/queue`
+
+List verification tickets awaiting manual review (no screenshot content).
+
+**Authentication:** Required (`X-Api-Key` + `X-Discord-User-Id` with guild admin access; same as automod invalidate-cache)
+
+**Response:**
+```json
+[
+  {
+    "id": 42,
+    "user_id": 123456789,
+    "channel_id": 987654321,
+    "status": "manual_review",
+    "ai_reason": "Payment date unclear",
+    "ai_can_verify": false,
+    "ai_needs_manual_review": true,
+    "payment_date": "2026-07-01",
+    "created_at": "2026-07-13T12:00:00Z"
+  }
+]
+```
+
+#### `POST /api/dashboard/{guild_id}/verification/{ticket_id}/resolve`
+
+Approve or reject a manual verification ticket. Resolution runs on the bot event loop (role assignment, DB update, channel cleanup).
+
+**Authentication:** Required (`X-Api-Key` + `X-Discord-User-Id` with guild admin access)
+
+**Request body:**
+```json
+{
+  "outcome": "approved",
+  "reason": "Optional reject reason shown to the member"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
 #### `GET /api/dashboard/{guild_id}/automod/stats`
 
 Get auto-moderation statistics and analytics.
@@ -799,14 +845,57 @@ Get operational logs (reconnect, disconnect, etc.) for the Mind dashboard. Requi
 - `BOT_READY` – Bot startup complete
 - `BOT_RECONNECT` – Bot reconnected and resynced commands (includes `synced` and `skipped` counts)
 - `BOT_DISCONNECT` – Bot disconnected from Discord
-- `GUILD_SYNC` – Command sync per guild (success/failure/cooldown, includes `sync_type`: startup/reconnect/guild_join)
+- `GUILD_SYNC` – Command sync per guild (success/failure/cooldown, includes `sync_type`: `first_ready` / `reconnect` / `guild_join`)
 - `ONBOARDING_ERROR` – Onboarding errors (no rules configured, role assignment failures, member not found)
 - `SETTINGS_CHANGED` – Settings changes via commands or API (includes `action`: set/clear/bulk_update/rollback, `source`: command/api)
 - `COG_ERROR` – Slash command errors per guild (includes command name, user ID, error type)
 
+### Agent Sessions
+
+Cross-platform agent session API (same runtime as Discord `/agent`). Registered in `agents/http_routes.py`. Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment.
+
+**Authentication:** Supabase JWT (`Authorization: Bearer <token>`). All routes require an active Discord link (`alphapy_discord_links`); unlinked users receive **403**.
+
+#### `POST /api/agents/sessions`
+
+Start a new agent session (HTTP equivalent of `/agent start`).
+
+**Request body:**
+```json
+{
+  "agent": "reflection",
+  "message": "Optional opening message"
+}
+```
+
+**Response:** `201` — active session with `session_id`, `assistant_message`, `turn_count`, and optional `messages` history.
+
+**Errors:** `409` if a session is already active; `402` if daily `/agent start` quota exceeded.
+
+#### `GET /api/agents/sessions/active`
+
+Return the caller's active session for the given agent (query param `agent`, default `reflection`).
+
+**Response:** Session payload + message history, or **404** if none active.
+
+#### `POST /api/agents/sessions/{session_id}/turns`
+
+Continue an active session (HTTP equivalent of `/agent continue`).
+
+**Request body:**
+```json
+{
+  "message": "Follow-up message"
+}
+```
+
+#### `POST /api/agents/sessions/{session_id}/complete`
+
+End an active session (HTTP equivalent of `/agent end`). Emits Hermit `gpt_command` on success.
+
 ### Reminder Management
 
-Mind and other clients authenticate with a **Supabase JWT**. The `user_id` path field and reminder payload `user_id` must equal the JWT `sub` (Innersync user UUID). Alphapy resolves that UUID to a Discord snowflake via `alphapy_discord_links` (and Supabase `profiles` as a fallback) before reading or writing `reminders.created_by`. If the user is not linked, reminder endpoints return **403** with guidance to run `/link` in Discord.
+Mind and other clients authenticate with a **Supabase JWT**. The `user_id` path field and reminder payload `user_id` must equal the JWT `sub` (Innersync user UUID). Alphapy resolves that UUID to a Discord snowflake via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int()` with default `allow_profile_fallback=False`). Legacy `profiles.discord_id` fallback exists for one-off backfill scripts but is not used on the reminder API hot path. If the user is not linked, reminder endpoints return **403** with guidance to run `/link` in Discord.
 
 #### `GET /api/reminders/{user_id}`
 

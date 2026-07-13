@@ -23,7 +23,8 @@
 - All groups are defined as class-level `app_commands.Group` attributes in `cogs/configuration.py` and loaded via `cogs.configuration`
 
 ## Database Architecture
-- Multiple asyncpg pools (FastAPI + per-cog dedicated)
+- **Shared bot pool**: One `asyncpg` pool from `utils/db_helpers.get_bot_db_pool()`; cogs use `DatabaseManager` (no per-cog dedicated pools)
+- **Command tracker**: Optional small dedicated pool in the bot event loop for batch flush (see `utils/command_tracker.py`)
 - Central `bot_settings` + `audit_logs` + feature tables (reminders, onboarding, support_tickets, automod_rules, automod_logs, etc.)
 - Auto-moderation: 5 tables (`automod_actions`, `automod_rules`, `automod_logs`, `automod_stats`, `automod_user_history`) with indexes for performance
 - Engagement: 9 tables (`engagement_badges`, `engagement_og_claims`, `engagement_og_setup`, `engagement_challenges`, `engagement_participants`, `engagement_weekly_messages`, `engagement_weekly_awards`, `engagement_weekly_results`, `engagement_streaks`) — all multi-guild scoped
@@ -35,11 +36,12 @@
 - All other secrets via environment variables (Railway / `.env`), zero hard-coded values
 
 ## Control flow
-1. Startup → `StartupManager` (phased: DB → settings → cogs → sync → background tasks)
-2. New guild / reconnect → minimal resync of commands
-3. User input → cog → sanitizer → database and/or GPT
-4. Background jobs → reminders, telemetry push to Supabase, cleanup tasks
-5. Observability → operational logs + `/api/dashboard/*` for Mind
+1. Startup → `StartupManager` (phased: DB → settings → cogs → global sync → background tasks)
+2. First `on_ready` → guild-only slash sync (`sync_type=first_ready`) when `bot.guilds` is populated
+3. Reconnect / new guild → resync global (if needed) + guild-only commands
+4. User input → cog → sanitizer → database and/or GPT
+5. Background jobs → reminders, telemetry push to Supabase, cleanup tasks
+6. Observability → operational logs + `/api/dashboard/*` for Mind
 
 ## Observability, Security & Testing
 - Request observability in FastAPI via `RequestObservabilityMiddleware`:

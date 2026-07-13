@@ -446,7 +446,7 @@ Command usage analytics (automatically tracked).
 
 **Notes:**
 - Automatically populated by event handlers in `bot.py` (`on_app_command_completion`, `on_command_completion`, etc.)
-- Uses dedicated database connection pool created in bot's event loop (not FastAPI's loop)
+- Uses the shared bot database pool via `DatabaseManager` / `get_bot_db_pool()` (bot event loop)
 - Initialized in `on_ready()` event handler, persists across bot restarts
 - Used for command usage analytics, dashboard metrics, and `/command_stats` Discord command
 - Tracking is non-blocking and failures don't affect command execution
@@ -513,35 +513,26 @@ Guild-defined automated message responses with configurable trigger patterns.
 
 ## Database Connection Architecture
 
-The bot uses `asyncpg` connection pools for all database operations, providing:
+The bot uses a **shared** `asyncpg` pool for Railway bot data (`utils/db_helpers.get_bot_db_pool()`). Cogs acquire connections through `DatabaseManager` in `utils/database_helpers.py` — it no longer creates per-cog pools.
+
+Benefits:
 - **Better concurrency**: Multiple operations can run simultaneously
 - **Connection reuse**: Efficient resource management
 - **Graceful error handling**: Automatic retry and recovery from connection errors
-- **Event loop isolation**: Command tracker uses dedicated pool in bot's event loop
 
-### Connection Pool Configuration
+### Connection pool configuration
 
-Each component manages its own connection pool with appropriate size limits:
-- **FastAPI (`api.py`)**: Main pool for API endpoints (shared with bot)
-- **Command Tracker**: Dedicated pool in bot's event loop (min_size=1, max_size=5)
-- **Reminders Cog**: Pool for reminder operations (max_size=10)
-- **Ticket Bot**: Pool for ticket operations (max_size=10)
-- **FAQ Cog**: Pool for FAQ operations (max_size=5)
-- **Embed Watcher**: Pool for embed parsing (max_size=10)
-- **Other Cogs**: Individual pools as needed (typically max_size=5)
- - **Verification Cog**: Pool for verification ticket operations (max_size=10)
+- **Bot + cogs**: Shared pool from `get_bot_db_pool()` (created during startup Phase 1)
+- **FastAPI (`api.py`)**: Uses the same shared pool when the bot instance is available
+- **Command tracker** (optional): Small dedicated pool in the bot event loop for batch flush (`utils/command_tracker.py`, min_size=1, max_size=5)
 
-All pools include:
-- Connection timeout handling
-- Graceful shutdown on cog unload
-- Error handling for connection failures
-- Pool status checks before operations
+All pool usage includes connection timeout handling, graceful shutdown, and health checks via `is_pool_healthy()`.
 
 ## Schema Management
 
 All schema changes are managed via Alembic migrations. See [Migrations guide](../migrations/) for migration workflow.
 
-**Current Migration Head:** `023_alphapy_discord_links`
+**Current Migration Head:** `024_agent_session_usage`
 
 To view current schema state:
 ```bash

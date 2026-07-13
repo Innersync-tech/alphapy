@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - (No changes yet)
 
 ### Changed
-- **Repo hygiene (P0)** — replace mistaken Next.js `package.json` / lockfile with minimal `pyright` devDependency; CI runs `npm ci` before typecheck.
+- **Docs audit (#308)** — AGENTS.md, `docs/api.md`, `docs/commands.md`, `docs/configuration.md`, `docs/database-schema.md`, `docs/alphapy-agents-architecture.md`, and `ARCHITECTURE.md` aligned with shared DB pool, post-connect guild sync, agent session REST API, verification queue, pattern loader, and reminder identity resolution.
 - **Tier-2 copy (P2)** — verification panel steps, growth check-in description and private-share copy; `user_messages` rollout to reminders, growth errors, learn, leadership, contentgen.
 - **Database pools (P3)** — `DatabaseManager` no longer creates per-cog pools; all cogs/helpers bind to shared `SettingsService` pool via `get_bot_db_pool()`. Removed cog-unload pool closes that could tear down the shared connection.
 

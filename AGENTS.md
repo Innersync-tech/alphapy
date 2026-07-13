@@ -83,7 +83,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
 - **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`
 - **GDPR**: `purge_agent_user_data()` on Supabase `USER_DELETED` and `/delete_my_data`; see `agents/memory.py`
-- **Events**: `emit_hermit_event(gpt_command)` on `/agent end` (one per completed multi-turn session)
+- **Pattern learning**: `agents/pattern_loader.py` injects Tier-2-safe summaries from Supabase `agent_graph_nodes` when `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`)
 
 ---
 
@@ -110,7 +110,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Shared helpers**: `utils/gdpr_helpers.py` — `GDPRView`, `GDPRButton`, `store_gdpr_acceptance`, `build_gdpr_text`
 - **Flow**: Admin runs `/gdpr post` → embed posted and pinned in configured channel → members click "I Agree" → acceptance stored in `gdpr_acceptance` (scoped by `guild_id`)
 - **Dashboard**: `GET /api/dashboard/{guild_id}/gdpr` returns `{ acceptance_count }` (Railway DB)
-- **Future**: `/delete_my_data`
+- **Self-service erasure**: `/delete_my_data` in `cogs/delete_my_data.py` — two-step confirmation; purges Railway PII + Supabase agent memory via `purge_agent_user_data()`
 
 ---
 
@@ -154,14 +154,14 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🔄 Agent: UtilityAdmin
-- **Commands**: `/clean`, `/sendto`, `/reload`
+- **Commands**: `/clean`, `/sendto`, `/reload`, `/embed` (`cogs/slash_utils.py` — post a formatted embed to a channel)
 
 ---
 
-## � Agent: Status
+## Agent: Status
 - **Path**: `cogs/status.py`
 - **Purpose**: General information and status commands
-- **Commands**: `/version`, `/gptstatus`, `/innersync`, `/release`, `/health`, `/commands`, `/command_stats`
+- **Commands**: `/version`, `/gptstatus`, `/innersync`, `/release`, `/health`, `/commands`, `/command_stats`, `/help`
 
 ---
 
@@ -172,10 +172,18 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 
 ---
 
+## 🔄 Command sync (startup lifecycle)
+- **Path**: `utils/lifecycle.py`, `utils/command_sync.py`, `bot.py`
+- **Global sync**: Phase 4 in `setup_hook` (`safe_sync`, guild=None) when not on cooldown
+- **Guild-only sync**: Deferred until gateway connect — `sync_guild_only_commands_for_all_guilds(sync_type="first_ready")` on first `on_ready`; `sync_type="reconnect"` after disconnect; `sync_type="guild_join"` on new guild
+- **Diagnostics**: `on_interaction` in `bot.py` logs inbound interaction type, command name, user, and guild (ops only)
+
+---
+
 ## 🌐 API Agent: FastAPI Dashboard Endpoint
-- **Path**: `api.py`
-- **Purpose**: Exposes reminders and realtime metrics for Mind/App
-- **Endpoints**: `/api/reminders/*`, `/api/dashboard/metrics`, `/api/dashboard/logs`
+- **Path**: `api.py`, `agents/http_routes.py`
+- **Purpose**: Exposes reminders, agent sessions, and realtime metrics for Mind/App
+- **Endpoints**: `/api/reminders/*`, `/api/agents/sessions*`, `/api/dashboard/metrics`, `/api/dashboard/logs`
 
 ---
 
