@@ -12,6 +12,7 @@ from utils.supabase_client import (
     insert_insight_for_discord,
 )
 from utils.user_messages import ERR_GENERIC
+from gpt.errors import GrokUnavailableError, grok_user_message
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,8 @@ Avoid clichés.
                     )
 
             asyncio.create_task(_store_caption_insight())
+        except GrokUnavailableError as e:
+            await interaction.followup.send(grok_user_message(e), ephemeral=True)
         except Exception:
             # ask_gpt() already logs all its errors internally, so we don't log again
             await interaction.followup.send(ERR_GENERIC, ephemeral=True)

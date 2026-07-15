@@ -32,6 +32,7 @@ from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_embed_text
 from utils.user_messages import ERR_GENERIC
+from gpt.errors import GrokUnavailableError, grok_user_message
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +198,9 @@ class AgentGroup(app_commands.Group):
                 ephemeral=True,
             )
             return
+        except GrokUnavailableError as exc:
+            await interaction.followup.send(grok_user_message(exc), ephemeral=True)
+            return
         except Exception as exc:
             logger.exception("Agent session failed: %s", exc)
             await interaction.followup.send(ERR_GENERIC, ephemeral=True)
@@ -258,6 +262,9 @@ class AgentGroup(app_commands.Group):
                 "No active session. Start one with `/agent start` first.", ephemeral=True
             )
             return
+        except GrokUnavailableError as exc:
+            await interaction.followup.send(grok_user_message(exc), ephemeral=True)
+            return
         except Exception as exc:
             logger.exception("Agent continue failed: %s", exc)
             await interaction.followup.send(
@@ -306,6 +313,9 @@ class AgentGroup(app_commands.Group):
             await interaction.followup.send(
                 "No active session to end. Use `/agent start` first.", ephemeral=True
             )
+            return
+        except GrokUnavailableError as exc:
+            await interaction.followup.send(grok_user_message(exc), ephemeral=True)
             return
         except Exception as exc:
             logger.exception("Agent end failed: %s", exc)

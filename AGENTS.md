@@ -56,6 +56,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ## 🚀 Agent: GrokInteraction
 - **Purpose**: AI functionality with Grok
 - **Commands**: `/create_caption`, `/learn_topic`, `/gptstatus`
+- **Outages**: `gpt/errors.py` classifies credits / bad key / 5xx as `offline` (`ERR_GROK_OFFLINE`); rate limits as `rate_limited`. `ask_gpt` raises `GrokUnavailableError` (never returns fallback text as a model reply). Operators see last `kind` on `/gptstatus`.
 
 ---
 

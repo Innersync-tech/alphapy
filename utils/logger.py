@@ -34,6 +34,8 @@ class GPTStatusLogs:
         self.error_count: int = 0
         self.rate_limit_hits: int = 0
         self.last_rate_limit_time: datetime | None = None
+        self.last_failure_kind: str | None = None
+        self.last_failure_detail: str | None = None
         self.last_success_latency_ms: int | None = None
         self.success_events: deque[dict[str, Any]] = deque(maxlen=MAX_EVENT_HISTORY)
         self.error_events: deque[dict[str, Any]] = deque(maxlen=MAX_EVENT_HISTORY)

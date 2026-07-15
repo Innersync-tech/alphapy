@@ -10,6 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from gpt.helpers import ask_gpt_vision
+from gpt.errors import GrokUnavailableError, grok_user_message
 from utils.cog_base import AlphaCog
 from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
@@ -693,6 +694,22 @@ class VerificationCog(AlphaCog):
                     "Never include any text, explanation, or formatting outside the JSON object."
                 ),
             )
+        except GrokUnavailableError as e:
+            logger.exception("VerificationCog: vision call failed: %s", e)
+            await message.channel.send(
+                embed=EmbedBuilder.error(
+                    title="❌ Verification failed",
+                    description=grok_user_message(e),
+                )
+            )
+            await self._update_verification_ticket(
+                channel_id=int(message.channel.id),
+                status="error",
+                ai_can_verify=None,
+                ai_needs_manual_review=None,
+                ai_reason=e.operator_detail,
+            )
+            return
         except Exception as e:
             logger.exception(f"VerificationCog: vision call failed: {e}")
             await message.channel.send(
