@@ -9,8 +9,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from gpt.helpers import ask_gpt_vision
 from gpt.errors import GrokUnavailableError, grok_user_message
+from gpt.helpers import ask_gpt_vision
 from utils.cog_base import AlphaCog
 from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy

@@ -8,8 +8,8 @@ from discord import app_commands
 from discord.app_commands import checks as app_checks
 from discord.ext import commands
 
-from gpt.helpers import ask_gpt, log_gpt_error
 from gpt.errors import GrokUnavailableError, grok_user_message
+from gpt.helpers import ask_gpt, log_gpt_error
 from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord

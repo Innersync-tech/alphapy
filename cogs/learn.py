@@ -7,13 +7,13 @@ from discord.app_commands import checks as app_checks
 from discord.ext import commands
 
 from gpt.dataset_loader import load_topic_context
+from gpt.errors import GrokUnavailableError, grok_user_message
 from gpt.helpers import ask_gpt, is_allowed_prompt, log_gpt_error
 from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
 )
 from utils.user_messages import ERR_GENERIC
-from gpt.errors import GrokUnavailableError, grok_user_message
 
 logger = logging.getLogger(__name__)
 

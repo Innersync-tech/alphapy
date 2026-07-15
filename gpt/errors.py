@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class GrokFailureKind(str, Enum):
+class GrokFailureKind(StrEnum):
     """Shared taxonomy — mirrors App `/api/gpt` codes where applicable."""
 
     RATE_LIMITED = "rate_limited"

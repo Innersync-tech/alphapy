@@ -13,12 +13,12 @@ from discord import app_commands
 from discord.app_commands import checks as app_checks
 from discord.ext import commands, tasks
 
+from gpt.errors import GrokUnavailableError, grok_user_message
 from utils.cog_base import AlphaCog
 from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
 from utils.validators import validate_admin
-from gpt.errors import GrokUnavailableError, grok_user_message
 
 try:
     import config_local as config  # type: ignore

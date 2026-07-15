@@ -16,6 +16,12 @@ try:
 except ImportError:
     import config  # type: ignore
 
+from gpt.errors import (
+    GrokFailureKind,
+    GrokUnavailableError,
+    classify_grok_error,
+    should_enqueue_retry,
+)
 from utils.hermit_context import (
     _strategy_packet_enabled,
     fetch_hermit_context,
@@ -23,13 +29,6 @@ from utils.hermit_context import (
     record_prompt_usage,
 )
 from utils.user_messages import ERR_GROK_OFFLINE, ERR_GROK_RATE_LIMITED
-
-from gpt.errors import (
-    GrokFailureKind,
-    GrokUnavailableError,
-    classify_grok_error,
-    should_enqueue_retry,
-)
 
 logger = logging.getLogger("bot")
 

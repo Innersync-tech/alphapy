@@ -3,8 +3,8 @@
 from gpt.errors import (
     GrokFailureKind,
     GrokUnavailableError,
-    classify_grok_error,
     classify_from_http,
+    classify_grok_error,
     grok_user_message,
     should_enqueue_retry,
 )
