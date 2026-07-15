@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- (No changes yet)
+- **DB migration 025**: `growth_checkins.goal` / `obstacle` / `feeling` / `grok_response` + index on `(user_id, created_at DESC)` for `/growthhistory` and the control-panel Growth tab.
 
 ### Changed
 - **Docs audit (#308)** — AGENTS.md, `docs/api.md`, `docs/commands.md`, `docs/configuration.md`, `docs/database-schema.md`, `docs/alphapy-agents-architecture.md`, and `ARCHITECTURE.md` aligned with shared DB pool, post-connect guild sync, agent session REST API, verification queue, pattern loader, and reminder identity resolution.
@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - **Dead code (P2)** — `bot_only.py`; unittest modules under `cogs/test_*.py` (moved `test_reminders_repo` → `tests/`); dev prefix cog `cogs/test_automod.py`; legacy migration cogs unloaded from lifecycle (`importdata`, `importinvite`, `migrate_gdpr`); unused `csv_helpers` temp-file helpers, `slash_utils.is_owner_or_admin`, `config.ROLE_ID`, `hermit_context.invalidate_hermit_cache`.
 
 ### Fixed
-- (No changes yet)
+- **`/growthhistory`**: No longer reads encrypted App vault rows from Supabase `reflections`. Check-in content is stored and loaded from Railway `growth_checkins` (migration `025`) so Grok replies stay plaintext in Discord.
 
 ## [3.12.1] - 2026-07-08
 

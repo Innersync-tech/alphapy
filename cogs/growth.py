@@ -15,7 +15,6 @@ from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_embed_text
 from utils.supabase_client import (
     SupabaseConfigurationError,
-    _supabase_delete,
     _supabase_get,
     insert_reflection_for_discord,
 )
@@ -281,14 +280,21 @@ Keep your response under 250 words. End with a complete sentence.
                     async with acquire_safe(pool) as conn:
                         await conn.execute(
                             """
-                            INSERT INTO growth_checkins (guild_id, user_id, shared)
-                            VALUES ($1, $2, FALSE)
+                            INSERT INTO growth_checkins (
+                                guild_id, user_id, shared,
+                                goal, obstacle, feeling, grok_response
+                            )
+                            VALUES ($1, $2, FALSE, $3, $4, $5, $6)
                             """,
                             guild_id or 0,
                             interaction.user.id,
+                            self.goal.value,
+                            self.obstacle.value,
+                            self.feeling.value,
+                            reply,
                         )
                 except Exception as exc:
-                    logger.debug("Failed to log growth check-in to Railway: %s", exc)
+                    logger.warning("Failed to log growth check-in to Railway: %s", exc)
 
             asyncio.create_task(_log_checkin_to_railway())
 
@@ -307,26 +313,34 @@ _HISTORY_PER_PAGE = 3
 _HISTORY_MAX_FETCH = 15  # 5 pages max
 
 
-def _parse_reflection(raw: str) -> tuple[str, str, str]:
-    """Parse 'Goal: ...\nObstacle: ...\nFeeling: ...' into (goal, obstacle, feeling)."""
-    goal = obstacle = feeling = ""
-    for line in raw.splitlines():
-        if line.startswith("Goal: "):
-            goal = line[6:]
-        elif line.startswith("Obstacle: "):
-            obstacle = line[10:]
-        elif line.startswith("Feeling: "):
-            feeling = line[9:]
-    return goal, obstacle, feeling
+def _checkin_date_str(row: dict) -> str:
+    """Format a growth_checkins row date for display labels."""
+    created = row.get("created_at")
+    if created is None:
+        return ""
+    if hasattr(created, "date"):
+        return created.date().isoformat()
+    return str(created)[:10]
+
+
+def _checkin_field(row: dict, key: str) -> str:
+    value = row.get(key)
+    return value.strip() if isinstance(value, str) else (str(value) if value else "")
 
 
 class GrowthDeleteConfirmView(discord.ui.View):
     """Confirmation step before deleting a check-in."""
 
-    def __init__(self, row: dict, supabase_user_id: str, back_view: "GrowthHistoryView", detail_view: "GrowthDetailView"):
+    def __init__(
+        self,
+        row: dict,
+        discord_user_id: int,
+        back_view: "GrowthHistoryView",
+        detail_view: "GrowthDetailView",
+    ):
         super().__init__(timeout=60)
         self.row = row
-        self.supabase_user_id = supabase_user_id
+        self.discord_user_id = discord_user_id
         self.back_view = back_view
         self.detail_view = detail_view
 
@@ -334,16 +348,32 @@ class GrowthDeleteConfirmView(discord.ui.View):
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         row_id = self.row.get("id")
         if not row_id:
-            await interaction.response.edit_message(content="❌ Could not identify the check-in to delete.", view=None)
+            await interaction.response.edit_message(
+                content="❌ Could not identify the check-in to delete.", view=None
+            )
             return
         try:
-            await _supabase_delete(
-                "reflections",
-                {"id": f"eq.{row_id}", "user_id": f"eq.{self.supabase_user_id}"},
-            )
-            # Remove from in-memory list and adjust page if needed
-            reflections = self.back_view.reflections
-            self.back_view.reflections = [r for r in reflections if r.get("id") != row_id]
+            pool = get_bot_db_pool(interaction.client)
+            if not pool:
+                raise RuntimeError("Database pool unavailable")
+            async with acquire_safe(pool) as conn:
+                result = await conn.execute(
+                    """
+                    DELETE FROM growth_checkins
+                    WHERE id = $1 AND user_id = $2
+                    """,
+                    int(row_id),
+                    self.discord_user_id,
+                )
+            deleted_count = int(str(result).split()[-1])
+            if deleted_count == 0:
+                await interaction.response.edit_message(
+                    content="❌ Could not delete the check-in. Please try again later.",
+                    view=self.detail_view,
+                )
+                return
+            checkins = self.back_view.checkins
+            self.back_view.checkins = [r for r in checkins if r.get("id") != row_id]
             if self.back_view.page >= self.back_view.total_pages:
                 self.back_view.page = max(0, self.back_view.total_pages - 1)
             self.back_view._rebuild_items()
@@ -353,7 +383,7 @@ class GrowthDeleteConfirmView(discord.ui.View):
                 view=self.back_view,
             )
         except Exception as e:
-            logger.warning("Failed to delete reflection id=%s: %s", row_id, e)
+            logger.warning("Failed to delete growth_checkins id=%s: %s", row_id, e)
             await interaction.response.edit_message(
                 content="❌ Could not delete the check-in. Please try again later.",
                 view=self.detail_view,
@@ -362,24 +392,32 @@ class GrowthDeleteConfirmView(discord.ui.View):
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content=None, embed=self.detail_view.build_embed(), view=self.detail_view)
+        await interaction.response.edit_message(
+            content=None, embed=self.detail_view.build_embed(), view=self.detail_view
+        )
         self.stop()
 
 
 class GrowthDetailView(discord.ui.View):
     """Full detail view for one check-in, including Grok response."""
 
-    def __init__(self, row: dict, back_view: "GrowthHistoryView", supabase_user_id: str = ""):
+    def __init__(
+        self,
+        row: dict,
+        back_view: "GrowthHistoryView",
+        discord_user_id: int,
+    ):
         super().__init__(timeout=300)
         self.row = row
         self.back_view = back_view
-        self.supabase_user_id = supabase_user_id
+        self.discord_user_id = discord_user_id
 
     def build_embed(self) -> discord.Embed:
-        date_str = str(self.row.get("date", ""))[:10]
-        raw = self.row.get("reflection", "")
-        goal, obstacle, feeling = _parse_reflection(raw)
-        future_message = self.row.get("future_message") or ""
+        date_str = _checkin_date_str(self.row)
+        goal = _checkin_field(self.row, "goal")
+        obstacle = _checkin_field(self.row, "obstacle")
+        feeling = _checkin_field(self.row, "feeling")
+        grok_response = _checkin_field(self.row, "grok_response")
 
         embed = discord.Embed(
             title=f"🌱 Growth Check-in — {date_str}",
@@ -392,8 +430,8 @@ class GrowthDetailView(discord.ui.View):
             embed.add_field(name="Obstacle", value=safe_embed_text(obstacle[:1024]), inline=False)
         if feeling:
             embed.add_field(name="How I felt", value=safe_embed_text(feeling[:1024]), inline=False)
-        if future_message:
-            grok_text = future_message[:1021] + "…" if len(future_message) > 1024 else future_message
+        if grok_response:
+            grok_text = grok_response[:1021] + "…" if len(grok_response) > 1024 else grok_response
             embed.add_field(name="🤖 Grok's reflection", value=safe_embed_text(grok_text), inline=False)
         embed.set_footer(text="Innersync • Growth")
         return embed
@@ -409,10 +447,10 @@ class GrowthDetailView(discord.ui.View):
 
     @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="🗑️", row=0)
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-        date_str = str(self.row.get("date", ""))[:10]
+        date_str = _checkin_date_str(self.row)
         confirm_view = GrowthDeleteConfirmView(
             row=self.row,
-            supabase_user_id=self.supabase_user_id,
+            discord_user_id=self.discord_user_id,
             back_view=self.back_view,
             detail_view=self,
         )
@@ -426,21 +464,21 @@ class GrowthDetailView(discord.ui.View):
 class GrowthHistoryView(discord.ui.View):
     """Paginated list of growth check-ins (3 per page) with a Select for detail."""
 
-    def __init__(self, reflections: list, page: int = 0, supabase_user_id: str = ""):
+    def __init__(self, checkins: list, page: int = 0, discord_user_id: int = 0):
         super().__init__(timeout=300)
-        self.reflections = reflections
+        self.checkins = checkins
         self.page = page
-        self.supabase_user_id = supabase_user_id
+        self.discord_user_id = discord_user_id
         self._rebuild_items()
 
     @property
     def total_pages(self) -> int:
-        return max(1, math.ceil(len(self.reflections) / _HISTORY_PER_PAGE))
+        return max(1, math.ceil(len(self.checkins) / _HISTORY_PER_PAGE))
 
     @property
     def page_items(self) -> list:
         start = self.page * _HISTORY_PER_PAGE
-        return self.reflections[start:start + _HISTORY_PER_PAGE]
+        return self.checkins[start:start + _HISTORY_PER_PAGE]
 
     def build_embed(self) -> discord.Embed:
         embed = discord.Embed(
@@ -448,12 +486,13 @@ class GrowthHistoryView(discord.ui.View):
             color=_GROWTH_EMBED_COLOR,
             timestamp=datetime.now(UTC),
         )
-        if not self.reflections:
+        if not self.checkins:
             embed.description = "No check-ins found yet. Use `/growthcheckin` to get started."
         else:
             for row in self.page_items:
-                date_str = str(row.get("date", ""))[:10]
-                goal, obstacle, _ = _parse_reflection(row.get("reflection", ""))
+                date_str = _checkin_date_str(row)
+                goal = _checkin_field(row, "goal")
+                obstacle = _checkin_field(row, "obstacle")
                 preview_parts = []
                 if goal:
                     preview_parts.append(f"**Goal:** {goal[:120]}")
@@ -473,8 +512,8 @@ class GrowthHistoryView(discord.ui.View):
         if items:
             options = []
             for i, row in enumerate(items):
-                date_str = str(row.get("date", ""))[:10]
-                goal, _, _ = _parse_reflection(row.get("reflection", ""))
+                date_str = _checkin_date_str(row)
+                goal = _checkin_field(row, "goal")
                 desc = goal[:97] + "…" if len(goal) > 97 else goal
                 options.append(discord.SelectOption(
                     label=date_str or f"Check-in {self.page * _HISTORY_PER_PAGE + i + 1}",
@@ -509,9 +548,13 @@ class GrowthHistoryView(discord.ui.View):
 
     async def _on_select(self, interaction: discord.Interaction):
         idx = int(interaction.data["values"][0])
-        row = self.reflections[idx]
-        detail_view = GrowthDetailView(row=row, back_view=self, supabase_user_id=self.supabase_user_id)
-        await interaction.response.edit_message(content=None, embed=detail_view.build_embed(), view=detail_view)
+        row = self.checkins[idx]
+        detail_view = GrowthDetailView(
+            row=row, back_view=self, discord_user_id=self.discord_user_id
+        )
+        await interaction.response.edit_message(
+            content=None, embed=detail_view.build_embed(), view=detail_view
+        )
 
     async def _on_prev(self, interaction: discord.Interaction):
         self.page -= 1
@@ -545,30 +588,44 @@ class GrowthCheckin(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             pool = get_bot_db_pool(interaction.client)
-            user_id = await get_innersync_id_for_discord(
-                pool, interaction.user.id, allow_profile_fallback=False
-            )
-            if not user_id:
+            if not pool:
                 await interaction.followup.send(
-                    "No Innersync profile linked to your account. Link first with `/link`, then run `/growthcheckin`.",
+                    "❌ Database unavailable. Please try again later.",
                     ephemeral=True,
                 )
                 return
 
-            rows = await _supabase_get(
-                "reflections",
-                {
-                    "select": "id,reflection,future_message,date",
-                    "user_id": f"eq.{user_id}",
-                    "order": "date.desc",
-                    "limit": _HISTORY_MAX_FETCH,
-                },
-            )
+            async with acquire_safe(pool) as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, goal, obstacle, feeling, grok_response, created_at
+                    FROM growth_checkins
+                    WHERE user_id = $1
+                      AND (
+                        goal IS NOT NULL
+                        OR obstacle IS NOT NULL
+                        OR feeling IS NOT NULL
+                        OR grok_response IS NOT NULL
+                      )
+                    ORDER BY created_at DESC
+                    LIMIT $2
+                    """,
+                    interaction.user.id,
+                    _HISTORY_MAX_FETCH,
+                )
 
-            view = GrowthHistoryView(reflections=rows or [], supabase_user_id=user_id)
+            checkins = [dict(row) for row in rows]
+            view = GrowthHistoryView(
+                checkins=checkins,
+                discord_user_id=interaction.user.id,
+            )
             await interaction.followup.send(embed=view.build_embed(), view=view, ephemeral=True)
         except Exception as e:
-            logger.warning("Failed to load growth history for discord_id=%s: %s", interaction.user.id, e)
+            logger.warning(
+                "Failed to load growth history for discord_id=%s: %s",
+                interaction.user.id,
+                e,
+            )
             await interaction.followup.send(
                 "❌ Could not load your growth history. Please try again later.",
                 ephemeral=True,
