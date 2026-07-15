@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **`/growthhistory`**: No longer reads encrypted App vault rows from Supabase `reflections`. Check-in content is stored and loaded from Railway `growth_checkins` (migration `025`) so Grok replies stay plaintext in Discord.
+- **Grok offline handling**: `ask_gpt` / `ask_gpt_vision` classify credits, bad/missing API key, and 5xx as `offline` (calm user copy via `ERR_GROK_OFFLINE`); rate limits stay separate; callers must not persist unavailable text as model output; `/gptstatus` shows last failure kind for operators.
 
 ## [3.12.1] - 2026-07-08
 

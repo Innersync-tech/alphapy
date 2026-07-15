@@ -16,12 +16,19 @@ try:
 except ImportError:
     import config  # type: ignore
 
+from gpt.errors import (
+    GrokFailureKind,
+    GrokUnavailableError,
+    classify_grok_error,
+    should_enqueue_retry,
+)
 from utils.hermit_context import (
     _strategy_packet_enabled,
     fetch_hermit_context,
     get_cached_strategy_packet,
     record_prompt_usage,
 )
+from utils.user_messages import ERR_GROK_OFFLINE, ERR_GROK_RATE_LIMITED
 
 logger = logging.getLogger("bot")
 
@@ -67,7 +74,8 @@ Geef een duidelijke, uitgebreide uitleg gebaseerd op de context, maar voeg ook j
 bot_instance: commands.Bot | None = None
 
 # --- Grok Fallback & Retry Queue ---
-FALLBACK_MESSAGE = "I'm temporarily unavailable. Please try again in a few minutes."
+# User-facing rate-limit copy (also exported as FALLBACK_MESSAGE for older imports).
+FALLBACK_MESSAGE = ERR_GROK_RATE_LIMITED
 _gpt_retry_queue: list = []  # List of dicts: {messages, user_id, model, guild_id, include_reflections, retry_count, timestamp}
 MAX_RETRY_QUEUE_SIZE = 50
 MAX_RETRIES = 5
@@ -92,6 +100,8 @@ def log_gpt_success(user_id=None, tokens_used=0, latency_ms=0, guild_id: int | N
     logs.success_count += 1
     logs.total_tokens_session += tokens_used
     logs.last_success_latency_ms = latency_ms
+    logs.last_failure_kind = None
+    logs.last_failure_detail = None
     if model:
         logs.current_model = model
     logs.success_events.appendleft(
@@ -110,7 +120,14 @@ def log_gpt_success(user_id=None, tokens_used=0, latency_ms=0, guild_id: int | N
         _background_tasks.add(t)
         t.add_done_callback(_background_tasks.discard)
 
-def log_gpt_error(error_type="unknown", user_id=None, guild_id: int | None = None):
+def log_gpt_error(
+    error_type="unknown",
+    user_id=None,
+    guild_id: int | None = None,
+    *,
+    kind: GrokFailureKind | None = None,
+    operator_detail: str | None = None,
+):
     from utils.logger import get_gpt_status_logs
     now = datetime.now(UTC)
     logs = get_gpt_status_logs()
@@ -118,21 +135,61 @@ def log_gpt_error(error_type="unknown", user_id=None, guild_id: int | None = Non
     logs.last_error_time = now
     logs.last_user = user_id
     logs.error_count += 1
+    if kind is not None:
+        logs.last_failure_kind = kind.value
+        logs.last_failure_detail = operator_detail or kind.value
     # Detect rate limit errors (429)
     error_lower = error_type.lower()
-    if "429" in error_type or "rate limit" in error_lower or "ratelimit" in error_lower:
+    is_rate_limit = (
+        kind is GrokFailureKind.RATE_LIMITED
+        or "429" in error_type
+        or "rate limit" in error_lower
+        or "ratelimit" in error_lower
+    )
+    if is_rate_limit:
         logs.rate_limit_hits += 1
         logs.last_rate_limit_time = now
     logs.error_events.appendleft(
-        {"timestamp": now, "user_id": user_id, "error_type": error_type}
+        {
+            "timestamp": now,
+            "user_id": user_id,
+            "error_type": error_type,
+            "kind": kind.value if kind else None,
+            "operator_detail": operator_detail,
+        }
     )
 
-    log_message = f"❌ Grok error [{error_type}] by {user_id}"
+    detail_suffix = f" kind={kind.value} detail={operator_detail}" if kind else ""
+    log_message = f"❌ Grok error [{error_type}] by {user_id}{detail_suffix}"
     logger.error(log_message)
     if bot_instance and guild_id:
         t = asyncio.create_task(log_to_channel(log_message, level="error", guild_id=guild_id))
         _background_tasks.add(t)
         t.add_done_callback(_background_tasks.discard)
+
+
+def _user_message_for_kind(kind: GrokFailureKind) -> str:
+    if kind is GrokFailureKind.RATE_LIMITED:
+        return ERR_GROK_RATE_LIMITED
+    return ERR_GROK_OFFLINE
+
+
+def _raise_grok_unavailable(exc: BaseException, *, user_id=None, guild_id: int | None = None) -> None:
+    """Log, classify, and raise GrokUnavailableError (never returns)."""
+    kind, operator_detail = classify_grok_error(exc)
+    error_type = f"{type(exc).__name__}: {exc}"
+    log_gpt_error(
+        error_type=error_type,
+        user_id=user_id,
+        guild_id=guild_id,
+        kind=kind,
+        operator_detail=operator_detail,
+    )
+    raise GrokUnavailableError(
+        kind,
+        operator_detail=operator_detail,
+        user_message=_user_message_for_kind(kind),
+    ) from exc
 
 def is_allowed_prompt(prompt: str) -> bool:
     # Add words or phrases here that you want to block
@@ -442,34 +499,30 @@ async def ask_gpt(messages, user_id=None, model: str | None = None, guild_id: in
         return response.choices[0].message.content
 
     except Exception as e:
-        error_type = f"{type(e).__name__}: {str(e)}"
-        
-        # Check if this is a retryable error (rate limit or API error)
-        is_retryable = False
-        status_code = None
-        
-        # Check for rate limit (429) or server errors (500, 503)
-        status_code = getattr(e, "status_code", None)
-        if status_code is not None and isinstance(status_code, int):
-            if status_code in [429, 500, 503]:
-                is_retryable = True
-        elif "rate limit" in str(e).lower() or "429" in str(e):
-            is_retryable = True
-        elif "503" in str(e) or "500" in str(e):
-            is_retryable = True
-        
-        log_gpt_error(error_type=error_type, user_id=user_id, guild_id=guild_id)
-        
-        # If retryable and not already a retry attempt, add to queue and return fallback message
-        if is_retryable and not _is_retry:
+        kind, operator_detail = classify_grok_error(e)
+        error_type = f"{type(e).__name__}: {e}"
+        log_gpt_error(
+            error_type=error_type,
+            user_id=user_id,
+            guild_id=guild_id,
+            kind=kind,
+            operator_detail=operator_detail,
+        )
+
+        if should_enqueue_retry(kind) and not _is_retry:
             await _add_to_retry_queue(
                 messages, user_id, model or _default_model, guild_id, include_reflections, max_tokens
             )
-            logger.warning(f"⚠️ Grok error (retryable): {error_type}. Returning fallback message and queuing for retry.")
-            return FALLBACK_MESSAGE
-        
-        # Non-retryable errors or retry attempts that fail: raise as before
-        raise
+            logger.warning(
+                "⚠️ Grok rate-limited: %s. Queuing silent retry; raising unavailable for caller.",
+                error_type,
+            )
+
+        raise GrokUnavailableError(
+            kind,
+            operator_detail=operator_detail,
+            user_message=_user_message_for_kind(kind),
+        ) from e
 
 
 async def ask_gpt_vision(
@@ -492,6 +545,9 @@ async def ask_gpt_vision(
     Pass `system_prompt` to override the default chatbot personality — required
     for task-specific vision calls (e.g. verification) so the model follows the
     structured instructions instead of the assistant persona.
+
+    Raises:
+        GrokUnavailableError: when the model cannot produce a real reply.
     """
     start = time.perf_counter()
 
@@ -556,7 +612,8 @@ async def ask_gpt_vision(
         )
         return response.choices[0].message.content or ""
 
-    except Exception as e:
-        error_type = f"{type(e).__name__}: {str(e)}"
-        log_gpt_error(error_type=error_type, user_id=user_id, guild_id=guild_id)
+    except GrokUnavailableError:
         raise
+    except Exception as e:
+        _raise_grok_unavailable(e, user_id=user_id, guild_id=guild_id)
+        raise  # pragma: no cover — _raise_grok_unavailable always raises

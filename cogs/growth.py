@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.app_commands import checks as app_checks
 from discord.ext import commands
 
+from gpt.errors import GrokUnavailableError, grok_user_message
 from gpt.helpers import ask_gpt, log_gpt_error
 from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
@@ -302,6 +303,8 @@ Keep your response under 250 words. End with a complete sentence.
                 from utils.fyi_tips import send_fyi_if_first
 
                 await send_fyi_if_first(interaction.client, guild_id, "first_growthcheckin")
+        except GrokUnavailableError as e:
+            await interaction.followup.send(grok_user_message(e), ephemeral=True)
         except Exception:
             await interaction.followup.send(
                 "❌ Check-in failed. Try again — if it persists, run `/gptstatus`.",

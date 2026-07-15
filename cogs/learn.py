@@ -7,6 +7,7 @@ from discord.app_commands import checks as app_checks
 from discord.ext import commands
 
 from gpt.dataset_loader import load_topic_context
+from gpt.errors import GrokUnavailableError, grok_user_message
 from gpt.helpers import ask_gpt, is_allowed_prompt, log_gpt_error
 from utils.supabase_client import (
     SupabaseConfigurationError,
@@ -150,6 +151,8 @@ class LearnTopic(commands.Cog):
 
             asyncio.create_task(_store_learn_insight())
 
+        except GrokUnavailableError as e:
+            await interaction.followup.send(grok_user_message(e), ephemeral=True)
         except Exception:
             # ask_gpt() already logs all its errors internally, so we don't log again
             await interaction.followup.send("❌ Couldn't generate a response. Try again later.", ephemeral=True)

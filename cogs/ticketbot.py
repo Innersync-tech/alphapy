@@ -13,6 +13,7 @@ from discord import app_commands
 from discord.app_commands import checks as app_checks
 from discord.ext import commands, tasks
 
+from gpt.errors import GrokUnavailableError, grok_user_message
 from utils.cog_base import AlphaCog
 from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
@@ -743,6 +744,10 @@ class TicketBot(AlphaCog):
                     user_id=None,
                     guild_id=guild_id,
                 )
+            except GrokUnavailableError as e:
+                logger.error("Failed to generate ticket summary: %s", e)
+                await channel.send(grok_user_message(e))
+                return None
             except Exception as e:
                 logger.error(f"Failed to generate ticket summary: {e}")
                 await channel.send("❌ Failed to generate summary. Please try again.")
@@ -1486,6 +1491,10 @@ class TicketActionView(discord.ui.View):
                     user_id=None,
                     guild_id=guild_id,
                 )
+            except GrokUnavailableError as e:
+                logger.error("Failed to generate ticket summary: %s", e)
+                await channel.send(grok_user_message(e))
+                return None
             except Exception as e:
                 logger.error(f"Failed to generate ticket summary: {e}")
                 await channel.send("❌ Failed to generate summary. Please try again.")
@@ -1956,6 +1965,10 @@ class TicketActionView(discord.ui.View):
                 guild_id=guild_id,
                 include_reflections=False,
             )
+        except GrokUnavailableError as e:
+            logger.error("Failed to get AI suggestion: %s", e)
+            await interaction.followup.send(grok_user_message(e), ephemeral=True)
+            return
         except Exception as e:
             logger.error(f"Failed to get AI suggestion: {e}")
             await interaction.followup.send("❌ Failed to get suggestion. Please try again.", ephemeral=True)

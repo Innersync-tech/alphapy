@@ -25,6 +25,7 @@ from agents.runtime import (
     end_agent_session,
     start_agent_session,
 )
+from gpt.errors import GrokUnavailableError, grok_user_message
 from utils.cog_base import AlphaCog
 from utils.core_discord_integration import normalize_http_url
 from utils.db_helpers import get_bot_db_pool
@@ -197,6 +198,9 @@ class AgentGroup(app_commands.Group):
                 ephemeral=True,
             )
             return
+        except GrokUnavailableError as exc:
+            await interaction.followup.send(grok_user_message(exc), ephemeral=True)
+            return
         except Exception as exc:
             logger.exception("Agent session failed: %s", exc)
             await interaction.followup.send(ERR_GENERIC, ephemeral=True)
@@ -258,6 +262,9 @@ class AgentGroup(app_commands.Group):
                 "No active session. Start one with `/agent start` first.", ephemeral=True
             )
             return
+        except GrokUnavailableError as exc:
+            await interaction.followup.send(grok_user_message(exc), ephemeral=True)
+            return
         except Exception as exc:
             logger.exception("Agent continue failed: %s", exc)
             await interaction.followup.send(
@@ -306,6 +313,9 @@ class AgentGroup(app_commands.Group):
             await interaction.followup.send(
                 "No active session to end. Use `/agent start` first.", ephemeral=True
             )
+            return
+        except GrokUnavailableError as exc:
+            await interaction.followup.send(grok_user_message(exc), ephemeral=True)
             return
         except Exception as exc:
             logger.exception("Agent end failed: %s", exc)

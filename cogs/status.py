@@ -617,6 +617,18 @@ def _format_timedelta(ts: datetime) -> str:
 
 def _derive_api_health(logs) -> str:
     """Return a health string derived from our own success/error logs."""
+    # Prefer explicit offline signal when the last failure is newer than last success.
+    if logs.last_failure_kind == "offline" and logs.last_error_time is not None:
+        err_ts = logs.last_error_time
+        if err_ts.tzinfo is None:
+            err_ts = err_ts.replace(tzinfo=UTC)
+        ok_ts = logs.last_success_time
+        if ok_ts is None or (
+            (ok_ts.replace(tzinfo=UTC) if ok_ts.tzinfo is None else ok_ts) < err_ts
+        ):
+            detail = logs.last_failure_detail or "offline"
+            return f"❌ Offline ({detail})"
+
     if logs.last_success_time is None:
         return "❓ No activity this session"
     ts = logs.last_success_time
@@ -661,6 +673,11 @@ async def get_gptstatus_embed(guild_id: int | None = None, bot=None):
         _format_timedelta(logs.last_success_time) if logs.last_success_time else "—"
     )
     last_error_str = logs.last_error_type or "None"
+    if logs.last_failure_kind:
+        detail = logs.last_failure_detail or logs.last_failure_kind
+        last_error_str = f"`{logs.last_failure_kind}` ({detail})"
+        if logs.last_error_type:
+            last_error_str = f"{last_error_str}\n{logs.last_error_type}"
     last_error_time_str = (
         _format_timedelta(logs.last_error_time) if logs.last_error_time else "—"
     )

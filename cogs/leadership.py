@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.app_commands import checks as app_checks
 from discord.ext import commands
 
+from gpt.errors import GrokUnavailableError, grok_user_message
 from gpt.helpers import ask_gpt, log_gpt_error
 from utils.logger import logger
 from utils.supabase_client import (
@@ -91,6 +92,8 @@ class ChallengeSelect(discord.ui.Select):
                     )
 
             asyncio.create_task(_store_insight())
+        except GrokUnavailableError as e:
+            await interaction.followup.send(grok_user_message(e), ephemeral=True)
         except Exception as e:
             logger.exception(f"Unhandled Grok error (ChallengeSelect) by {interaction.user}: {e}")
             # ask_gpt() already logs errors internally
@@ -173,6 +176,8 @@ class AskQuestionButton(discord.ui.Button):
 
             asyncio.create_task(_store_question_insight())
 
+        except GrokUnavailableError as e:
+            await interaction.followup.send(grok_user_message(e), ephemeral=True)
         except Exception as e:
             # ask_gpt() already logs all its errors internally, so we don't log again
             logger.exception(f"Unhandled Grok error (AskQuestionButton) by {interaction.user}: {e}")
