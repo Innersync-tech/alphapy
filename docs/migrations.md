@@ -222,6 +222,7 @@ Tables added across all migrations:
 | `022_api_observability_tables` | Creates/ensures `audit_logs` and `health_check_history` + indexes; adds `idx_reminders_event_time` for scheduler/filter performance. Also aligns startup so schema creation is migration-driven (no runtime DDL in API lifespan). |
 | `023_alphapy_discord_links` | Adds `alphapy_discord_links` table for Innersync UUID ↔ Discord snowflake mapping used by `/link`, API reminder resolution, and Discord identity webhooks. |
 | `024_agent_session_usage` | Adds `agent_session_usage` for per-user daily `/agent start` quota (tier-based limits in `utils/premium_tiers.py`). |
+| `025_growth_checkins_content` | Adds `goal` / `obstacle` / `feeling` / `grok_response` on `growth_checkins` for plaintext `/growthhistory` (must not use encrypted Supabase vault `reflections`). |
 
 ## References
 

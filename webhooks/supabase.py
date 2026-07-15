@@ -49,6 +49,7 @@ async def _purge_railway_data(pool, discord_id: int, supabase_user_id: str) -> N
         ("automod_logs", "user_id"),
         ("automod_user_history", "user_id"),
         ("app_reflections", "user_id"),
+        ("growth_checkins", "user_id"),       # /growthcheckin plaintext history
     ]
     tables_to_anonymize = [
         ("reminders", "created_by"),

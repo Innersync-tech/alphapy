@@ -231,6 +231,26 @@ Plaintext reflections received from the App via Core-API webhook. Used for Grok 
 
 ---
 
+### `growth_checkins`
+
+Per-guild activity log and plaintext content for Discord `/growthcheckin` / `/growthhistory`.
+
+**Columns:**
+- `id` (BIGSERIAL, PRIMARY KEY)
+- `guild_id` (BIGINT, NOT NULL): Discord guild ID (`0` when invoked outside a guild)
+- `user_id` (BIGINT, NOT NULL): Discord user snowflake
+- `shared` (BOOLEAN, NOT NULL, DEFAULT FALSE): Whether the check-in was shared to the growth channel
+- `goal` / `obstacle` / `feeling` / `grok_response` (TEXT, nullable): Check-in content (migration `025`)
+- `created_at` (TIMESTAMPTZ, NOT NULL, DEFAULT NOW())
+
+**Indexes:** `idx_growth_checkins_guild_id`, `idx_growth_checkins_created_at`, `idx_growth_checkins_user_created` on `(user_id, created_at DESC)`.
+
+**Notes:**
+- Content is stored on Railway so `/growthhistory` never depends on zero-knowledge encrypted Supabase `reflections`.
+- Purged on GDPR erasure (`/delete_my_data` and Supabase `USER_DELETED`).
+
+---
+
 ### `alphapy_discord_links`
 
 Maps Supabase Auth user id (Innersync UUID) to a Discord snowflake for Alphapy and the HTTP API. There is no database-level foreign key to Supabase `users` (different host); integrity is enforced when Core confirms a link via webhook.

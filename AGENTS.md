@@ -60,12 +60,16 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🌱 Agent: GrowthCheckIn
+- **Path**: `cogs/growth.py`
 - **Purpose**: Personal growth guidance via Grok, with optional community sharing
-- **Command**: `/growthcheckin`
+- **Commands**: `/growthcheckin`, `/growthhistory`
 - **Premium**: Mockingbird spicy mode for premium users
 - **Reflection context**: Past reflections (Supabase `reflections_shared` + `app_reflections`) are automatically injected into the Grok prompt via `ask_gpt(include_reflections=True)`. The prompt explicitly instructs Grok to reference recurring patterns and progress.
 - **Sharing**: After the AI response, users see a `GrowthShareView` (ephemeral) with three options: share anonymously, share with display name, or keep private. The share posts a Discord embed (goal / obstacle / feeling / Grok response) to the configured `growth.log_channel_id`. If no channel is configured, the share option is not shown.
+- **History**: `/growthhistory` reads plaintext rows from Railway `growth_checkins` (migration `025`). It does **not** read Supabase `reflections` — App vault fields may be zero-knowledge encrypted and are not decryptable by the bot.
+- **Storage**: Each `/growthcheckin` inserts `goal` / `obstacle` / `feeling` / `grok_response` into Railway `growth_checkins`; optional Supabase `reflections` sync remains for AI context when a profile is linked.
 - **Admin config**: `/growth set_channel [#channel]` — provide a channel to set it, or omit to clear the configuration.
+- **GDPR**: `growth_checkins` purged with other Railway PII via `/delete_my_data` and Supabase `USER_DELETED`.
 
 ---
 
