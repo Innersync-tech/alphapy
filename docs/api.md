@@ -100,14 +100,6 @@ Returns rolling in-memory request metrics for API and webhook traffic:
 - latency percentiles (`p50`, `p95`, `p99`)
 - request counts
 
-#### `GET /api/hermit/growth-checkins`
-
-Service-key broker for Core/Hermit progress loops. Reads Railway `growth_checkins` (plaintext Discord `/growthcheckin` content). Requires `X-API-Key` = Alphapy `API_KEY`.
-
-Query: `user_id` (Discord snowflake), optional `lookback_days` (default 30), `limit` (default 20).
-
-Response includes `source: "railway"` and `items[]` with `content` shaped as `Goal:` / `Obstacle:` / `Feeling:` lines plus optional `future_message` (Grok reply).
-
 **Response:**
 ```json
 {
@@ -136,6 +128,33 @@ All responses now include an `X-Request-ID` header for request correlation.
 - `active_commands_24h`: Number of commands executed in last 24 hours (optional)
 - `gpt_status`: Grok/LLM service status (`operational`, `degraded`, `error`) (optional)
 - `database_pool_size`: Current size of the database connection pool (managed automatically by `asyncpg`)
+
+#### `GET /api/hermit/growth-checkins`
+
+Service-key broker for Core/Hermit progress loops. Reads Railway `growth_checkins` (plaintext Discord `/growthcheckin` content). Requires `X-API-Key` = Alphapy `API_KEY`. Does **not** read Supabase vault `reflections`.
+
+**Query Parameters:**
+- `user_id` (required): Discord snowflake
+- `lookback_days` (optional, default: 30, max: 180)
+- `limit` (optional, default: 20, max: 100)
+
+**Response:**
+```json
+{
+  "source": "railway",
+  "items": [
+    {
+      "id": "42",
+      "created_at": "2026-07-15T18:00:00Z",
+      "type": "growthcheckin",
+      "content": "Goal: ship the vault copy\nObstacle: scope creep\nFeeling: focused",
+      "future_message": "One micro-step: finish the Files tab note."
+    }
+  ]
+}
+```
+
+`content` is assembled as `Goal:` / `Obstacle:` / `Feeling:` lines. `future_message` is the optional Grok reply (`grok_response`). Core brokers this via `GET /integrations/hermit/growthcheckins` (preferred Railway source).
 
 #### `GET /api/health/history`
 
