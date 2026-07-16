@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -32,7 +32,7 @@ class GrowthCheckinItem(BaseModel):
     created_at: datetime
     content: str
     type: Literal["growthcheckin"] = "growthcheckin"
-    future_message: Optional[str] = None
+    future_message: str | None = None
 
 
 class GrowthCheckinsResponse(BaseModel):
@@ -62,7 +62,7 @@ async def get_growth_checkins_for_hermit(
     if pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    since = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    since = datetime.now(UTC) - timedelta(days=lookback_days)
     discord_id = int(user_id)
 
     async with pool.acquire() as conn:
@@ -100,14 +100,14 @@ async def get_growth_checkins_for_hermit(
             continue
         created = row["created_at"]
         if not isinstance(created, datetime):
-            created = datetime.now(timezone.utc)
+            created = datetime.now(UTC)
         elif created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+            created = created.replace(tzinfo=UTC)
         grok = row["grok_response"]
         items.append(
             GrowthCheckinItem(
                 id=str(row["id"]),
-                created_at=created.astimezone(timezone.utc),
+                created_at=created.astimezone(UTC),
                 content=content[:4000],
                 future_message=(str(grok)[:2000] if grok else None),
             )

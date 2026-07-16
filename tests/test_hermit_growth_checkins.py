@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -27,7 +27,7 @@ def test_hermit_growth_checkins_returns_railway_rows(monkeypatch) -> None:
     monkeypatch.setattr(config, "API_KEY", "svc-secret", raising=False)
     from api import app
 
-    created = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    created = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
     row = {
         "id": 42,
         "created_at": created,
