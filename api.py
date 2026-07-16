@@ -320,6 +320,10 @@ app.include_router(discord_link_webhook_router)
 app.include_router(founder_webhook_router)
 app.include_router(legal_update_webhook_router)
 
+from hermit_api import router as hermit_broker_router  # noqa: E402
+
+app.include_router(hermit_broker_router)
+
 # CORS settings
 _allowed_origins = getattr(config, "ALLOWED_ORIGINS", [])
 app.add_middleware(

@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **DB migration 025**: `growth_checkins.goal` / `obstacle` / `feeling` / `grok_response` + index on `(user_id, created_at DESC)` for `/growthhistory` and the control-panel Growth tab.
+- **`GET /api/hermit/growth-checkins`** — service-key broker for Core/Hermit; returns plaintext Railway `growth_checkins` (canonical Discord growth store).
 
 ### Changed
 - **Docs audit (#308)** — AGENTS.md, `docs/api.md`, `docs/commands.md`, `docs/configuration.md`, `docs/database-schema.md`, `docs/alphapy-agents-architecture.md`, and `ARCHITECTURE.md` aligned with shared DB pool, post-connect guild sync, agent session REST API, verification queue, pattern loader, and reminder identity resolution.
