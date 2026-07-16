@@ -65,25 +65,37 @@ async def get_growth_checkins_for_hermit(
     since = datetime.now(UTC) - timedelta(days=lookback_days)
     discord_id = int(user_id)
 
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT id, created_at, goal, obstacle, feeling, grok_response
-            FROM growth_checkins
-            WHERE user_id = $1
-              AND created_at >= $2
-              AND (
-                    COALESCE(goal, '') <> ''
-                 OR COALESCE(obstacle, '') <> ''
-                 OR COALESCE(feeling, '') <> ''
-              )
-            ORDER BY created_at DESC
-            LIMIT $3
-            """,
-            discord_id,
-            since,
-            limit,
-        )
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, created_at, goal, obstacle, feeling, grok_response
+                FROM growth_checkins
+                WHERE user_id = $1
+                  AND created_at >= $2
+                  AND (
+                        COALESCE(goal, '') <> ''
+                     OR COALESCE(obstacle, '') <> ''
+                     OR COALESCE(feeling, '') <> ''
+                  )
+                ORDER BY created_at DESC
+                LIMIT $3
+                """,
+                discord_id,
+                since,
+                limit,
+            )
+    except Exception as exc:  # noqa: BLE001 — surface schema/runtime clearly
+        msg = str(exc).lower()
+        if "goal" in msg or "obstacle" in msg or "feeling" in msg or "does not exist" in msg:
+            raise HTTPException(
+                status_code=503,
+                detail="growth_checkins content columns missing — run Alembic migration 025",
+            ) from exc
+        raise HTTPException(
+            status_code=503,
+            detail="growth_checkins query failed",
+        ) from exc
 
     items: list[GrowthCheckinItem] = []
     for row in rows:

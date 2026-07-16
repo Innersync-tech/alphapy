@@ -58,3 +58,48 @@ def test_hermit_growth_checkins_returns_railway_rows(monkeypatch) -> None:
     assert len(body["items"]) == 1
     assert "Goal: sleep better" in body["items"][0]["content"]
     assert body["items"][0]["future_message"] == "Rest is momentum."
+
+
+def _pool_fetch_raises(exc: Exception) -> MagicMock:
+    conn = AsyncMock()
+    conn.fetch = AsyncMock(side_effect=exc)
+    conn.__aenter__ = AsyncMock(return_value=conn)
+    conn.__aexit__ = AsyncMock(return_value=None)
+    pool = MagicMock()
+    pool.acquire = MagicMock(return_value=conn)
+    return pool
+
+
+def test_hermit_growth_checkins_missing_columns_returns_503(monkeypatch) -> None:
+    monkeypatch.setattr(config, "API_KEY", "svc-secret", raising=False)
+    from api import app
+
+    client = TestClient(app)
+    with patch(
+        "api.db_pool",
+        _pool_fetch_raises(Exception('column "goal" of relation "growth_checkins" does not exist')),
+    ):
+        response = client.get(
+            "/api/hermit/growth-checkins",
+            params={"user_id": "123456789012345678"},
+            headers={"X-API-Key": "svc-secret"},
+        )
+
+    assert response.status_code == 503
+    assert "migration 025" in response.json()["detail"]
+
+
+def test_hermit_growth_checkins_generic_query_failure_returns_503(monkeypatch) -> None:
+    monkeypatch.setattr(config, "API_KEY", "svc-secret", raising=False)
+    from api import app
+
+    client = TestClient(app)
+    with patch("api.db_pool", _pool_fetch_raises(Exception("connection reset"))):
+        response = client.get(
+            "/api/hermit/growth-checkins",
+            params={"user_id": "123456789012345678"},
+            headers={"X-API-Key": "svc-secret"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "growth_checkins query failed"
