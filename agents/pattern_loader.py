@@ -24,12 +24,14 @@ async def _fetch_pattern_nodes(innersync_user_id: str, limit: int = 5) -> list[d
     except SupabaseConfigurationError:
         return []
 
+    # Over-fetch then drop ops tallies so user progress still fills the context window.
+    fetch_limit = max(limit * 3, 15)
     path = (
         f"/rest/v1/{_GRAPH_NODES_TABLE}"
         f"?innersync_user_id=eq.{innersync_user_id}"
         f"&node_type=eq.pattern"
         f"&order=usage_count.desc,updated_at.desc"
-        f"&limit={limit}"
+        f"&limit={fetch_limit}"
         f"&select=label,body_md,memory_tree_path,usage_count,metadata"
     )
     try:
@@ -37,7 +39,28 @@ async def _fetch_pattern_nodes(innersync_user_id: str, limit: int = 5) -> list[d
     except Exception as exc:
         logger.debug("Pattern node fetch failed: %s", exc)
         return []
-    return rows if isinstance(rows, list) else []
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if not _is_ops_telemetry_node(row)][:limit]
+
+
+def _is_ops_telemetry_node(node: dict[str, Any]) -> bool:
+    """Skip Hermit gpt_command / agents/ tallies — only user progress belongs in prompts."""
+    meta = node.get("metadata") if isinstance(node.get("metadata"), dict) else {}
+    kind = str(meta.get("kind") or "").strip().lower()
+    source = str(meta.get("source") or "").strip().lower()
+    if kind == "user_progress" or source == "growthcheckin":
+        return False
+    path = str(node.get("memory_tree_path") or "").lstrip("/").lower()
+    if path.startswith("agents/"):
+        return True
+    label = str(node.get("label") or "").strip().lower()
+    if label.endswith(" dominance") or "gpt_command" in label:
+        return True
+    if meta.get("event_type") and kind != "user_progress":
+        return True
+    body = str(node.get("body_md") or "").lower()
+    return "ops event snapshot" in body or "dominant event:" in body
 
 
 async def load_pattern_context(
