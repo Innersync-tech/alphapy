@@ -468,11 +468,25 @@ Be conservative - only flag clear violations."""
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 log.error(f"AI moderation: failed to parse response: {e}")
                 return RuleResult(False, 0.0, "AI analysis parse error", {'error': str(e)})
-                
+
         except Exception as e:
+            from gpt.errors import GrokUnavailableError
+
+            if isinstance(e, GrokUnavailableError):
+                log.warning(
+                    "AI moderation: Grok unavailable kind=%s detail=%s",
+                    e.kind.value,
+                    e.operator_detail,
+                )
+                return RuleResult(
+                    False,
+                    0.0,
+                    "AI analysis unavailable",
+                    {"kind": e.kind.value},
+                )
             log.error(f"AI moderation error: {e}")
             # Fail open - don't block on AI errors
-            return RuleResult(False, 0.0, f"AI error: {str(e)}", {'error': str(e)})
+            return RuleResult(False, 0.0, "AI analysis unavailable", {'error': type(e).__name__})
         
     async def create_rule(self, guild_id: int, rule_type: str, name: str, config: dict, 
                          action_type: str, action_config: dict, created_by: int, is_premium: bool = False) -> int:
