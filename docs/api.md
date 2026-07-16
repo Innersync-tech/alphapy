@@ -100,6 +100,14 @@ Returns rolling in-memory request metrics for API and webhook traffic:
 - latency percentiles (`p50`, `p95`, `p99`)
 - request counts
 
+#### `GET /api/hermit/growth-checkins`
+
+Service-key broker for Core/Hermit progress loops. Reads Railway `growth_checkins` (plaintext Discord `/growthcheckin` content). Requires `X-API-Key` = Alphapy `API_KEY`.
+
+Query: `user_id` (Discord snowflake), optional `lookback_days` (default 30), `limit` (default 20).
+
+Response includes `source: "railway"` and `items[]` with `content` shaped as `Goal:` / `Obstacle:` / `Feeling:` lines plus optional `future_message` (Grok reply).
+
 **Response:**
 ```json
 {
