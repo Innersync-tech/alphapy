@@ -70,3 +70,4 @@ SYSTEM_INTEGRATION_ANALYSIS.md
 ZERO_KNOWLEDGE_CROSS_MODULE_STRATEGY.md
 .gitnexus/
 .claude/
+.repoly/audit.jsonl
