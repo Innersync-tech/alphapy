@@ -14,7 +14,7 @@ except ImportError:
 
 from agents.base import AgentResult
 from agents.fatigue import should_prompt_fatigue_check
-from agents.fatigue_ui import FatigueQuickCheckView
+from agents.fatigue_ui import FatigueQuickCheckView, register_pending_fatigue_start
 from agents.memory import get_active_session, get_session_messages
 from agents.registry import list_agents, resolve_agent
 from agents.runtime import (
@@ -158,8 +158,7 @@ class AgentGroup(app_commands.Group):
             prompt_fatigue = False
 
         if prompt_fatigue:
-            view = FatigueQuickCheckView(
-                cog,
+            register_pending_fatigue_start(
                 innersync_user_id=innersync_id,
                 discord_user_id=discord_user_id,
                 guild_id=guild_id,
@@ -170,7 +169,7 @@ class AgentGroup(app_commands.Group):
                 "**Quick energy check-in** — How is your energy right now? "
                 "This helps your reflection agent pace the session. "
                 "You can also set this in Innersync App → Settings → Agent memory.",
-                view=view,
+                view=FatigueQuickCheckView(),
                 ephemeral=True,
             )
             return

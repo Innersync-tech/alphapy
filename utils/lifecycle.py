@@ -283,10 +283,13 @@ class StartupManager:
         if not hasattr(self.bot, "start_time"):
             self.bot.start_time = time.time()
         
-        # Add GDPR view
+        # Add persistent views (survive process restart for button custom_ids)
+        from agents.fatigue_ui import FatigueQuickCheckView
         from cogs.gdpr import GDPRView
+
         self.bot.add_view(GDPRView(self.bot))
-        
+        self.bot.add_view(FatigueQuickCheckView())
+
         logger.info(f"  ✅ {self.bot.user} is ready! Intents actief: {self.bot.intents}")
         
         # Guilds may not be fully loaded yet at this point (they load after connect)
