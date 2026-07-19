@@ -322,8 +322,6 @@ The following environment variables are required/optional for bot operation:
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase anonymous key
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key
-- `APP_ENV`: Runtime environment (`development` or `production`)
-- `STRICT_SECURITY_MODE`: Set to `1` to enforce production security requirements at startup (fails fast when critical auth/webhook secrets are missing in production)
 - `APP_ENV`: Runtime environment (`development` by default). Use `production` on production deployments.
 - `STRICT_SECURITY_MODE`: Set to `1` to enforce production hardening checks at startup (`APP_ENV=production` required). Startup fails when auth and webhook secret requirements are not met.
 - `ALLOWED_ORIGINS`: Comma-separated CORS origins. If omitted, defaults to trusted application origins from config.
@@ -331,6 +329,13 @@ The following environment variables are required/optional for bot operation:
 ### Optional - AI/LLM
 - `GROK_API_KEY`: Grok API key (or `OPENAI_API_KEY` for OpenAI)
 - `LLM_PROVIDER`: "grok" or "openai" (default: "grok")
+
+When users see calm “temporarily unavailable” copy from Grok-powered commands, operators should check `/gptstatus` for `last_failure_kind` (`offline` vs `rate_limited`) and detail. Taxonomy lives in `gpt/errors.py`.
+
+### Optional - Outbound dashboard webhooks (Alphapy → Alphapy-Dashboard)
+- `DASHBOARD_BASE_URL`: Base URL of the bot control panel (e.g. `https://dashboard.alphapy.innersync.tech`). When unset, outbound forwards are no-ops.
+- `REFLECTION_WEBHOOK_SECRET`: HMAC secret for forwarding reflection upsert events to `{DASHBOARD_BASE_URL}/api/webhooks/*` (`utils/dashboard_webhooks.py`).
+- `GDPR_WEBHOOK_SECRET`: HMAC secret for revoke-reflection / related GDPR forwards to the dashboard.
 
 ### Optional - Core API (telemetry / operational events)
 - `CORE_API_URL`: Base URL of the Core API for centralised telemetry and operational event ingress. When set, operational events and telemetry are sent to Core instead of directly to Supabase.

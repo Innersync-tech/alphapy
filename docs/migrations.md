@@ -192,7 +192,7 @@ If a migration fails partway through:
 
 ## Current Schema
 
-**Current migration head:** `024_agent_session_usage`
+**Current migration head:** `025_growth_checkins_content`
 
 Tables added across all migrations:
 

@@ -552,7 +552,7 @@ All pool usage includes connection timeout handling, graceful shutdown, and heal
 
 All schema changes are managed via Alembic migrations. See [Migrations guide](../migrations/) for migration workflow.
 
-**Current Migration Head:** `024_agent_session_usage`
+**Current Migration Head:** `025_growth_checkins_content`
 
 To view current schema state:
 ```bash

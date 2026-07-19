@@ -40,7 +40,7 @@ Tiered memory model, derived insights, and multi-turn Discord sessions — witho
 - Alphapy [#255](https://github.com/Innersync-tech/alphapy/pull/255) (2.1), [#256](https://github.com/Innersync-tech/alphapy/pull/256) (2.2), [#257](https://github.com/Innersync-tech/alphapy/pull/257) (2.3)
 
 #### Deferred (Phase 4.0)
-- `POST /api/agents/run` — App-triggered agent runs (separate from 2.3)
+- App-triggered agent runs via REST — shipped as `/api/agents/sessions*` (not a separate `POST /api/agents/run`)
 
 ---
 
@@ -118,13 +118,13 @@ This release completes the verification workflow with full admin controls and AI
 
 #### What's New
 - **Verification — manual approve/reject**: `ManualReviewView` with admin Approve/Reject buttons posted when AI flags a screenshot for manual review; reject opens a modal for optional reason
-- **Verification — reference image**: Admins can set a reference payment screenshot via `/config verification set_reference_image`; the AI compares both images on every submission
-- **Verification — AI prompt context**: `/config verification set_ai_prompt_context` lets admins tell the AI what a valid payment looks like for their community
+- **Verification — reference image**: Admins can set a reference payment screenshot via `/verification set_reference_image`; the AI compares both images on every submission
+- **Verification — AI prompt context**: `/verification set_ai_prompt_context` lets admins tell the AI what a valid payment looks like for their community
 - **Verification — channel auto-delete**: Verification channels are deleted 5 seconds after resolution instead of being left locked/renamed
 - **Verification — audit trail**: `resolved_by_user_id` and `rejection_reason` columns added to `verification_tickets`
 - **`/growthcheckin`**: Optional community sharing (anonymous or named) to a configured growth channel
 - **`/growthhistory`**: Paginated view of last 15 check-ins with full detail modal and per-entry deletion
-- **`/config growth set_channel`**: Configure the community growth channel with optional channel picker
+- **`/growth set_channel`**: Configure the community growth channel with optional channel picker
 
 #### Bug Fixes
 - **Verification AI pipeline**: `ask_gpt_vision` now respects the caller's explicit model — guild `gpt.model` setting was overriding to a text-only model, silently breaking all image analysis
@@ -141,7 +141,7 @@ This release expands moderation capabilities, improves privacy-aware reflection 
 
 #### What's New
 - **Auto-Moderation System:**
-  - New moderation engine with configurable rule types and actions (`/config automod ...`)
+  - New moderation engine with configurable rule types and actions (`/automod ...`)
   - Rule coverage for spam, bad words, links, mentions, caps, duplicate content, regex (premium), and AI moderation (premium)
   - Database-backed moderation logs, stats, and user history with migration-backed schema
 - **App Reflections Webhooks:**
