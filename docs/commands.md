@@ -635,6 +635,8 @@ Reload the FAQ index (admin only). Use after bulk changes or imports.
 
 ## AI Features
 
+**Grok outage UX:** When Grok is unavailable (credits, bad/missing key, 5xx, network), user-facing flows (`/growthcheckin`, `/agent`, tickets, verification, `/learn_topic`, `/create_caption`, leadership) show calm offline copy (`ERR_GROK_OFFLINE`) instead of raw provider errors. Rate limits use distinct copy (`ERR_GROK_RATE_LIMITED`). Operators should check `/gptstatus` for `last_failure_kind` / detail after users report “temporarily unavailable”.
+
 ### `/growthcheckin`
 Grok-powered check-in for goals, obstacles, and emotions.
 
@@ -719,6 +721,8 @@ Start a multi-turn reflection agent session (first turn).
 - `message` (optional): Focus question or topic for the agent
 
 **Behavior:** Creates an `active` session, gathers skill context, runs Grok, stores the turn in `agent_session_messages`, and returns an ephemeral embed. Session stays open until `/agent end`.
+
+**Energy check-in (optional):** When your energy self-report is missing or older than 24 hours, the bot first sends an ephemeral **Quick energy check-in** (buttons `1`–`5` + **Skip**). Choosing a level saves Tier 1 `agent_prefs` (`energy_level` / `fatigue_reported_at`) then starts the session; Skip starts without updating prefs. You can also set energy in Innersync App → Settings → Agent memory. Buttons use a persistent View (`alphapy:fatigue:*`); after a bot redeploy an old prompt may expire — run `/agent start` again.
 
 **Example:**
 ```
@@ -821,7 +825,9 @@ Show Innersync info and official links.
 ### `/gptstatus`
 Check the status of the Grok/LLM API.
 
-**Response:** Shows API health (derived from own logs), current model, uptime, last success time, rolling average latency, last triggering user, last error type and time, interaction counts (success/error), rate limit hits this session, live retry queue size, and total tokens used this session.
+**Response:** Shows API health (derived from own logs), current model, uptime, last success time, rolling average latency, last triggering user, interaction counts (success/error), rate limit hits this session, live retry queue size, and total tokens used this session.
+
+**Failure taxonomy:** When Grok fails, the embed’s last-error field includes `last_failure_kind` such as `` `offline` `` (credits, bad/missing key, 5xx, network) or `` `rate_limited` ``, plus operator detail for admins. Health can show `❌ Offline ({detail})` when the latest `offline` failure is newer than the last success (see `gpt/errors.py` and `cogs/status.py`).
 
 ---
 

@@ -76,10 +76,11 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🤖 Agent: AlphapyAgents (multi-user closed loop)
-- **Path**: `agents/`, `cogs/agents.py`, `docs/alphapy-agents-architecture.md`
+- **Path**: `agents/`, `cogs/agents.py`, `agents/fatigue_ui.py`, `docs/alphapy-agents-architecture.md`
 - **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal **Hermes** (Nous Research) on VPS
 - **Commands**: `/agent list`, `/agent start`, `/agent continue`, `/agent end`, `/agent status`
 - **Admin config**: `/config agents show`, `/config agents toggle`
+- **Energy check-in**: When energy prefs are missing or older than 24h, `/agent start` shows an ephemeral 1–5 + Skip prompt (`FatigueQuickCheckView`). Persistent View (`timeout=None`, `alphapy:fatigue:*` custom_ids) registered in `utils/lifecycle.py` Phase 6; pending start state is in-process (120s TTL). After redeploy, expired prompts ask the user to run `/agent start` again.
 - **Safety policy**: `agents/policy.py` (`AGENT_SAFETY_RULES` + `build_agent_system_prompt()`); see `docs/agents-safety-guidelines.md` and [Innersync-meta AGENT-SAFETY-POLICY](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md)
 - **Agents**: `reflection` (journal sync; trade agents deferred)
 - **Skills**: `inner_voice`, `inner_critic_dialogue`, `avoidance_processor`, `fatigue_check`, `chain_breaker_micro`, `journal_sync` (`trade_insight` skill file kept dormant for later)
@@ -187,9 +188,9 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🌐 API Agent: FastAPI Dashboard Endpoint
-- **Path**: `api.py`, `agents/http_routes.py`
-- **Purpose**: Exposes reminders, agent sessions, and realtime metrics for Mind/App
-- **Endpoints**: `/api/reminders/*`, `/api/agents/sessions*`, `/api/dashboard/metrics`, `/api/dashboard/logs`
+- **Path**: `api.py`, `agents/http_routes.py`, `hermit_api.py`
+- **Purpose**: Exposes reminders, agent sessions, Hermit broker data, and realtime metrics for Mind/App/Core
+- **Endpoints**: `/api/reminders/*`, `/api/agents/sessions*`, `/api/hermit/growth-checkins` (service `API_KEY`), `/api/dashboard/metrics`, `/api/dashboard/logs`
 
 ---
 

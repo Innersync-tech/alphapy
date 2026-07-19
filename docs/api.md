@@ -20,6 +20,7 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 - **Onboarding Management**: Questions, rules, and flow configuration (`/api/dashboard/{guild_id}/onboarding/*`)
 - **Reminder Management**: User-facing reminder CRUD operations (requires Supabase JWT subject match)
 - **Agent Sessions**: Cross-platform `/agent` REST API for App/Mind (requires Supabase JWT + Discord link)
+- **Hermit broker**: Core/Hermit progress data from Railway (`/api/hermit/*`; service `X-API-Key` = `API_KEY`)
 - **Verification Queue**: Dashboard manual-review tickets (requires dashboard Discord admin auth)
 - **Exports**: CSV export endpoints for tickets and FAQ
 - **Webhooks**: Incoming webhooks from Core-API and GitHub Actions; validated via `X-Webhook-Signature` (includes app-reflections, discord-link, premium-invalidate, founder, legal-update)
@@ -34,7 +35,7 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 
 Most endpoints require authentication via:
 - **Supabase JWT**: `Authorization: Bearer <token>` (required for user-scoped and dashboard endpoints)
-- **API Key**: `X-API-Key` (used for internal service endpoints such as `/api/observability`)
+- **API Key**: `X-API-Key` (used for internal service endpoints such as `/api/observability` and `/api/hermit/growth-checkins`)
 
 Important:
 - User identity is derived from verified JWT claims (`sub`) only.
@@ -155,6 +156,10 @@ Service-key broker for Core/Hermit progress loops. Reads Railway `growth_checkin
 ```
 
 `content` is assembled as `Goal:` / `Obstacle:` / `Feeling:` lines. `future_message` is the optional Grok reply (`grok_response`). Core brokers this via `GET /integrations/hermit/growthcheckins` (preferred Railway source).
+
+**Errors:**
+- `401`: Missing or invalid `X-API-Key`
+- `503`: `API_KEY` not configured; database pool unavailable; `growth_checkins` content columns missing (run Alembic migration `025`); or query failure
 
 #### `GET /api/health/history`
 
@@ -1145,6 +1150,7 @@ All endpoints may return standard HTTP error codes:
 - `400 Bad Request`: Invalid request parameters
 - `401 Unauthorized`: Missing or invalid authentication
 - `404 Not Found`: Resource not found
+- `503 Service Unavailable`: Dependency unavailable (e.g. Hermit broker when DB/API key/migration 025 columns are missing)
 - `500 Internal Server Error`: Server error
 
 Error response format:

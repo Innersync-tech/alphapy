@@ -109,10 +109,17 @@ cogs/agents.py     /agent list|start|continue|end|status
 | Command | Behavior |
 |---------|----------|
 | `/agent list` | Lists registered agents (`reflection`) |
-| `/agent start [message]` | First turn; session stays `active` |
+| `/agent start [message]` | First turn; session stays `active`. May prompt energy check-in first (see below). |
 | `/agent continue <message>` | Append a turn using session message history |
 | `/agent end` | Distill Tier 2, patch Tier 3, complete session, delete ephemeral messages |
 | `/agent status` | Active session start time + turn count |
+
+**Discord energy check-in (`agents/fatigue_ui.py`):**
+
+- Triggered when Tier 1 energy prefs are missing or older than 24h (`should_prompt_fatigue_check`)
+- Ephemeral buttons `1`–`5` + Skip; stable custom_ids `alphapy:fatigue:*`
+- Persistent View (`timeout=None`) registered in `utils/lifecycle.py` Phase 6 via `bot.add_view`
+- Pending `/agent start` context kept in-process for 120s; after restart, clicks ACK with “expired… run `/agent start` again”
 
 **Gates:**
 
@@ -245,7 +252,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 - [x] `journal_sync` skill (reflections opt-in + streaks)
 - [x] `inner_voice` skill — Tier 1 `agent_prefs.inner_voice` (App Settings)
 - [x] `inner_critic_dialogue`, `avoidance_processor`, `chain_breaker_micro` — Tier 2 dialogue skills + session insight snapshot
-- [x] `fatigue_check` skill — energy self-report in App + Discord quick check on `/agent start`
+- [x] `fatigue_check` skill — energy self-report in App + Discord quick check on `/agent start` (persistent View + 120s pending TTL; see §3)
 - [x] `POST /api/agents/sessions` (+ turns/complete) in `agents/http_routes.py` (Mind/App trigger)
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh
 - [x] Premium tier caps on `/agent start` (free 10/day, monthly 25/day, yearly/lifetime unlimited)

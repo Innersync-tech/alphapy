@@ -74,7 +74,7 @@ Minor release completing bot–dashboard schema parity and polishing the setting
 **Status:** ✅ **Fully Implemented & Released**
 
 Minor release converting GDPR management to slash commands and hardening the ticket and DB layers:
-- **GDPR**: `/config gdpr post` replaces `!postgdpr`; `/config gdpr set_acceptance_role` configures auto-role on consent; `utils/gdpr_helpers.py` extracted to avoid circular imports; migration 018 adds `guild_id` to `gdpr_acceptance`
+- **GDPR**: `/gdpr post` replaces `!postgdpr`; `/gdpr set_acceptance_role` configures auto-role on consent; `utils/gdpr_helpers.py` extracted to avoid circular imports; migration 018 adds `guild_id` to `gdpr_acceptance`
 - **Tickets**: Transcript (up to 500 messages) exported as `.txt` to log channel before channel deletion on archive
 - **Tickets**: `guild.fetch_channel()` replaces stale-cache `guild.get_channel()` for category validation; `HTTPException` guard on channel creation
 - **Tickets**: Panel embed copy made generic (community-agnostic)
@@ -121,7 +121,7 @@ Patch release focused entirely on security remediation from the 2026-04-13 inter
 Minor release completing the verification workflow and growth community features:
 - **Verification**: Manual approve/reject buttons for admin review, reference image comparison, AI prompt context setting, channel auto-delete on resolution, audit trail columns
 - **Verification AI pipeline**: Fixed vision model override bug (guild `gpt.model` was silently overriding vision model), fixed content types for xAI chat completions, updated default to `grok-4-1-fast-reasoning`
-- **Growth check-in**: Community sharing (anonymous/named) to configured channel, `/growthhistory` with paginated view + deletion, `/config growth set_channel` with picker
+- **Growth check-in**: Community sharing (anonymous/named) to configured channel, `/growthhistory` with paginated view + deletion, `/growth set_channel` with picker
 
 ## ✅ COMPLETED: Premium Tier Differentiation & GPT Quotas (v3.2.0)
 
@@ -166,7 +166,7 @@ Patch release focused on internal quality, security, and correctness:
 **Status:** ✅ **Fully Implemented & Released**
 
 Recent platform extensions shipped in v3.1.0:
-- **Auto-Moderation**: full `/config automod` command suite, moderation rule engine, DB-backed logs/stats/history, premium-gated advanced actions and AI analysis
+- **Auto-Moderation**: full `/automod` command suite, moderation rule engine, DB-backed logs/stats/history, premium-gated advanced actions and AI analysis
 - **Legal update automation**: workflow + webhook flow for Terms/Privacy updates (`POST /webhooks/legal-update`) with signed payload handling
 - **App reflections integration**: inbound reflection/revoke webhooks with privacy-safe context usage (user-self flows only; excluded from ticket suggestion flow)
 - **Operational cleanup**: branch naming/docs alignment to `main`, and tightened release hygiene around version references
