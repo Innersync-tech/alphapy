@@ -9,7 +9,7 @@ from typing import Any
 import discord
 
 from utils.logger import logger
-from utils.settings_helpers import is_module_enabled
+from utils.settings_helpers import is_module_enabled_async
 from utils.timezone import BRUSSELS_TZ
 
 FYI_SCOPE = "fyi"
@@ -138,7 +138,7 @@ async def send_fyi_if_first(
     if not hasattr(bot, "settings") or not hasattr(bot.settings, "get_raw"):
         return
 
-    if not is_module_enabled(bot, guild_id, "fyi"):
+    if not await is_module_enabled_async(bot, guild_id, "fyi"):
         return
 
     already = await bot.settings.get_raw(FYI_SCOPE, key, guild_id, fallback=None)

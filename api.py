@@ -3436,6 +3436,22 @@ async def invalidate_automod_rules_cache(
     return {"success": True}
 
 
+@router.post("/dashboard/{guild_id}/settings/invalidate-cache")
+async def invalidate_guild_settings_cache(
+    guild_id: int,
+    discord_admin_id: int = Depends(verify_dashboard_discord_admin),
+):
+    """Reload bot in-memory settings for a guild after Dashboard writes to bot_settings."""
+    del discord_admin_id
+    from gpt.helpers import bot_instance
+
+    settings = getattr(bot_instance, "settings", None) if bot_instance else None
+    if settings is None or not callable(getattr(settings, "reload_guild", None)):
+        raise HTTPException(status_code=503, detail="Bot settings service unavailable")
+    loaded = await settings.reload_guild(guild_id)
+    return {"success": True, "loaded": loaded}
+
+
 async def _resolve_verification_on_bot_loop(
     guild_id: int,
     ticket_id: int,

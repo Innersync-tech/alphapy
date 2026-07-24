@@ -18,7 +18,7 @@ from discord.ext import commands
 from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.embed_builder import EmbedBuilder
 from utils.sanitizer import safe_embed_text
-from utils.settings_helpers import is_module_enabled
+from utils.settings_helpers import is_module_enabled_async
 from utils.validators import validate_admin
 
 logger = logging.getLogger(__name__)
@@ -288,7 +288,7 @@ class CustomCommandsCog(commands.Cog):
         if not message.guild:
             return
 
-        if not is_module_enabled(self.bot, message.guild.id, "custom_commands"):
+        if not await is_module_enabled_async(self.bot, message.guild.id, "custom_commands"):
             return
 
         content = message.content

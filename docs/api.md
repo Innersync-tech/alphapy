@@ -688,6 +688,20 @@ Drop the in-memory AutoMod rules cache for a guild after dashboard direct DB wri
 }
 ```
 
+#### `POST /api/dashboard/{guild_id}/settings/invalidate-cache`
+
+Reload the bot's in-memory `bot_settings` snapshot for a guild after Dashboard writes (so Disable / `{scope}.enabled` takes effect without restart). Alphapy Dashboard calls this after settings save when `ALPHAPY_API_KEY` is configured. Module gates also call `ensure_fresh` (short TTL) as a fallback.
+
+**Authentication:** Required (`X-Api-Key` + `X-Discord-User-Id` with guild admin access; same as automod invalidate-cache)
+
+**Response:**
+```json
+{
+  "success": true,
+  "loaded": 12
+}
+```
+
 #### `GET /api/dashboard/{guild_id}/verification/queue`
 
 List verification tickets awaiting manual review (no screenshot content).

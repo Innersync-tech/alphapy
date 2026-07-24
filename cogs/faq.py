@@ -11,7 +11,7 @@ from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.logger import logger
-from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled_async
 from utils.validators import validate_admin
 
 SYNS: dict[str, list[str]] = {
@@ -131,7 +131,7 @@ class FAQ(commands.Cog):
         if not interaction.guild:
             return True
 
-        if not is_module_enabled(self.bot, interaction.guild.id, "faq"):
+        if not await is_module_enabled_async(self.bot, interaction.guild.id, "faq"):
             if interaction.response.is_done():
                 await interaction.followup.send(MODULE_DISABLED_MSG, ephemeral=True)
             else:

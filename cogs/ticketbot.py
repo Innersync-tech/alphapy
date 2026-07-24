@@ -17,7 +17,7 @@ from gpt.errors import GrokUnavailableError, grok_user_message
 from utils.cog_base import AlphaCog
 from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
-from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled_async
 from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
 from utils.validators import validate_admin
 
@@ -254,7 +254,7 @@ class TicketBot(AlphaCog):
             await interaction.response.send_message(ERR_GUILD_ONLY, ephemeral=True)
             return
 
-        if not is_module_enabled(self.bot, interaction.guild.id, "ticketbot"):
+        if not await is_module_enabled_async(self.bot, interaction.guild.id, "ticketbot"):
             await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
             return
 
@@ -461,7 +461,7 @@ class TicketBot(AlphaCog):
         await interaction.response.send_message("✅ Ticket panel posted.", ephemeral=True)
 
     async def create_ticket_for_user(self, interaction: discord.Interaction, description: str) -> None:
-        if interaction.guild and not is_module_enabled(self.bot, interaction.guild.id, "ticketbot"):
+        if interaction.guild and not await is_module_enabled_async(self.bot, interaction.guild.id, "ticketbot"):
             await interaction.followup.send(MODULE_DISABLED_MSG, ephemeral=True)
             return
 
@@ -1271,7 +1271,7 @@ class TicketBot(AlphaCog):
             for ticket in idle_tickets:
                 try:
                     guild_id = ticket["guild_id"]
-                    if not is_module_enabled(self.bot, guild_id, "ticketbot"):
+                    if not await is_module_enabled_async(self.bot, guild_id, "ticketbot"):
                         continue
                     user_id = ticket["user_id"]
                     ticket_id = ticket["id"]
@@ -1330,7 +1330,7 @@ class TicketBot(AlphaCog):
                 try:
                     ticket_id = ticket["id"]
                     guild_id = ticket["guild_id"]
-                    if not is_module_enabled(self.bot, guild_id, "ticketbot"):
+                    if not await is_module_enabled_async(self.bot, guild_id, "ticketbot"):
                         continue
                     channel_id = ticket.get("channel_id")
                     
@@ -1440,7 +1440,7 @@ class TicketActionView(discord.ui.View):
         self.cog = cog
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.guild and not is_module_enabled(self.bot, interaction.guild.id, "ticketbot"):
+        if interaction.guild and not await is_module_enabled_async(self.bot, interaction.guild.id, "ticketbot"):
             await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
             return False
         return True

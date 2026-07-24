@@ -6,13 +6,14 @@ boilerplate code across cogs. Provides type-safe getters with automatic
 coercion and caching.
 """
 
+import inspect
 import json
 from collections import OrderedDict
 from typing import Any
 
 from utils.db_helpers import acquire_transactional
 from utils.logger import logger
-from utils.settings_service import SettingsService
+from utils.settings_service import DEFAULT_GUILD_SETTINGS_TTL, SettingsService
 
 # Scopes whose `{scope}.enabled` defaults to False when unset.
 _MODULE_ENABLED_DEFAULT_FALSE = frozenset({"agents"})
@@ -27,6 +28,9 @@ def is_module_enabled(source: Any, guild_id: int, scope: str, *, fallback: bool 
 
     ``source`` may be a bot (with ``.settings`` / ``.settings_helper``) or a SettingsService.
     Default fallback is True for all scopes except ``agents`` (False).
+
+    For Discord gates after Dashboard writes, prefer ``is_module_enabled_async`` so the
+    in-memory settings snapshot is refreshed from ``bot_settings``.
     """
     if fallback is None:
         fallback = scope not in _MODULE_ENABLED_DEFAULT_FALSE
@@ -50,6 +54,53 @@ def is_module_enabled(source: Any, guild_id: int, scope: str, *, fallback: bool 
         return bool(value) if value is not None else fallback
     except Exception:
         return fallback
+
+
+async def is_module_enabled_async(
+    source: Any,
+    guild_id: int,
+    scope: str,
+    *,
+    fallback: bool | None = None,
+    ttl: float = DEFAULT_GUILD_SETTINGS_TTL,
+) -> bool:
+    """Like ``is_module_enabled``, but reloads guild settings from DB when stale.
+
+    On refresh failure: retries once with ``ttl=0``. If that also fails, returns
+    ``False`` (fail closed) so Dashboard Disable cannot be bypassed by a stale cache
+    during a transient DB error.
+
+    Non-awaitable ``ensure_fresh`` stubs (e.g. MagicMock in tests) are ignored.
+    """
+    settings = source if callable(getattr(source, "get", None)) else getattr(source, "settings", None)
+    ensure_fresh = getattr(settings, "ensure_fresh", None)
+    if callable(ensure_fresh):
+        async def _run_fresh(fresh_ttl: float) -> bool:
+            """Return True if refresh ran (or was skipped as non-awaitable); False on failure."""
+            try:
+                result = ensure_fresh(guild_id, ttl=fresh_ttl)
+                if inspect.isawaitable(result):
+                    await result
+                return True
+            except Exception as exc:
+                logger.warning(
+                    "settings ensure_fresh failed guild=%s scope=%s ttl=%s: %s",
+                    guild_id,
+                    scope,
+                    fresh_ttl,
+                    exc,
+                )
+                return False
+
+        if not await _run_fresh(ttl):
+            if not await _run_fresh(0):
+                logger.warning(
+                    "settings ensure_fresh retry failed guild=%s scope=%s; treating module as disabled",
+                    guild_id,
+                    scope,
+                )
+                return False
+    return is_module_enabled(source, guild_id, scope, fallback=fallback)
 
 
 class CachedSettingsHelper:
@@ -82,6 +133,9 @@ class CachedSettingsHelper:
             self._cache.pop(self._get_cache_key(scope, key, guild_id), None)
 
         settings.add_global_listener(_on_setting_changed)
+        add_reload = getattr(settings, "add_reload_listener", None)
+        if callable(add_reload):
+            add_reload(lambda guild_id: self.clear_cache(guild_id=guild_id))
     
     def _get_cache_key(self, scope: str, key: str, guild_id: int) -> tuple[str, str, int]:
         """Generate cache key from scope, key, and guild_id."""
