@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from collections.abc import Callable, Coroutine, Iterable
 from dataclasses import dataclass
 from typing import Any
@@ -13,6 +14,14 @@ from utils.operational_logs import EventType, log_operational_event
 SettingListener = Callable[[Any], Coroutine[Any, Any, None]]
 # Global listener receives (scope, key, guild_id, new_value) for every setting change.
 GlobalSettingListener = Callable[[str, str, int, Any], Coroutine[Any, Any, None]]
+# Fired after reload_guild so helpers can drop per-guild LRU entries.
+ReloadListener = Callable[[int], None]
+
+# How long ensure_fresh may reuse the last DB reload for a guild (seconds).
+DEFAULT_GUILD_SETTINGS_TTL = 2.0
+
+# Sentinel for "key was not present in old overrides" (identity-stable).
+_MISSING = object()
 
 
 def _unwrap_quoted_scalar_str(value: str) -> str:
@@ -47,6 +56,9 @@ class SettingsService:
         self._raw_overrides: dict[tuple[int, str, str], Any] = {}  # in-memory raw (e.g. fyi) when pool unavailable
         self._listeners: dict[tuple[str, str], list[SettingListener]] = {}
         self._global_listeners: list[GlobalSettingListener] = []
+        self._reload_listeners: list[ReloadListener] = []
+        self._guild_fresh_at: dict[int, float] = {}
+        self._reload_locks: dict[int, asyncio.Lock] = {}
         self._ready = False
 
     def register(self, definition: SettingDefinition) -> None:
@@ -158,6 +170,7 @@ class SettingsService:
             # Load existing settings
             rows = await conn.fetch("SELECT guild_id, scope, key, value FROM bot_settings")
             loaded_count = 0
+            loaded_guilds: set[int] = set()
             for row in rows:
                 composite_key = (row["guild_id"], row["scope"], row["key"])
                 definition = self._definitions.get((row["scope"], row["key"]))
@@ -168,7 +181,12 @@ class SettingsService:
                     continue  # Unknown setting stored earlier; ignore gracefully.
                 decoded = self._decode_value(row["value"], definition)
                 self._overrides[composite_key] = decoded
+                loaded_guilds.add(int(row["guild_id"]))
                 loaded_count += 1
+
+            now = time.monotonic()
+            for guild_id in loaded_guilds:
+                self._guild_fresh_at[guild_id] = now
 
             log_database_event("SETTINGS_LOADED", details=f"Loaded {loaded_count} settings from database")
 
@@ -187,6 +205,98 @@ class SettingsService:
             return fallback
 
         return definition.default
+
+    def _reload_lock_for(self, guild_id: int) -> asyncio.Lock:
+        lock = self._reload_locks.get(guild_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._reload_locks[guild_id] = lock
+        return lock
+
+    async def reload_guild(self, guild_id: int) -> int:
+        """Reload registered settings for one guild from ``bot_settings`` into memory.
+
+        Dashboard (and other) writers update Postgres directly; without this the bot
+        keeps startup-time overrides and ignores Disable / setting changes until restart.
+
+        Builds the new override map fully before swapping so concurrent ``get()`` never
+        observes a half-cleared guild.
+        """
+        if not self._pool:
+            self._guild_fresh_at[guild_id] = time.monotonic()
+            return 0
+
+        async with self._reload_lock_for(guild_id):
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch(
+                    "SELECT scope, key, value FROM bot_settings WHERE guild_id = $1",
+                    guild_id,
+                )
+
+            new_overrides: dict[tuple[int, str, str], Any] = {}
+            for row in rows:
+                definition = self._definitions.get((row["scope"], row["key"]))
+                if not definition:
+                    continue
+                composite = (guild_id, row["scope"], row["key"])
+                try:
+                    new_overrides[composite] = self._decode_value(row["value"], definition)
+                except Exception as exc:
+                    log_database_event(
+                        "SETTINGS_RELOAD_DECODE_FAILED",
+                        guild_id=guild_id,
+                        details=f"{row['scope']}.{row['key']}: {exc}",
+                    )
+
+            old_overrides = {
+                key: value for key, value in self._overrides.items() if key[0] == guild_id
+            }
+            # Single dict reassignment — no await between drop and apply (asyncio-safe).
+            self._overrides = {
+                key: value for key, value in self._overrides.items() if key[0] != guild_id
+            } | new_overrides
+
+            self._guild_fresh_at[guild_id] = time.monotonic()
+            for listener in self._reload_listeners:
+                try:
+                    listener(guild_id)
+                except Exception as exc:
+                    log_database_event(
+                        "SETTINGS_RELOAD_LISTENER_FAILED",
+                        guild_id=guild_id,
+                        details=str(exc),
+                    )
+
+            touched = set(old_overrides) | set(new_overrides)
+            for composite in touched:
+                _gid, scope, key = composite
+                new_value = self.get(scope, key, guild_id)
+                old_value = old_overrides.get(composite, _MISSING)
+                if old_value is _MISSING or old_value != new_value:
+                    await self._notify(scope, key, guild_id, new_value)
+
+            loaded = len(new_overrides)
+            log_database_event(
+                "SETTINGS_RELOADED",
+                guild_id=guild_id,
+                details=f"Reloaded {loaded} settings from database",
+            )
+            return loaded
+
+    async def ensure_fresh(
+        self,
+        guild_id: int,
+        *,
+        ttl: float = DEFAULT_GUILD_SETTINGS_TTL,
+    ) -> None:
+        """Reload guild settings from DB when the in-memory snapshot is older than ``ttl``."""
+        if guild_id <= 0:
+            return
+        now = time.monotonic()
+        last = self._guild_fresh_at.get(guild_id, 0.0)
+        if ttl > 0 and (now - last) < ttl:
+            return
+        await self.reload_guild(guild_id)
 
     def is_overridden(self, scope: str, key: str, guild_id: int = 0) -> bool:
         return (guild_id, scope, key) in self._overrides
@@ -448,6 +558,10 @@ class SettingsService:
     def add_global_listener(self, listener: GlobalSettingListener) -> None:
         """Register a listener that fires on every setting change with (scope, key, guild_id, value)."""
         self._global_listeners.append(listener)
+
+    def add_reload_listener(self, listener: ReloadListener) -> None:
+        """Register a sync callback invoked after ``reload_guild`` (guild_id)."""
+        self._reload_listeners.append(listener)
 
     async def _notify(self, scope: str, key: str, guild_id: int, value: Any) -> None:
         per_key = self._listeners.get((scope, key))

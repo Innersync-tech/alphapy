@@ -534,6 +534,21 @@ class TestAutomodInvalidateCache:
         mock_invalidate.assert_called_once_with(GUILD_ID)
 
 
+class TestSettingsInvalidateCache:
+    def test_invalidate_settings_cache_success(self):
+        app = _make_dashboard_app()
+        mock_settings = MagicMock()
+        mock_settings.reload_guild = AsyncMock(return_value=3)
+        mock_bot = MagicMock()
+        mock_bot.settings = mock_settings
+        with patch("gpt.helpers.bot_instance", mock_bot):
+            client = TestClient(app)
+            response = client.post(f"/api/dashboard/{GUILD_ID}/settings/invalidate-cache")
+        assert response.status_code == 200
+        assert response.json() == {"success": True, "loaded": 3}
+        mock_settings.reload_guild.assert_awaited_once_with(GUILD_ID)
+
+
 # ---------------------------------------------------------------------------
 # Dashboard discord meta
 # ---------------------------------------------------------------------------

@@ -72,7 +72,7 @@ from utils.engagement_service import (
 )
 from utils.logger import logger
 from utils.sanitizer import safe_embed_text
-from utils.settings_helpers import is_module_enabled
+from utils.settings_helpers import is_module_enabled_async
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -133,7 +133,7 @@ async def _is_enabled(bot: commands.Bot, guild_id: int, feature: str) -> bool:
         return cached[0]
     _cache_stats["feature_flag_misses"] += 1
 
-    if not is_module_enabled(bot, guild_id, "engagement"):
+    if not await is_module_enabled_async(bot, guild_id, "engagement"):
         _feature_flag_cache[cache_key] = (False, now + _FEATURE_FLAG_TTL)
         return False
 

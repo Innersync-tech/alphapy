@@ -14,7 +14,7 @@ from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_embed_text
-from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled_async
 from utils.supabase_client import (
     SupabaseConfigurationError,
     _supabase_get,
@@ -75,6 +75,12 @@ class GrowthShareView(discord.ui.View):
 
     @discord.ui.button(label="Share anonymously", style=discord.ButtonStyle.secondary, emoji="🌱")
     async def share_anonymous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.guild and not await is_module_enabled_async(
+            interaction.client, interaction.guild.id, "growth"
+        ):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            self.stop()
+            return
         embed = _build_growth_embed(None, self.goal, self.obstacle, self.feeling, self.reply)
         try:
             await self.growth_channel.send(embed=embed)
@@ -89,6 +95,12 @@ class GrowthShareView(discord.ui.View):
 
     @discord.ui.button(label="Share with my name", style=discord.ButtonStyle.primary, emoji="🌿")
     async def share_named(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.guild and not await is_module_enabled_async(
+            interaction.client, interaction.guild.id, "growth"
+        ):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            self.stop()
+            return
         embed = _build_growth_embed(interaction.user, self.goal, self.obstacle, self.feeling, self.reply)
         try:
             await self.growth_channel.send(embed=embed)
@@ -128,6 +140,13 @@ class GrowthModal(discord.ui.Modal, title="🌱 Growth Check-in"):
     async def on_submit(self, interaction: discord.Interaction):
         from utils.sanitizer import safe_prompt
 
+        guild_id = interaction.guild.id if interaction.guild else None
+        if guild_id is not None and not await is_module_enabled_async(
+            interaction.client, guild_id, "growth"
+        ):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return
+
         safe_goal = safe_prompt(self.goal.value)
         safe_obstacle = safe_prompt(self.obstacle.value)
         safe_feeling = safe_prompt(self.feeling.value)
@@ -149,7 +168,6 @@ If you have context from this user's past reflections, actively reference patter
 
 Keep your response under 250 words. End with a complete sentence.
 """
-        guild_id = interaction.guild.id if interaction.guild else None
 
         try:
             await interaction.response.defer(thinking=True, ephemeral=True)
@@ -575,10 +593,10 @@ class GrowthCheckin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def _growth_enabled(self, guild_id: int | None) -> bool:
+    async def _growth_enabled(self, guild_id: int | None) -> bool:
         if guild_id is None:
             return True
-        return is_module_enabled(self.bot, guild_id, "growth")
+        return await is_module_enabled_async(self.bot, guild_id, "growth")
 
     @app_commands.command(
         name="growthcheckin",
@@ -586,7 +604,7 @@ class GrowthCheckin(commands.Cog):
     )
     @app_checks.cooldown(2, 300.0, key=lambda i: (i.guild.id, i.user.id) if i.guild else i.user.id)
     async def growthcheckin(self, interaction: discord.Interaction):
-        if interaction.guild and not self._growth_enabled(interaction.guild.id):
+        if interaction.guild and not await self._growth_enabled(interaction.guild.id):
             await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
             return
         await interaction.response.send_modal(GrowthModal())
@@ -597,7 +615,7 @@ class GrowthCheckin(commands.Cog):
     )
     @app_checks.cooldown(1, 30.0, key=lambda i: i.user.id)
     async def growthhistory(self, interaction: discord.Interaction):
-        if interaction.guild and not self._growth_enabled(interaction.guild.id):
+        if interaction.guild and not await self._growth_enabled(interaction.guild.id):
             await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)

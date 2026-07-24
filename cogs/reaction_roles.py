@@ -6,7 +6,7 @@ from discord.ext import commands
 from utils.embed_builder import EmbedBuilder
 from utils.logger import log_with_guild, logger
 from utils.operational_logs import EventType, log_operational_event
-from utils.settings_helpers import is_module_enabled
+from utils.settings_helpers import is_module_enabled_async
 
 
 class StartOnboardingView(discord.ui.View):
@@ -52,7 +52,7 @@ class StartOnboardingButton(discord.ui.Button):
                 await interaction.response.send_message("❌ Onboarding system unavailable.", ephemeral=True)
 
         elif mode in ["rules_only", "rules_with_questions"]:
-            rules_on = is_module_enabled(bot, interaction.guild.id, "rules")
+            rules_on = await is_module_enabled_async(bot, interaction.guild.id, "rules")
             if not rules_on:
                 if mode == "rules_with_questions":
                     onboarding_cog = bot.get_cog("Onboarding")
