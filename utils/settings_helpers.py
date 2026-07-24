@@ -124,7 +124,9 @@ class CachedSettingsHelper:
             self._cache.pop(self._get_cache_key(scope, key, guild_id), None)
 
         settings.add_global_listener(_on_setting_changed)
-        settings.add_reload_listener(lambda guild_id: self.clear_cache(guild_id=guild_id))
+        add_reload = getattr(settings, "add_reload_listener", None)
+        if callable(add_reload):
+            add_reload(lambda guild_id: self.clear_cache(guild_id=guild_id))
     
     def _get_cache_key(self, scope: str, key: str, guild_id: int) -> tuple[str, str, int]:
         """Generate cache key from scope, key, and guild_id."""

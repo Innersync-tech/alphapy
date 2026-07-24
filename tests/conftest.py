@@ -36,6 +36,9 @@ class MockSettingsService:
     def add_global_listener(self, listener) -> None:
         """No-op stub — global listeners not needed in tests."""
 
+    def add_reload_listener(self, listener) -> None:
+        """No-op stub — reload listeners not needed in tests."""
+
 
 class MockBot:
     """Mock Discord bot for testing."""

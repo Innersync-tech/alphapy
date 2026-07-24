@@ -40,6 +40,9 @@ class _FakeSettings:
     def add_global_listener(self, listener) -> None:
         self.listeners.append(listener)
 
+    def add_reload_listener(self, listener) -> None:
+        self.listeners.append(listener)
+
 
 @pytest.mark.asyncio
 async def test_engagement_feature_flag_and_food_channel_cache() -> None:
