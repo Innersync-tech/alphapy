@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Module enable contract** — Dashboard Disable and Discord share `{scope}.enabled` (default true; `agents.enabled` default false). Gates for growth, verification, ticketbot, embedwatcher, custom_commands, gpt, faq, rules, fyi, and engagement master (#328).
+- **`POST /api/dashboard/{guild_id}/settings/invalidate-cache`** — reloads the bot in-memory `bot_settings` snapshot after Dashboard DB writes (#330).
 - **DB migration 025**: `growth_checkins.goal` / `obstacle` / `feeling` / `grok_response` + index on `(user_id, created_at DESC)` for `/growthhistory` and the control-panel Growth tab.
 - **`GET /api/hermit/growth-checkins`** — service-key broker for Core/Hermit; returns plaintext Railway `growth_checkins` (canonical Discord growth store).
 
 ### Changed
+- **Module gates** — Discord command/listener paths use `is_module_enabled_async` with short TTL `ensure_fresh` so Dashboard Disable is honored without bot restart (#330).
 - **Docs audit (#308)** — AGENTS.md, `docs/api.md`, `docs/commands.md`, `docs/configuration.md`, `docs/database-schema.md`, `docs/alphapy-agents-architecture.md`, and `ARCHITECTURE.md` aligned with shared DB pool, post-connect guild sync, agent session REST API, verification queue, pattern loader, and reminder identity resolution.
 - **Tier-2 copy (P2)** — verification panel steps, growth check-in description and private-share copy; `user_messages` rollout to reminders, growth errors, learn, leadership, contentgen.
 - **Database pools (P3)** — `DatabaseManager` no longer creates per-cog pools; all cogs/helpers bind to shared `SettingsService` pool via `get_bot_db_pool()`. Removed cog-unload pool closes that could tear down the shared connection.
@@ -18,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - **Dead code (P2)** — `bot_only.py`; unittest modules under `cogs/test_*.py` (moved `test_reminders_repo` → `tests/`); dev prefix cog `cogs/test_automod.py`; legacy migration cogs unloaded from lifecycle (`importdata`, `importinvite`, `migrate_gdpr`); unused `csv_helpers` temp-file helpers, `slash_utils.is_owner_or_admin`, `config.ROLE_ID`, `hermit_context.invalidate_hermit_cache`.
 
 ### Fixed
+- **Dashboard Disable lag** — bot no longer keeps only the startup `bot_settings` snapshot; `reload_guild` (atomic swap, per-guild lock, fail-closed refresh) + Growth modal/share re-checks (#330).
 - **`/growthhistory`**: No longer reads encrypted App vault rows from Supabase `reflections`. Check-in content is stored and loaded from Railway `growth_checkins` (migration `025`) so Grok replies stay plaintext in Discord.
 - **Grok offline handling**: `ask_gpt` / `ask_gpt_vision` classify credits, bad/missing API key, and 5xx as `offline` (calm user copy via `ERR_GROK_OFFLINE`); rate limits stay separate; callers must not persist unavailable text as model output; `/gptstatus` shows last failure kind for operators.
 
