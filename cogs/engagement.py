@@ -121,10 +121,10 @@ def get_engagement_cache_stats() -> dict[str, int]:
 
 
 async def _is_enabled(bot: commands.Bot, guild_id: int, feature: str) -> bool:
-    """Return True if master engagement.enabled AND the feature flag are on."""
-    if not is_module_enabled(bot, guild_id, "engagement"):
-        return False
+    """Return True if master engagement.enabled AND the feature flag are on.
 
+    Combined result is TTL-cached so hot paths do not re-read settings every message.
+    """
     now = time.monotonic()
     cache_key = (guild_id, feature)
     cached = _feature_flag_cache.get(cache_key)
@@ -132,6 +132,10 @@ async def _is_enabled(bot: commands.Bot, guild_id: int, feature: str) -> bool:
         _cache_stats["feature_flag_hits"] += 1
         return cached[0]
     _cache_stats["feature_flag_misses"] += 1
+
+    if not is_module_enabled(bot, guild_id, "engagement"):
+        _feature_flag_cache[cache_key] = (False, now + _FEATURE_FLAG_TTL)
+        return False
 
     settings = getattr(bot, "settings", None)
     if not settings:

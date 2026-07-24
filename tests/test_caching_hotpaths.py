@@ -28,6 +28,7 @@ class _FakeSettings:
         self.calls = 0
         self.listeners = []
         self.values = {
+            ("engagement", "enabled", 123): True,
             ("engagement", "challenges_enabled", 123): True,
             ("engagement", "weekly_food_channel_ids", 123): "10, 20, nope, 30",
         }
@@ -45,23 +46,23 @@ async def test_engagement_feature_flag_and_food_channel_cache() -> None:
     settings = _FakeSettings()
     bot = SimpleNamespace(settings=settings)
 
-    # First call reads settings, second call should hit TTL cache.
+    # First call reads master + feature; second call should hit TTL cache.
     assert await _is_enabled(bot, 123, "challenges") is True
     assert await _is_enabled(bot, 123, "challenges") is True
-    assert settings.calls == 1
+    assert settings.calls == 2
 
     ids = await _get_food_channel_ids(bot, 123)
     assert ids == {10, 20, 30}
     ids_cached = await _get_food_channel_ids(bot, 123)
     assert ids_cached == {10, 20, 30}
-    assert settings.calls == 2
+    assert settings.calls == 3
 
     # Simulate settings update event and ensure cache invalidates.
     _invalidate_engagement_cache("engagement", "challenges_enabled", 123)
     _invalidate_engagement_cache("engagement", "weekly_food_channel_ids", 123)
     assert await _is_enabled(bot, 123, "challenges") is True
     assert await _get_food_channel_ids(bot, 123) == {10, 20, 30}
-    assert settings.calls == 4
+    assert settings.calls == 6
 
     stats = get_engagement_cache_stats()
     assert stats["engagement_feature_flag_cache_hits"] >= 1
