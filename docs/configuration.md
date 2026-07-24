@@ -260,6 +260,12 @@ Dashboard **Disable** and Discord gates share one flag per module (default **tru
 
 Admin config / panel-post commands stay available so operators can re-enable.
 
+Dashboard writes `bot_settings` directly (and optionally calls
+`POST /api/dashboard/{guild_id}/settings/invalidate-cache`). The bot also
+refreshes guild settings via `SettingsService.ensure_fresh` / `reload_guild`
+on module gates (`is_module_enabled_async`) so Disable takes effect without
+restart. Refresh failure fails closed (module treated as disabled).
+
 Optional env vars:
 
 ```
