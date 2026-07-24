@@ -14,6 +14,7 @@ from utils.db_helpers import acquire_safe, get_bot_db_pool
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.sanitizer import safe_embed_text
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
 from utils.supabase_client import (
     SupabaseConfigurationError,
     _supabase_get,
@@ -574,12 +575,20 @@ class GrowthCheckin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    def _growth_enabled(self, guild_id: int | None) -> bool:
+        if guild_id is None:
+            return True
+        return is_module_enabled(self.bot, guild_id, "growth")
+
     @app_commands.command(
         name="growthcheckin",
         description="Name your goal, blocker, and feeling. Grok responds.",
     )
     @app_checks.cooldown(2, 300.0, key=lambda i: (i.guild.id, i.user.id) if i.guild else i.user.id)
     async def growthcheckin(self, interaction: discord.Interaction):
+        if interaction.guild and not self._growth_enabled(interaction.guild.id):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return
         await interaction.response.send_modal(GrowthModal())
 
     @app_commands.command(
@@ -588,6 +597,9 @@ class GrowthCheckin(commands.Cog):
     )
     @app_checks.cooldown(1, 30.0, key=lambda i: i.user.id)
     async def growthhistory(self, interaction: discord.Interaction):
+        if interaction.guild and not self._growth_enabled(interaction.guild.id):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             pool = get_bot_db_pool(interaction.client)

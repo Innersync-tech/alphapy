@@ -230,6 +230,15 @@ _default_llm_model = "grok-3" if getattr(config, "LLM_PROVIDER", "grok").strip()
 settings_service.register(
     SettingDefinition(
         scope="gpt",
+        key="enabled",
+        description="Enable member Grok slash commands (/create_caption, /learn_topic).",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="gpt",
         key="model",
         description="Default AI model for Grok commands (e.g. grok-3).",
         value_type="str",
@@ -416,10 +425,82 @@ settings_service.register(
 settings_service.register(
     SettingDefinition(
         scope="growth",
+        key="enabled",
+        description="Enable Growth Check-in commands (/growthcheckin, /growthhistory).",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="growth",
         key="log_channel_id",
         description="Channel where shared Growth Check-in posts are published.",
         value_type="channel",
         default=0,  # Must be configured per guild
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="verification",
+        key="enabled",
+        description="Enable member verification start flow and screenshot review.",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="ticketbot",
+        key="enabled",
+        description="Enable member ticket create/claim/close flows and idle ticket loop.",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="embedwatcher",
+        key="enabled",
+        description="Enable auto-reminder creation from announcement embeds.",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="custom_commands",
+        key="enabled",
+        description="Enable custom-command trigger replies on messages.",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="faq",
+        key="enabled",
+        description="Enable /faq commands for this guild.",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="rules",
+        key="enabled",
+        description="Show guild rules in the onboarding RuleAcceptanceView.",
+        value_type="bool",
+        default=True,
+    )
+)
+settings_service.register(
+    SettingDefinition(
+        scope="fyi",
+        key="enabled",
+        description="Enable contextual FYI tip posts for first-time events.",
+        value_type="bool",
+        default=True,
     )
 )
 # --- Alphapy agents module settings ---
@@ -433,6 +514,15 @@ settings_service.register(
     )
 )
 # --- Engagement module settings ---
+settings_service.register(
+    SettingDefinition(
+        scope="engagement",
+        key="enabled",
+        description="Master switch for Engagement module (AND with per-feature flags).",
+        value_type="bool",
+        default=True,
+    )
+)
 for _eng_feature in ("challenges", "weekly", "badges", "streaks", "og"):
     settings_service.register(
         SettingDefinition(

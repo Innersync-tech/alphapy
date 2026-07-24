@@ -240,6 +240,26 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment (Railway env). Per-guil
 
 When enabled, linked members can use `/agent list`, `/agent start`, `/agent continue`, `/agent end`, and `/agent status`.
 
+### Module enable contract (`{scope}.enabled`)
+
+Dashboard **Disable** and Discord gates share one flag per module (default **true**, except `agents.enabled` default **false**):
+
+| Scope | Silences when false |
+|---|---|
+| `growth` | `/growthcheckin`, `/growthhistory` |
+| `verification` | Start panel + screenshot flow + review buttons |
+| `ticketbot` | Member ticket create/claim/close + idle loop (Dashboard **Support** uses the same flag) |
+| `embedwatcher` | Auto-reminder create from announcements |
+| `custom_commands` | Message trigger replies |
+| `gpt` | `/create_caption`, `/learn_topic` |
+| `faq` | `/faq *` |
+| `rules` | RuleAcceptanceView body (questions-only path still works) |
+| `fyi` | Contextual FYI tip posts |
+| `engagement` | Master AND with per-feature `*_enabled` flags |
+| `reminders` / `automod` / `onboarding` / `invites` / `gdpr` / `agents` | Existing gates |
+
+Admin config / panel-post commands stay available so operators can re-enable.
+
 Optional env vars:
 
 ```

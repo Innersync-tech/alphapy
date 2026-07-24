@@ -9,6 +9,7 @@ from discord.ext import commands
 from gpt.dataset_loader import load_topic_context
 from gpt.errors import GrokUnavailableError, grok_user_message
 from gpt.helpers import ask_gpt, is_allowed_prompt, log_gpt_error
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
 from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
@@ -26,6 +27,9 @@ class LearnTopic(commands.Cog):
     @app_commands.describe(topic="e.g. RSI, scalping, risk management…")
     async def learn_topic(self, interaction: discord.Interaction, topic: str):
         guild_id = interaction.guild.id if interaction.guild else None
+        if guild_id is not None and not is_module_enabled(self.bot, guild_id, "gpt"):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return
         
         # Defer the interaction response
         try:
