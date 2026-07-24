@@ -96,6 +96,14 @@ async def test_is_module_enabled_async_fail_closed_after_retry():
 
 
 @pytest.mark.asyncio
+async def test_is_module_enabled_async_ignores_non_awaitable_ensure_fresh():
+    """MagicMock.ensure_fresh must not fail-close module gates in tests."""
+    settings = MagicMock()
+    settings.get.side_effect = lambda scope, key, guild_id=0, fallback=None: fallback
+    bot = SimpleNamespace(settings=settings)
+    assert await is_module_enabled_async(bot, 1, "fyi") is True
+
+@pytest.mark.asyncio
 async def test_reload_guild_applies_dashboard_write():
     """Simulate Dashboard writing growth.enabled=false into bot_settings."""
     service = SettingsService(dsn=None)

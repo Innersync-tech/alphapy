@@ -6,6 +6,7 @@ boilerplate code across cogs. Provides type-safe getters with automatic
 coercion and caching.
 """
 
+import inspect
 import json
 from collections import OrderedDict
 from typing import Any
@@ -68,27 +69,35 @@ async def is_module_enabled_async(
     On refresh failure: retries once with ``ttl=0``. If that also fails, returns
     ``False`` (fail closed) so Dashboard Disable cannot be bypassed by a stale cache
     during a transient DB error.
+
+    Non-awaitable ``ensure_fresh`` stubs (e.g. MagicMock in tests) are ignored.
     """
     settings = source if callable(getattr(source, "get", None)) else getattr(source, "settings", None)
     ensure_fresh = getattr(settings, "ensure_fresh", None)
     if callable(ensure_fresh):
-        try:
-            await ensure_fresh(guild_id, ttl=ttl)
-        except Exception as first_exc:
-            logger.warning(
-                "settings ensure_fresh failed guild=%s scope=%s; retrying once: %s",
-                guild_id,
-                scope,
-                first_exc,
-            )
+        async def _run_fresh(fresh_ttl: float) -> bool:
+            """Return True if refresh ran (or was skipped as non-awaitable); False on failure."""
             try:
-                await ensure_fresh(guild_id, ttl=0)
-            except Exception as retry_exc:
+                result = ensure_fresh(guild_id, ttl=fresh_ttl)
+                if inspect.isawaitable(result):
+                    await result
+                return True
+            except Exception as exc:
                 logger.warning(
-                    "settings ensure_fresh retry failed guild=%s scope=%s; treating module as disabled: %s",
+                    "settings ensure_fresh failed guild=%s scope=%s ttl=%s: %s",
                     guild_id,
                     scope,
-                    retry_exc,
+                    fresh_ttl,
+                    exc,
+                )
+                return False
+
+        if not await _run_fresh(ttl):
+            if not await _run_fresh(0):
+                logger.warning(
+                    "settings ensure_fresh retry failed guild=%s scope=%s; treating module as disabled",
+                    guild_id,
+                    scope,
                 )
                 return False
     return is_module_enabled(source, guild_id, scope, fallback=fallback)
