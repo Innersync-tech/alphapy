@@ -14,6 +14,43 @@ from utils.db_helpers import acquire_transactional
 from utils.logger import logger
 from utils.settings_service import SettingsService
 
+# Scopes whose `{scope}.enabled` defaults to False when unset.
+_MODULE_ENABLED_DEFAULT_FALSE = frozenset({"agents"})
+
+MODULE_DISABLED_MSG = (
+    "This module is disabled in this server. Ask an admin to enable it in the Alphapy Dashboard."
+)
+
+
+def is_module_enabled(source: Any, guild_id: int, scope: str, *, fallback: bool | None = None) -> bool:
+    """Return True if `{scope}.enabled` is on for the guild.
+
+    ``source`` may be a bot (with ``.settings`` / ``.settings_helper``) or a SettingsService.
+    Default fallback is True for all scopes except ``agents`` (False).
+    """
+    if fallback is None:
+        fallback = scope not in _MODULE_ENABLED_DEFAULT_FALSE
+
+    # Prefer CachedSettingsHelper on bot-like objects (not on SettingsService itself).
+    if not callable(getattr(source, "get", None)):
+        helper = getattr(source, "settings_helper", None)
+        if helper is not None and callable(getattr(helper, "get_bool", None)):
+            return bool(helper.get_bool(scope, "enabled", guild_id, fallback=fallback))
+
+    # SettingsService directly, or bot.settings
+    settings = source if callable(getattr(source, "get", None)) else getattr(source, "settings", None)
+    if settings is None or not callable(getattr(settings, "get", None)):
+        return fallback
+    try:
+        value = settings.get(scope, "enabled", guild_id, fallback)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes", "on")
+        return bool(value) if value is not None else fallback
+    except Exception:
+        return fallback
+
 
 class CachedSettingsHelper:
     """

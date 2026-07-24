@@ -18,6 +18,7 @@ from utils.embed_builder import EmbedBuilder
 from utils.logger import log_database_event, log_guild_action, log_with_guild, logger
 from utils.premium_guard import guild_has_premium
 from utils.sanitizer import safe_embed_text, safe_prompt
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
 from utils.timezone import BRUSSELS_TZ
 from utils.user_messages import ERR_GUILD_ONLY
 
@@ -582,6 +583,9 @@ class VerificationCog(AlphaCog):
         if not message.attachments:
             return
 
+        if not is_module_enabled(self.bot, message.guild.id, "verification"):
+            return
+
         guild = message.guild
         guild_id = guild.id
         category_id = self._get_category_id(guild_id)
@@ -938,6 +942,9 @@ class ManualReviewView(discord.ui.View):
         if not interaction.guild:
             await interaction.response.send_message("❌ Only works in a server.", ephemeral=True)
             return False
+        if not is_module_enabled(self.cog.bot, interaction.guild.id, "verification"):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return False
         is_admin, error_msg = await validate_admin(interaction, raise_on_fail=False)
         if not is_admin:
             await interaction.response.send_message(error_msg or "⛔ Admins only.", ephemeral=True)
@@ -1045,6 +1052,10 @@ class VerificationPanelView(discord.ui.View):
 
         if not interaction.guild:
             await interaction.followup.send(ERR_GUILD_ONLY, ephemeral=True)
+            return
+
+        if not is_module_enabled(self.cog.bot, interaction.guild.id, "verification"):
+            await interaction.followup.send(MODULE_DISABLED_MSG, ephemeral=True)
             return
 
         if not await guild_has_premium(interaction.guild.id):

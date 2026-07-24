@@ -72,6 +72,7 @@ from utils.engagement_service import (
 )
 from utils.logger import logger
 from utils.sanitizer import safe_embed_text
+from utils.settings_helpers import is_module_enabled
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -94,9 +95,15 @@ def _invalidate_engagement_cache(scope: str, key: str, guild_id: int) -> None:
     """Drop local engagement cache entries when related settings change."""
     if scope != "engagement":
         return
-    if key.endswith("_enabled"):
-        feature = key[:-8]
-        _feature_flag_cache.pop((guild_id, feature), None)
+    if key.endswith("_enabled") or key == "enabled":
+        if key == "enabled":
+            # Master switch changed — drop all feature caches for this guild.
+            for cache_key in list(_feature_flag_cache):
+                if cache_key[0] == guild_id:
+                    _feature_flag_cache.pop(cache_key, None)
+        else:
+            feature = key[:-8]
+            _feature_flag_cache.pop((guild_id, feature), None)
     if key == "weekly_food_channel_ids":
         _food_channels_cache.pop(guild_id, None)
 
@@ -114,7 +121,10 @@ def get_engagement_cache_stats() -> dict[str, int]:
 
 
 async def _is_enabled(bot: commands.Bot, guild_id: int, feature: str) -> bool:
-    """Return True if the given engagement feature is enabled for the guild."""
+    """Return True if master engagement.enabled AND the feature flag are on.
+
+    Combined result is TTL-cached so hot paths do not re-read settings every message.
+    """
     now = time.monotonic()
     cache_key = (guild_id, feature)
     cached = _feature_flag_cache.get(cache_key)
@@ -122,6 +132,10 @@ async def _is_enabled(bot: commands.Bot, guild_id: int, feature: str) -> bool:
         _cache_stats["feature_flag_hits"] += 1
         return cached[0]
     _cache_stats["feature_flag_misses"] += 1
+
+    if not is_module_enabled(bot, guild_id, "engagement"):
+        _feature_flag_cache[cache_key] = (False, now + _FEATURE_FLAG_TTL)
+        return False
 
     settings = getattr(bot, "settings", None)
     if not settings:

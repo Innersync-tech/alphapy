@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from gpt.errors import GrokUnavailableError, grok_user_message
 from gpt.helpers import ask_gpt
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
 from utils.supabase_client import (
     SupabaseConfigurationError,
     insert_insight_for_discord,
@@ -39,6 +40,10 @@ class ContentGen(commands.Cog):
         app_commands.Choice(name=style.capitalize(), value=style) for style in STYLES
     ])
     async def create_caption(self, interaction: discord.Interaction, topic: str, style: app_commands.Choice[str]):
+        if interaction.guild and not is_module_enabled(self.bot, interaction.guild.id, "gpt"):
+            await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return
+
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         from utils.sanitizer import safe_prompt

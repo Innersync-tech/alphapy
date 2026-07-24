@@ -27,6 +27,7 @@ from utils.embed_parser import (
 from utils.logger import logger
 from utils.parsers import format_days_for_display, parse_days_string
 from utils.sanitizer import safe_embed_text
+from utils.settings_helpers import is_module_enabled
 from utils.timezone import BRUSSELS_TZ
 from utils.validators import validate_admin
 
@@ -69,6 +70,9 @@ class EmbedReminderWatcher(AlphaCog):
     async def on_message(self, message: discord.Message):
         if not message.guild:
             return  # Skip messages not in a guild
+
+        if not is_module_enabled(self.bot, message.guild.id, "embedwatcher"):
+            return
         
         announcements_channel_id = self._get_announcements_channel_id(message.guild.id)
         if message.channel.id != announcements_channel_id:

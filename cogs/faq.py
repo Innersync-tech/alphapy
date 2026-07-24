@@ -11,6 +11,7 @@ from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.logger import logger
+from utils.settings_helpers import MODULE_DISABLED_MSG, is_module_enabled
 from utils.validators import validate_admin
 
 SYNS: dict[str, list[str]] = {
@@ -117,6 +118,26 @@ class FAQ(commands.Cog):
 
     # --- Slash group
     faq = app_commands.Group(name="faq", description="FAQ commands")
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Refuse /faq when faq.enabled is false."""
+        if interaction.command is None:
+            return True
+        root = interaction.command
+        while getattr(root, "parent", None) is not None:
+            root = root.parent  # type: ignore[assignment]
+        if getattr(root, "name", None) != "faq":
+            return True
+        if not interaction.guild:
+            return True
+
+        if not is_module_enabled(self.bot, interaction.guild.id, "faq"):
+            if interaction.response.is_done():
+                await interaction.followup.send(MODULE_DISABLED_MSG, ephemeral=True)
+            else:
+                await interaction.response.send_message(MODULE_DISABLED_MSG, ephemeral=True)
+            return False
+        return True
 
     async def _log_embed(self, title: str, description: str) -> None:
         try:
