@@ -562,6 +562,24 @@ async def end_agent_session(
     )
     await delete_session_messages(session_id)
 
+    # Memory Vault Phase 2: Tier-2 labels → Core agent_graph (fail-open).
+    try:
+        from utils.core_agent_graph import push_agent_chat_progress
+
+        themes = []
+        if isinstance(derived_profile, dict):
+            raw_themes = derived_profile.get("active_themes")
+            if isinstance(raw_themes, list):
+                themes = raw_themes
+        await push_agent_chat_progress(
+            discord_user_id=discord_user_id,
+            session_id=session_id,
+            insight_snapshot=snapshot if isinstance(snapshot, list) else None,
+            active_themes=themes,
+        )
+    except Exception:
+        logger.warning("agent-graph progress push failed after session end", exc_info=True)
+
     last_assistant = ""
     for row in reversed(prior_turns):
         if row.get("role") == "assistant":
