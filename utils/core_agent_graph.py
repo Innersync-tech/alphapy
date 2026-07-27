@@ -20,7 +20,9 @@ except ImportError:
 from utils.logger import logger
 
 _TIMEOUT = 12.0
-_TOKEN_RE = re.compile(r"[a-zA-Zà-ÿÀ-Ÿ0-9]+")
+# Lowercase labels before match; one Latin-1 letter range avoids CodeQL py/overly-large-range
+# (à-ÿ and À-Ÿ overlapped in the same class).
+_TOKEN_RE = re.compile(r"[a-z0-9à-ÿ]+")
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
