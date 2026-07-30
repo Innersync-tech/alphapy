@@ -19,8 +19,9 @@ TIER1_FIELDS = frozenset({
     "fatigue_note",
     "fatigue_reported_at",
 })
-TIER1_BOOL_FIELDS = frozenset({"learn_from_shared"})
+TIER1_BOOL_FIELDS = frozenset({"learn_from_shared", "learn_from_patterns"})
 TIER3_FIELDS = frozenset({"session_count", "last_session_at", "last_session_id", "last_agent"})
+
 
 PERSONA_DESCRIPTIONS: dict[str, str] = {
     "calm": "warm, gentle, and grounding",
@@ -34,7 +35,10 @@ def _now_iso() -> str:
 
 
 def normalize_agent_prefs(raw: Any) -> dict[str, str | bool]:
-    """Return sanitized Tier 1 prefs from JSON."""
+    """Return sanitized Tier 1 prefs from JSON.
+
+    Unknown keys are dropped. Boolean learning flags are preserved when present.
+    """
     from agents.fatigue import VALID_ENERGY_LEVELS
 
     if not isinstance(raw, dict):
@@ -64,8 +68,9 @@ def normalize_agent_prefs(raw: Any) -> dict[str, str | bool]:
     persona = out.get("persona", "")
     if isinstance(persona, str) and persona.lower() and persona.lower() not in PERSONA_DESCRIPTIONS:
         out["persona"] = "calm"
-    if "learn_from_shared" in raw:
-        out["learn_from_shared"] = bool(raw.get("learn_from_shared"))
+    for bool_key in TIER1_BOOL_FIELDS:
+        if bool_key in raw:
+            out[bool_key] = bool(raw.get(bool_key))
     return out
 
 
@@ -74,6 +79,15 @@ def learn_from_shared_enabled(prefs: dict[str, str | bool]) -> bool:
     value = prefs.get("learn_from_shared")
     if value is None:
         return False
+    return bool(value)
+
+
+def learn_from_patterns_enabled(prefs: dict[str, str | bool]) -> bool:
+    """Whether pattern-graph context injection is allowed for this user."""
+    value = prefs.get("learn_from_patterns")
+    if value is None:
+        # Fall back to shared-reflections learning when the newer flag is unset.
+        return learn_from_shared_enabled(prefs)
     return bool(value)
 
 
@@ -100,7 +114,11 @@ async def merge_agent_prefs_fields(
     innersync_user_id: str,
     raw_merged: dict[str, Any],
 ) -> dict[str, str | bool]:
-    """Upsert merged Tier 1 agent_prefs for a user (service role)."""
+    """Upsert merged Tier 1 agent_prefs for a user (service role).
+
+    Always normalizes before write so Discord writers cannot drop App-owned
+    fields like learn_from_patterns when only patching energy.
+    """
     storage = normalize_agent_prefs(raw_merged)
     try:
         await _supabase_post(

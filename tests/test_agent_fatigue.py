@@ -93,6 +93,23 @@ def test_pending_fatigue_start_pop_and_expire() -> None:
 
 
 @pytest.mark.asyncio
+async def test_save_fatigue_refuses_overwrite_when_load_fails(monkeypatch) -> None:
+    from agents.fatigue import save_fatigue_self_report
+
+    async def _fail_load(_user_id: str):
+        return None
+
+    async def _should_not_merge(_user_id: str, _merged: dict):
+        raise AssertionError("merge must not run when prefs load failed")
+
+    monkeypatch.setattr("agents.fatigue.load_raw_agent_prefs", _fail_load)
+    monkeypatch.setattr("agents.fatigue.merge_agent_prefs_fields", _should_not_merge)
+
+    with pytest.raises(RuntimeError, match="could not be loaded"):
+        await save_fatigue_self_report("user-1", energy_level="3")
+
+
+@pytest.mark.asyncio
 async def test_fatigue_check_skill_gather(monkeypatch) -> None:
     from agents.base import AgentContext
     from agents.skills.fatigue_check import FatigueCheckSkill

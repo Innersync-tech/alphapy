@@ -21,6 +21,44 @@ def test_normalize_agent_prefs_trims_and_validates_persona() -> None:
     assert prefs["default_focus"] == "boundaries"
 
 
+def test_normalize_agent_prefs_preserves_learning_flags() -> None:
+    prefs = normalize_agent_prefs(
+        {
+            "display_name": "Nova",
+            "persona": "calm",
+            "learn_from_shared": True,
+            "learn_from_patterns": True,
+            "energy_level": "3",
+        }
+    )
+    assert prefs["learn_from_shared"] is True
+    assert prefs["learn_from_patterns"] is True
+    assert prefs["display_name"] == "Nova"
+    assert prefs["energy_level"] == "3"
+
+
+def test_normalize_agent_prefs_fatigue_merge_keeps_app_fields() -> None:
+    """Discord energy write must not drop App Tier-1 prefs."""
+    merged = {
+        "display_name": "Nova",
+        "persona": "direct",
+        "default_focus": "boundaries",
+        "inner_voice": "harsh when tired",
+        "learn_from_shared": True,
+        "learn_from_patterns": False,
+        "energy_level": "2",
+        "fatigue_reported_at": "2026-07-30T12:00:00+00:00",
+    }
+    prefs = normalize_agent_prefs(merged)
+    assert prefs["display_name"] == "Nova"
+    assert prefs["persona"] == "direct"
+    assert prefs["default_focus"] == "boundaries"
+    assert prefs["inner_voice"] == "harsh when tired"
+    assert prefs["learn_from_shared"] is True
+    assert prefs["learn_from_patterns"] is False
+    assert prefs["energy_level"] == "2"
+
+
 def test_build_agent_profile_block_includes_tier1_and_tier3() -> None:
     block = build_agent_profile_block(
         {"display_name": "Nova", "persona": "direct", "default_focus": "energy"},
