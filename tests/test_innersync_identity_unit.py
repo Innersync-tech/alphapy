@@ -54,6 +54,39 @@ async def test_get_innersync_id_from_db_row() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_innersync_id_default_skips_profile_fallback() -> None:
+    """Default allow_profile_fallback=False must not invent identity from profiles."""
+    conn = AsyncMock()
+    conn.fetchrow = AsyncMock(return_value=None)
+    pool = _pool_with_conn(conn)
+    ii.invalidate_identity_cache()
+    with patch(
+        "utils.innersync_identity._fallback_innersync_from_supabase_profiles",
+        new=AsyncMock(return_value=str(uuid.uuid4())),
+    ) as fallback:
+        out = await ii.get_innersync_id_for_discord(pool, 999002)
+    assert out is None
+    fallback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_innersync_id_explicit_profile_fallback() -> None:
+    conn = AsyncMock()
+    conn.fetchrow = AsyncMock(return_value=None)
+    pool = _pool_with_conn(conn)
+    iu = str(uuid.uuid4())
+    ii.invalidate_identity_cache()
+    with patch(
+        "utils.innersync_identity._fallback_innersync_from_supabase_profiles",
+        new=AsyncMock(return_value=iu),
+    ):
+        out = await ii.get_innersync_id_for_discord(
+            pool, 999003, allow_profile_fallback=True
+        )
+    assert out == iu
+
+
+@pytest.mark.asyncio
 async def test_get_discord_fallback_supabase() -> None:
     iu = str(uuid.uuid4())
     with patch(

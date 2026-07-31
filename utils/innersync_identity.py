@@ -133,13 +133,16 @@ async def get_innersync_id_for_discord(
     pool: asyncpg.Pool | None,
     discord_user_id: int,
     *,
-    allow_profile_fallback: bool = True,
+    allow_profile_fallback: bool = False,
 ) -> str | None:
     """
     Return Innersync (Supabase) user id string for a Discord snowflake.
 
-    When allow_profile_fallback is False, only alphapy_discord_links counts (for /link).
-    API/reminder flows keep the default True so legacy profiles.discord_id still resolves.
+    Runtime SoT is Railway ``alphapy_discord_links`` (via ``/link``). Profile fallback
+    (Supabase ``profiles.discord_id``) is **off by default**. Pass
+    ``allow_profile_fallback=True`` only for documented one-off UX (e.g. ``/unlink``
+    legacy hint). Run ``scripts/backfill_discord_links_from_profiles.py`` before
+    relying on links-only resolution in production.
     """
     cached = _cache_get_by_discord(discord_user_id)
     if cached is not None:

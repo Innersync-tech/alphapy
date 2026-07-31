@@ -116,7 +116,7 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
     innersync_user_id = await get_innersync_id_for_discord(
         pool,
         int(discord_user_id),
-        allow_profile_fallback=True,
+        allow_profile_fallback=False,
     )
     if innersync_user_id:
         try:

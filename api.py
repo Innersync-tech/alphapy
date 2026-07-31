@@ -114,7 +114,7 @@ async def get_authenticated_user_id(
 async def _require_discord_id_for_linked_innersync(innersync_sub: str) -> int:
     """
     Resolve Supabase JWT `sub` to a Discord snowflake using `alphapy_discord_links`
-    (and Supabase profile fallback). Fails closed if nothing is linked.
+    only (no legacy profile fallback). Fails closed if nothing is linked.
     """
     global db_pool
     if db_pool is None:
@@ -2937,7 +2937,7 @@ async def create_automod_rule(
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        # Get user's Discord ID (Innersync JWT sub → Discord via alphapy_discord_links / profile fallback)
+        # Get user's Discord ID (Innersync JWT sub → Discord via alphapy_discord_links)
         user_id = await _require_discord_id_for_linked_innersync(auth_user_id)
         
         # Rule metadata reflects guild entitlement, not the caller's personal subscription
