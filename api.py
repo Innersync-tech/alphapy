@@ -123,6 +123,9 @@ async def _require_discord_id_for_linked_innersync(innersync_sub: str) -> int:
 
     did = await resolve_innersync_jwt_sub_to_discord_int(db_pool, innersync_sub)
     if did is None:
+        from utils.innersync_identity import record_jwt_unlinked_403
+
+        record_jwt_unlinked_403()
         raise HTTPException(
             status_code=403,
             detail=(
@@ -841,6 +844,20 @@ class PremiumMetrics(BaseModel):
     premium_guild_cache_misses: int = 0
 
 
+class IdentityMetrics(BaseModel):
+    """Discord link resolve observability (same process only)."""
+
+    identity_resolve_total: int = 0
+    identity_resolve_hit_links: int = 0
+    identity_resolve_miss: int = 0
+    identity_resolve_db_error: int = 0
+    identity_profile_fallback_used: int = 0
+    identity_jwt_unlinked_403: int = 0
+    identity_link_webhook_ok: int = 0
+    identity_link_webhook_conflict: int = 0
+    identity_link_webhook_503: int = 0
+
+
 class CommandUsage(BaseModel):
     command_name: str
     usage_count: int
@@ -873,6 +890,7 @@ class DashboardMetrics(BaseModel):
     command_usage: CommandStats | None = None
     cache_metrics: CacheMetrics | None = None
     premium_metrics: PremiumMetrics | None = None
+    identity_metrics: IdentityMetrics | None = None
     agent_sessions: AgentSessionMetricsPayload | None = None
 
 
@@ -1553,6 +1571,13 @@ async def _persist_telemetry_snapshot(
     except Exception as exc:
         logger.debug("Agent telemetry notes skipped: %s", exc)
 
+    try:
+        from utils.innersync_identity import format_identity_telemetry_notes
+
+        notes = f"{notes} · {format_identity_telemetry_notes()}"
+    except Exception as exc:
+        logger.debug("Identity telemetry notes skipped: %s", exc)
+
     # Use Supabase REST API - this is the ONLY way to write telemetry
     # Note: Make sure 'telemetry' schema is exposed in Supabase Studio → Settings → API → Exposed Schemas
     # Send only the essential fields that we have data for, matching the database schema types:
@@ -1810,6 +1835,16 @@ def _collect_premium_metrics() -> PremiumMetrics | None:
         return None
 
 
+def _collect_identity_metrics() -> IdentityMetrics | None:
+    try:
+        from utils.innersync_identity import get_identity_stats
+
+        stats = get_identity_stats()
+        return IdentityMetrics(**{k: int(stats.get(k, 0)) for k in IdentityMetrics.model_fields})
+    except Exception:
+        return None
+
+
 @router.get("/dashboard/metrics", response_model=DashboardMetrics)
 async def get_dashboard_metrics(
     guild_id: int | None = None,
@@ -1839,6 +1874,7 @@ async def get_dashboard_metrics(
     command_stats = await _fetch_command_stats(effective_guild_id)
     cache_metrics = _collect_cache_metrics()
     premium_metrics = _collect_premium_metrics()
+    identity_metrics = _collect_identity_metrics()
     agent_sessions_payload: AgentSessionMetricsPayload | None = None
     try:
         from agents.telemetry import collect_agent_session_metrics
@@ -1869,6 +1905,7 @@ async def get_dashboard_metrics(
         command_usage=command_stats,
         cache_metrics=cache_metrics,
         premium_metrics=premium_metrics,
+        identity_metrics=identity_metrics,
         agent_sessions=agent_sessions_payload,
     )
 
@@ -2219,7 +2256,11 @@ async def update_guild_settings(
         raise HTTPException(status_code=503, detail="Database not available")
 
     # Validate category
-    valid_categories = ['system', 'reminders', 'embedwatcher', 'gpt', 'invites', 'gdpr']
+    valid_categories = [
+        'system', 'reminders', 'embedwatcher', 'gpt', 'invites', 'gdpr',
+        'automod', 'onboarding', 'ticketbot', 'verification', 'growth',
+        'agents', 'engagement', 'custom_commands',
+    ]
     if request.category not in valid_categories:
         raise HTTPException(status_code=400, detail=f"Invalid category: {request.category}")
 
