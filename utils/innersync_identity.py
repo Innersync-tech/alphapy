@@ -11,6 +11,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
+from typing import Any
 
 import asyncpg
 
@@ -23,6 +24,82 @@ _cache_lock = threading.Lock()
 _by_innersync: dict[str, tuple[int, float]] = {}
 # discord_user_id -> (innersync_user_id str, expires_at)
 _by_discord: dict[int, tuple[str, float]] = {}
+
+# Process-local observability (mirrors utils.premium_guard)
+_stats_resolve_total = 0
+_stats_hit_links = 0
+_stats_miss = 0
+_stats_db_error = 0
+_stats_profile_fallback_used = 0
+_stats_jwt_unlinked_403 = 0
+_stats_link_webhook_ok = 0
+_stats_link_webhook_conflict = 0
+_stats_link_webhook_503 = 0
+
+
+def _inc(name: str) -> None:
+    global _stats_resolve_total, _stats_hit_links, _stats_miss, _stats_db_error
+    global _stats_profile_fallback_used, _stats_jwt_unlinked_403
+    global _stats_link_webhook_ok, _stats_link_webhook_conflict, _stats_link_webhook_503
+    with _cache_lock:
+        if name == "resolve_total":
+            _stats_resolve_total += 1
+        elif name == "hit_links":
+            _stats_hit_links += 1
+        elif name == "miss":
+            _stats_miss += 1
+        elif name == "db_error":
+            _stats_db_error += 1
+        elif name == "profile_fallback_used":
+            _stats_profile_fallback_used += 1
+        elif name == "jwt_unlinked_403":
+            _stats_jwt_unlinked_403 += 1
+        elif name == "link_webhook_ok":
+            _stats_link_webhook_ok += 1
+        elif name == "link_webhook_conflict":
+            _stats_link_webhook_conflict += 1
+        elif name == "link_webhook_503":
+            _stats_link_webhook_503 += 1
+
+
+def get_identity_stats() -> dict[str, Any]:
+    """Return identity resolve counters for observability (same process only)."""
+    with _cache_lock:
+        return {
+            "identity_resolve_total": _stats_resolve_total,
+            "identity_resolve_hit_links": _stats_hit_links,
+            "identity_resolve_miss": _stats_miss,
+            "identity_resolve_db_error": _stats_db_error,
+            "identity_profile_fallback_used": _stats_profile_fallback_used,
+            "identity_jwt_unlinked_403": _stats_jwt_unlinked_403,
+            "identity_link_webhook_ok": _stats_link_webhook_ok,
+            "identity_link_webhook_conflict": _stats_link_webhook_conflict,
+            "identity_link_webhook_503": _stats_link_webhook_503,
+        }
+
+
+def record_jwt_unlinked_403() -> None:
+    _inc("jwt_unlinked_403")
+
+
+def record_link_webhook(status: str) -> None:
+    if status == "ok":
+        _inc("link_webhook_ok")
+    elif status == "conflict":
+        _inc("link_webhook_conflict")
+    elif status == "503":
+        _inc("link_webhook_503")
+
+
+def format_identity_telemetry_notes(stats: dict[str, Any] | None = None) -> str:
+    s = stats or get_identity_stats()
+    return (
+        "identity:"
+        f"hit={s.get('identity_resolve_hit_links', 0)}"
+        f"/miss={s.get('identity_resolve_miss', 0)}"
+        f"/fb={s.get('identity_profile_fallback_used', 0)}"
+        f"/403={s.get('identity_jwt_unlinked_403', 0)}"
+    )
 
 
 def invalidate_identity_cache(
@@ -88,18 +165,25 @@ async def get_discord_id_for_innersync(
     allow_profile_fallback: bool = False,
 ) -> int | None:
     """Return Discord snowflake for a Supabase Auth user id, or None."""
+    _inc("resolve_total")
     try:
         uuid.UUID(innersync_user_id)
     except (ValueError, TypeError, AttributeError):
+        _inc("miss")
         return None
 
     cached = _cache_get_by_innersync(innersync_user_id)
     if cached is not None:
+        _inc("hit_links")
         return cached
 
     if pool is None:
         if allow_profile_fallback:
-            return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+            out = await _fallback_discord_from_supabase_profiles(innersync_user_id)
+            if out is None:
+                _inc("miss")
+            return out
+        _inc("miss")
         return None
 
     try:
@@ -115,17 +199,27 @@ async def get_discord_id_for_innersync(
             )
     except Exception as e:
         logger.warning("alphapy_discord_links lookup by innersync id failed: %s", e)
+        _inc("db_error")
         if allow_profile_fallback:
-            return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+            out = await _fallback_discord_from_supabase_profiles(innersync_user_id)
+            if out is None:
+                _inc("miss")
+            return out
+        _inc("miss")
         return None
 
     if row and row["discord_user_id"] is not None:
         did = int(row["discord_user_id"])
         _cache_set_by_innersync(innersync_user_id, did)
+        _inc("hit_links")
         return did
 
     if allow_profile_fallback:
-        return await _fallback_discord_from_supabase_profiles(innersync_user_id)
+        out = await _fallback_discord_from_supabase_profiles(innersync_user_id)
+        if out is None:
+            _inc("miss")
+        return out
+    _inc("miss")
     return None
 
 
@@ -144,13 +238,19 @@ async def get_innersync_id_for_discord(
     legacy hint). Run ``scripts/backfill_discord_links_from_profiles.py`` before
     relying on links-only resolution in production.
     """
+    _inc("resolve_total")
     cached = _cache_get_by_discord(discord_user_id)
     if cached is not None:
+        _inc("hit_links")
         return cached
 
     if pool is None:
         if allow_profile_fallback:
-            return await _fallback_innersync_from_supabase_profiles(discord_user_id)
+            out = await _fallback_innersync_from_supabase_profiles(discord_user_id)
+            if out is None:
+                _inc("miss")
+            return out
+        _inc("miss")
         return None
 
     try:
@@ -166,23 +266,34 @@ async def get_innersync_id_for_discord(
             )
     except Exception as e:
         logger.warning("alphapy_discord_links lookup by discord id failed: %s", e)
+        _inc("db_error")
         if allow_profile_fallback:
-            return await _fallback_innersync_from_supabase_profiles(discord_user_id)
+            out = await _fallback_innersync_from_supabase_profiles(discord_user_id)
+            if out is None:
+                _inc("miss")
+            return out
+        _inc("miss")
         return None
 
     if row and row["iid"]:
         iid = str(row["iid"])
         _cache_set_by_discord(discord_user_id, iid)
+        _inc("hit_links")
         return iid
 
     if allow_profile_fallback:
-        return await _fallback_innersync_from_supabase_profiles(discord_user_id)
+        out = await _fallback_innersync_from_supabase_profiles(discord_user_id)
+        if out is None:
+            _inc("miss")
+        return out
+    _inc("miss")
     return None
 
 
 async def _fallback_discord_from_supabase_profiles(innersync_user_id: str) -> int | None:
     from utils.supabase_client import get_discord_id_for_user
 
+    _inc("profile_fallback_used")
     raw = await get_discord_id_for_user(innersync_user_id)
     if not raw:
         return None
@@ -197,6 +308,7 @@ async def _fallback_discord_from_supabase_profiles(innersync_user_id: str) -> in
 async def _fallback_innersync_from_supabase_profiles(discord_user_id: int) -> str | None:
     from utils.supabase_client import get_user_id_for_discord
 
+    _inc("profile_fallback_used")
     uid = await get_user_id_for_discord(discord_user_id)
     if uid:
         _cache_set_by_discord(discord_user_id, uid)

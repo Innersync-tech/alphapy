@@ -14,7 +14,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, status
 
 from utils.hermit_events import emit_hermit_event
-from utils.innersync_identity import delete_discord_link_for_discord_user, upsert_discord_link
+from utils.innersync_identity import (
+    delete_discord_link_for_discord_user,
+    record_link_webhook,
+    upsert_discord_link,
+)
 from utils.logger import logger
 from webhooks.common import get_discord_link_webhook_secret, validate_webhook_signature
 
@@ -108,6 +112,7 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
 
     pool = getattr(request.app.state, "db_pool", None)
     if pool is None:
+        record_link_webhook("503")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database pool not available.",
@@ -115,7 +120,9 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
 
     event = payload.get("event")
     if event == "unlink":
-        return await _handle_unlink(pool, discord_user_id)
+        result = await _handle_unlink(pool, discord_user_id)
+        record_link_webhook("ok")
+        return result
 
     iu_raw = payload.get("innersync_user_id")
     if iu_raw is None:
@@ -144,6 +151,7 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
     )
 
     if status_str == "conflict":
+        record_link_webhook("conflict")
         logger.info(
             "discord-link webhook conflict: discord=%s innersync=%s detail=%s",
             discord_user_id,
@@ -156,6 +164,7 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
         )
 
     if status_str == "ok":
+        record_link_webhook("ok")
         await _try_dm_user(
             discord_user_id,
             "Your Innersync account is now linked to this Discord account. "
@@ -168,6 +177,8 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
                 payload={"source": "discord_link_webhook"},
             )
         )
+    else:
+        record_link_webhook("ok")
 
     logger.info(
         "discord-link webhook: status=%s discord_user_id=%s innersync_user_id=%s",

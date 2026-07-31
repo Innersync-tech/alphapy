@@ -217,3 +217,18 @@ async def test_resolve_innersync_jwt_sub_delegates() -> None:
         out = await ii.resolve_innersync_jwt_sub_to_discord_int(pool, str(uuid.uuid4()))
     assert out == 55
     m.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_identity_stats_increment_on_miss() -> None:
+    before = ii.get_identity_stats()["identity_resolve_miss"]
+    conn = AsyncMock()
+    conn.fetchrow = AsyncMock(return_value=None)
+    pool = _pool_with_conn(conn)
+    ii.invalidate_identity_cache()
+    out = await ii.get_innersync_id_for_discord(pool, 777001)
+    assert out is None
+    after = ii.get_identity_stats()
+    assert after["identity_resolve_miss"] >= before + 1
+    assert after["identity_resolve_total"] >= 1
+    assert "identity:hit=" in ii.format_identity_telemetry_notes(after)
