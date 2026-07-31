@@ -941,7 +941,7 @@ End an active session (HTTP equivalent of `/agent end`). Emits Hermit `gpt_comma
 
 ### Reminder Management
 
-Mind and other clients authenticate with a **Supabase JWT**. The `user_id` path field and reminder payload `user_id` must equal the JWT `sub` (Innersync user UUID). Alphapy resolves that UUID to a Discord snowflake via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int()` with default `allow_profile_fallback=False`). Legacy `profiles.discord_id` fallback exists for one-off backfill scripts but is not used on the reminder API hot path. If the user is not linked, reminder endpoints return **403** with guidance to run `/link` in Discord.
+Mind and other clients authenticate with a **Supabase JWT**. The `user_id` path field and reminder payload `user_id` must equal the JWT `sub` (Innersync user UUID). Alphapy resolves that UUID to a Discord snowflake via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int()` and `get_innersync_id_for_discord()` both default `allow_profile_fallback=False`). Legacy `profiles.discord_id` fallback is opt-in for documented one-offs (e.g. `/unlink` UX); run `scripts/backfill_discord_links_from_profiles.py` so legacy users land in Railway links. If the user is not linked, reminder endpoints return **403** with guidance to run `/link` in Discord.
 
 #### `GET /api/reminders/{user_id}`
 
