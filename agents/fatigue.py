@@ -93,7 +93,13 @@ def format_fatigue_context(prefs: dict[str, str | bool], *, now: datetime | None
     return "\n".join(lines)
 
 
-async def load_raw_agent_prefs(innersync_user_id: str) -> dict[str, Any]:
+async def load_raw_agent_prefs(innersync_user_id: str) -> dict[str, Any] | None:
+    """Load unsanitized agent_prefs JSON.
+
+    Returns:
+        dict: prefs object (possibly empty) when the row is readable.
+        None: load failed — callers must not treat this as empty prefs.
+    """
     try:
         rows = await _supabase_get(
             "app_user_settings",
@@ -105,7 +111,7 @@ async def load_raw_agent_prefs(innersync_user_id: str) -> dict[str, Any]:
         )
     except Exception as exc:
         logger.warning("Failed to load raw agent_prefs for %s: %s", innersync_user_id, exc)
-        return {}
+        return None
     if not rows:
         return {}
     raw = rows[0].get("agent_prefs")
@@ -131,6 +137,13 @@ async def save_fatigue_self_report(
         patch["fatigue_note"] = fatigue_note.strip()[:200]
 
     raw = await load_raw_agent_prefs(innersync_user_id)
+    if raw is None:
+        # Fail closed: never overwrite App Tier-1 prefs with only energy fields.
+        raise RuntimeError(
+            f"Refusing fatigue prefs write for {innersync_user_id}: "
+            "existing agent_prefs could not be loaded"
+        )
+
     merged = {**raw, **patch}
     return await merge_agent_prefs_fields(innersync_user_id, merged)
 
