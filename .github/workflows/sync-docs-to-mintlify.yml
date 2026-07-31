@@ -1,0 +1,70 @@
+name: Sync Alphapy docs to mintlify-docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Alphapy repo
+        uses: actions/checkout@v4
+
+      - name: Checkout mintlify-docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: Innersync-tech/mintlify-docs
+          token: ${{ secrets.DOCS_SYNC_TOKEN }}
+          path: mintlify-repo
+
+      - name: Validate docs sync token
+        run: |
+          if [ -z "${{ secrets.DOCS_SYNC_TOKEN }}" ]; then
+            echo "Missing required secret: DOCS_SYNC_TOKEN"
+            echo "Token needs write access to Innersync-tech/mintlify-docs (enable org SSO if required)."
+            exit 1
+          fi
+
+      - name: Sync docs folder to mintlify-repo/synced/alphapy
+        run: |
+          mkdir -p mintlify-repo/synced/alphapy
+          rsync -av --delete docs/ mintlify-repo/synced/alphapy/ \
+            --exclude=index.md \
+            --exclude=terms-of-service.md \
+            --exclude=privacy-policy.md \
+            --exclude=pricing.md \
+            --exclude=legal.md \
+            --exclude=_config.yml \
+            --exclude=CNAME \
+            --exclude=premium-local-insert.md \
+            --exclude=hermit-core-rollout.md \
+            --exclude=testers-plan.md \
+            --exclude=CONTRIBUTOR.md \
+            --exclude=premium-layer-plan.md
+
+      - name: Verify publication safety
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-publication-safe.sh" mintlify-repo/synced/alphapy
+
+      - name: Commit and push when changed
+        working-directory: mintlify-repo
+        run: |
+          if git diff --quiet -- synced/alphapy; then
+            echo "No docs changes to sync."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add synced/alphapy
+          git commit -m "sync: update Alphapy docs from bot repository"
+          git push origin HEAD:main

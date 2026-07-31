@@ -1,11 +1,9 @@
-name: Sync Alphapy docs to docs repo
+name: Sync Alphapy docs to docs repo (DISABLED — Starlight archived)
+
+# Sprint 3: Mintlify is docs SoT. Use sync-docs-to-mintlify.yml instead.
+# Kept disabled so accidental pushes do not revive Starlight content.
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "docs/**"
   workflow_dispatch:
 
 permissions:
@@ -14,61 +12,9 @@ permissions:
 jobs:
   sync-docs:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Alphapy repo
-        uses: actions/checkout@v4
-
-      - name: Checkout docs repo
-        uses: actions/checkout@v4
-        with:
-          repository: Innersync-tech/docs
-          token: ${{ secrets.DOCS_SYNC_TOKEN }}
-          path: docs-repo
-
-      - name: Validate docs repo token
+      - name: Disabled
         run: |
-          if [ -z "${{ secrets.DOCS_SYNC_TOKEN }}" ]; then
-            echo "Missing required secret: DOCS_SYNC_TOKEN"
-            echo "Create a token with write access to Innersync-tech/docs (and enable org SSO if required)."
-            exit 1
-          fi
-
-      - name: Sync docs folder to docs-repo/src/content/docs/alphapy
-        run: |
-          rsync -av --delete docs/ docs-repo/src/content/docs/alphapy/ \
-            --exclude=index.md \
-            --exclude=terms-of-service.md \
-            --exclude=privacy-policy.md \
-            --exclude=pricing.md \
-            --exclude=legal.md \
-            --exclude=_config.yml \
-            --exclude=CNAME \
-            --exclude=premium-local-insert.md \
-            --exclude=hermit-core-rollout.md \
-            --exclude=testers-plan.md \
-            --exclude=CONTRIBUTOR.md \
-            --exclude=premium-layer-plan.md
-
-      - name: Verify Starlight frontmatter
-        working-directory: docs-repo
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/ensure-starlight-frontmatter.sh" src/content/docs/alphapy
-
-      - name: Verify publication safety
-        working-directory: docs-repo
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-publication-safe.sh" src/content/docs/alphapy
-
-      - name: Commit and push when changed
-        working-directory: docs-repo
-        run: |
-          if git diff --quiet -- src/content/docs/alphapy; then
-            echo "No docs changes to sync."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add src/content/docs/alphapy
-          git commit -m "sync: update Alphapy docs from bot repository"
-          git push origin HEAD:main
+          echo "Starlight docs sync is disabled. Canonical target: Innersync-tech/mintlify-docs"
+          echo "See .github/workflows/sync-docs-to-mintlify.yml"
+          exit 0
