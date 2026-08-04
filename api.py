@@ -2122,6 +2122,61 @@ class GuildSettingsResponse(BaseModel):
     custom_commands: dict[str, Any] = {}
 
 
+_DASHBOARD_BOOL_SETTING_KEYS = frozenset({
+    "allow_everyone_mentions",
+    "enabled",
+    "log_actions",
+    "log_to_database",
+    "gpt_fallback_enabled",
+    "non_embed_enabled",
+    "process_bot_messages",
+})
+_DASHBOARD_INT_SETTING_KEYS = frozenset({
+    "embed_watcher_offset_hours",
+    "max_tokens",
+    "reminder_offset_minutes",
+    "idle_days_threshold",
+    "auto_close_days_threshold",
+})
+_DASHBOARD_BARE_SNOWFLAKE_KEYS = frozenset({"channel_id", "category_id"})
+
+
+def _is_dashboard_snowflake_setting_key(key: str) -> bool:
+    """True for Discord snowflake settings that must stay JSON strings for JS clients."""
+    return (
+        key.endswith(("_channel_id", "_role_id", "_message_id"))
+        or key in _DASHBOARD_BARE_SNOWFLAKE_KEYS
+        or key.startswith("badge_role_")
+    )
+
+
+def _coerce_dashboard_setting_value(key: str, value: Any) -> Any:
+    """Coerce bot_settings values for dashboard JSON (convention-first, no fragile allowlists)."""
+    if key in _DASHBOARD_BOOL_SETTING_KEYS or key.endswith("_enabled"):
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes")
+        return bool(value)
+
+    if _is_dashboard_snowflake_setting_key(key):
+        # Discord snowflakes must stay strings (JSON numbers lose precision past
+        # Number.MAX_SAFE_INTEGER). weekly_food_channel_ids (plural) is excluded.
+        return "" if value is None else str(value)
+
+    if key in _DASHBOARD_INT_SETTING_KEYS:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value
+
+    if key == "temperature":
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+
+    return value
+
+
 class UpdateSettingsRequest(BaseModel):
     category: str
     settings: dict[str, Any]
@@ -2303,48 +2358,8 @@ async def get_guild_settings(
                 key = row['key']
                 value = row['value']
 
-                # Convert string values back to appropriate types
                 if scope in settings:
-                    if key in ['allow_everyone_mentions', 'enabled', 'log_actions', 'log_to_database', 'gpt_fallback_enabled', 'non_embed_enabled', 'process_bot_messages'] or key.endswith('_enabled'):
-                        if isinstance(value, str):
-                            settings[scope][key] = value.strip().lower() in ('true', '1', 'yes')
-                        else:
-                            settings[scope][key] = bool(value)
-                    elif key in [
-                        'log_channel_id',
-                        'category_id',
-                        'staff_role_id',
-                        'escalation_role_id',
-                        'completion_role_id',
-                        'join_role_id',
-                        'verified_role_id',
-                        'onboarding_channel_id',
-                        'rules_channel_id',
-                        'announcements_channel_id',
-                        'default_channel_id',
-                        'channel_id',
-                        'reviewer_role_id',
-                        'verified_log_channel_id',
-                        'failed_parse_log_channel_id',
-                        'challenge_winner_role_id',
-                        # engagement (bot_settings keys — not weekly_channel_id / og_badge_role_id)
-                        'weekly_award_channel_id',
-                    ] or key.startswith('badge_role_'):
-                        # Discord snowflakes must stay strings for JS clients
-                        # (JSON numbers lose precision past Number.MAX_SAFE_INTEGER).
-                        settings[scope][key] = "" if value is None else str(value)
-                    elif key in ['embed_watcher_offset_hours', 'max_tokens', 'reminder_offset_minutes', 'idle_days_threshold', 'auto_close_days_threshold']:
-                        try:
-                            settings[scope][key] = int(value)
-                        except (TypeError, ValueError):
-                            settings[scope][key] = value
-                    elif key in ['temperature']:
-                        try:
-                            settings[scope][key] = float(value)
-                        except (TypeError, ValueError):
-                            settings[scope][key] = value
-                    else:
-                        settings[scope][key] = value
+                    settings[scope][key] = _coerce_dashboard_setting_value(key, value)
 
             return GuildSettingsResponse(**settings)
 
@@ -2982,7 +2997,7 @@ class AutoModViolation(BaseModel):
 
 class AutoModSettings(BaseModel):
     enabled: bool = False
-    log_channel_id: int | None = None
+    log_channel_id: str | None = None
     log_actions: bool = True
     log_to_database: bool = True
 
@@ -3445,17 +3460,13 @@ async def get_automod_settings(
             
             settings = {}
             for row in rows:
-                key = row['key']
-                value = row['value']
-                
-                # Convert boolean values
-                if key in ['enabled', 'log_actions', 'log_to_database']:
-                    settings[key] = value.lower() == 'true'
-                elif key == 'log_channel_id':
-                    settings[key] = int(value) if value.isdigit() else None
-                else:
-                    settings[key] = value
-            
+                key = row["key"]
+                coerced = _coerce_dashboard_setting_value(key, row["value"])
+                # Empty snowflake strings → None so AutoModSettings stays optional.
+                if key == "log_channel_id" and coerced == "":
+                    coerced = None
+                settings[key] = coerced
+
             return AutoModSettings(**settings)
             
     except HTTPException:

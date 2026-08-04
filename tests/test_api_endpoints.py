@@ -354,11 +354,16 @@ class TestGetGuildSettings:
         conn.fetch = AsyncMock(return_value=[
             {"scope": "system", "key": "log_channel_id", "value": snowflake},
             {"scope": "onboarding", "key": "completion_role_id", "value": snowflake_int},
-            # engagement uses weekly_award_channel_id + badge_role_* (not weekly_channel_id / og_badge_role_id)
+            # convention-based keys (not fragile allowlist)
+            {"scope": "invites", "key": "announcement_channel_id", "value": snowflake_int},
+            {"scope": "verification", "key": "reference_image_message_id", "value": snowflake_int},
             {"scope": "engagement", "key": "weekly_award_channel_id", "value": snowflake_int},
             {"scope": "engagement", "key": "badge_role_og", "value": snowflake_int},
             {"scope": "engagement", "key": "badge_role_motivator", "value": snowflake_int},
             {"scope": "engagement", "key": "challenge_winner_role_id", "value": snowflake_int},
+            {"scope": "engagement", "key": "weekly_food_channel_ids", "value": f"{snowflake},1"},
+            {"scope": "gpt", "key": "max_tokens", "value": "512"},
+            {"scope": "agents", "key": "agents_enabled", "value": "true"},
         ])
         app = make_app()
         with patch.object(api_module, "db_pool", pool):
@@ -369,12 +374,39 @@ class TestGetGuildSettings:
         assert data["system"]["log_channel_id"] == snowflake
         assert data["onboarding"]["completion_role_id"] == snowflake
         assert isinstance(data["system"]["log_channel_id"], str)
+        assert data["invites"]["announcement_channel_id"] == snowflake
+        assert data["verification"]["reference_image_message_id"] == snowflake
         assert data["engagement"]["weekly_award_channel_id"] == snowflake
         assert data["engagement"]["badge_role_og"] == snowflake
         assert data["engagement"]["badge_role_motivator"] == snowflake
         assert data["engagement"]["challenge_winner_role_id"] == snowflake
         assert isinstance(data["engagement"]["weekly_award_channel_id"], str)
         assert isinstance(data["engagement"]["badge_role_og"], str)
+        # plural channel list is not a single snowflake key
+        assert data["engagement"]["weekly_food_channel_ids"] == f"{snowflake},1"
+        assert data["gpt"]["max_tokens"] == 512
+        assert data["agents"]["agents_enabled"] is True
+
+    def test_automod_settings_keep_log_channel_as_string(self):
+        snowflake = "1439387968321228800"
+        pool, conn = _mock_pool()
+        conn.fetch = AsyncMock(return_value=[
+            {"key": "enabled", "value": "true"},
+            {"key": "log_channel_id", "value": int(snowflake)},
+            {"key": "log_actions", "value": True},
+            {"key": "log_to_database", "value": "false"},
+        ])
+        app = make_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/automod/settings")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["enabled"] is True
+        assert data["log_channel_id"] == snowflake
+        assert isinstance(data["log_channel_id"], str)
+        assert data["log_actions"] is True
+        assert data["log_to_database"] is False
 
     def test_accepts_discord_service_headers(self):
         """Control-panel proxy auth: X-Api-Key + X-Discord-User-Id (no JWT)."""
