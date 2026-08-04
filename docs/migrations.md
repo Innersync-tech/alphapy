@@ -192,7 +192,7 @@ If a migration fails partway through:
 
 ## Current Schema
 
-**Current migration head:** `025_growth_checkins_content`
+**Current migration head:** `026_reminders_completed_flag`
 
 Tables added across all migrations:
 

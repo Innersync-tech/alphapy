@@ -3783,6 +3783,10 @@ async def get_dashboard_discord_meta(
         raise HTTPException(status_code=500, detail="Failed to fetch discord meta") from exc
 
 
+from dashboard_guild_crud import register_dashboard_guild_crud
+
+register_dashboard_guild_crud(router, verify_dashboard_discord_admin)
+
 include_agent_routes(
     router,
     get_authenticated_user_id=get_authenticated_user_id,
