@@ -595,6 +595,52 @@ class TestGetAutomodRules:
             response = client.get(f"/api/dashboard/{GUILD_ID}/automod/rules")
         assert response.status_code == 403
 
+    def test_serializes_datetime_fields_as_strings(self):
+        pool, conn = _mock_pool()
+        created = datetime(2026, 8, 4, 12, 0, 0)
+        conn.fetch = AsyncMock(return_value=[{
+            "id": 1,
+            "guild_id": GUILD_ID,
+            "rule_type": "spam",
+            "name": "Spam",
+            "enabled": True,
+            "config": {"max": 5},
+            "created_by": DISCORD_USER_ID,
+            "created_at": created,
+            "updated_at": created,
+            "is_premium": False,
+            "action_type": "delete",
+            "action_config": {},
+            "severity": 1,
+        }])
+        app = make_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/automod/rules")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["created_at"] == created.isoformat()
+        assert data[0]["updated_at"] == created.isoformat()
+
+
+# ---------------------------------------------------------------------------
+# GET /api/dashboard/{guild_id}/automod/violations
+# ---------------------------------------------------------------------------
+
+
+class TestGetAutomodViolations:
+    def test_passes_days_as_string_for_asyncpg(self):
+        pool, conn = _mock_pool()
+        conn.fetch = AsyncMock(return_value=[])
+        app = make_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/automod/violations?days=7&limit=50")
+        assert response.status_code == 200
+        assert response.json() == []
+        assert conn.fetch.await_args.args[2] == "7"
+
 
 # ---------------------------------------------------------------------------
 # POST /api/dashboard/{guild_id}/automod/rules
@@ -771,18 +817,24 @@ class TestAutomodInvalidateCache:
 
 
 class TestSettingsInvalidateCache:
-    def test_invalidate_settings_cache_success(self):
+    @patch("api.asyncio.run_coroutine_threadsafe")
+    def test_invalidate_settings_cache_success(self, mock_threadsafe):
         app = _make_dashboard_app()
         mock_settings = MagicMock()
         mock_settings.reload_guild = AsyncMock(return_value=3)
         mock_bot = MagicMock()
         mock_bot.settings = mock_settings
+        mock_bot.loop = MagicMock()
+        future = Future()
+        future.set_result(3)
+        mock_threadsafe.return_value = future
         with patch("gpt.helpers.bot_instance", mock_bot):
             client = TestClient(app)
             response = client.post(f"/api/dashboard/{GUILD_ID}/settings/invalidate-cache")
         assert response.status_code == 200
         assert response.json() == {"success": True, "loaded": 3}
-        mock_settings.reload_guild.assert_awaited_once_with(GUILD_ID)
+        mock_threadsafe.assert_called_once()
+        assert mock_threadsafe.call_args.args[1] is mock_bot.loop
 
 
 # ---------------------------------------------------------------------------
