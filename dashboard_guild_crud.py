@@ -5,6 +5,7 @@ Auth: Dashboard service key + Discord snowflake via verify_dashboard_discord_adm
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import UTC, datetime, time
 from typing import Any, Literal
@@ -50,6 +51,66 @@ def _parse_channel_id(
         return int(value)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Invalid channel_id") from exc
+
+
+async def _channel_belongs_to_guild_on_bot_loop(guild_id: int, channel_id: int) -> bool:
+    """Run on the bot event loop: True iff channel exists and belongs to guild_id."""
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise RuntimeError("Bot not available")
+
+    guild = bot_instance.get_guild(guild_id)
+    if guild is None:
+        try:
+            guild = await bot_instance.fetch_guild(guild_id)
+        except Exception as exc:
+            raise RuntimeError("Guild not found") from exc
+
+    channel = guild.get_channel(channel_id)
+    if channel is None:
+        try:
+            channel = await bot_instance.fetch_channel(channel_id)
+        except Exception:
+            return False
+
+    channel_guild = getattr(channel, "guild", None)
+    return channel_guild is not None and int(channel_guild.id) == int(guild_id)
+
+
+async def _ensure_channel_in_guild(guild_id: int, channel_id: int) -> None:
+    """Reject reminder channel_ids outside the requested guild (cross-tenant guard).
+
+    Dashboard auth is scoped per guild; channel_id must not point at another
+    guild where the bot is also present.
+    """
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot not available to verify channel")
+
+    async def runner() -> bool:
+        return await _channel_belongs_to_guild_on_bot_loop(guild_id, channel_id)
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(runner(), bot_instance.loop)
+        belongs = await asyncio.wait_for(asyncio.wrap_future(future), timeout=5.0)
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Channel verification timed out") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.debug("[dashboard] channel guild check failed guild=%s channel=%s: %s", guild_id, channel_id, exc)
+        raise HTTPException(
+            status_code=400,
+            detail="channel_id must belong to this guild",
+        ) from exc
+
+    if not belongs:
+        raise HTTPException(
+            status_code=400,
+            detail="channel_id must belong to this guild",
+        )
 
 
 async def _resolve_image_url_for_write(
@@ -312,6 +373,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         pool = _require_pool()
         channel_id = _parse_channel_id(body.channel_id, required=True)
         assert channel_id is not None
+        await _ensure_channel_in_guild(guild_id, channel_id)
 
         name = (body.name or "Reminder").strip() or "Reminder"
         try:
@@ -391,7 +453,10 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         if body.name is not None:
             fields["name"] = body.name
         if body.channel_id is not None:
-            fields["channel_id"] = _parse_channel_id(body.channel_id, required=True)
+            parsed_channel = _parse_channel_id(body.channel_id, required=True)
+            assert parsed_channel is not None
+            await _ensure_channel_in_guild(guild_id, parsed_channel)
+            fields["channel_id"] = parsed_channel
         if body.completed is not None:
             fields["completed"] = body.completed
         if body.days is not None:
@@ -556,6 +621,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
             raise HTTPException(status_code=400, detail="At least one day is required")
         channel_id = _parse_channel_id(body.channel_id, required=True)
         assert channel_id is not None
+        await _ensure_channel_in_guild(guild_id, channel_id)
         try:
             resolved_image, should_record_image = await _resolve_image_url_for_write(
                 discord_admin_id,
