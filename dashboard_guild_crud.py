@@ -6,7 +6,6 @@ Auth: Dashboard service key + Discord snowflake via verify_dashboard_discord_adm
 from __future__ import annotations
 
 import re
-import time as time_module
 from datetime import UTC, datetime, time
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -15,7 +14,10 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-import config
+from utils.image_reminder_rate_limit import (
+    record_image_reminder,
+    would_exceed_image_reminder_rate_limit,
+)
 from utils.logger import logger
 from utils.premium_guard import get_user_tier, is_premium, premium_required_message
 from utils.premium_tiers import REMINDER_LIMIT
@@ -26,11 +28,6 @@ LIVE_SESSION_NAME = "Live session"
 LIVE_SESSION_MESSAGE = "Live session starting now!"
 MAX_CUSTOM_COMMANDS_PER_GUILD = 50
 VALID_TRIGGER_TYPES = frozenset({"exact", "starts_with", "contains", "regex"})
-# Max image reminder creates/updates per user+guild within IMAGE_REMINDER_RATE_LIMIT_WINDOW
-# (matches Discord cog hard-cap of 3; list retention uses IMAGE_REMINDER_RATE_LIMIT_COUNT).
-IMAGE_REMINDER_RATE_LIMIT = 3
-
-_image_reminder_timestamps: dict[tuple[int, int], list[float]] = {}
 
 
 async def _require_reminder_quota(conn: Any, user_id: int, guild_id: int) -> None:
@@ -40,7 +37,10 @@ async def _require_reminder_quota(conn: Any, user_id: int, guild_id: int) -> Non
     if limit is None:
         return
     count = await conn.fetchval(
-        "SELECT COUNT(*) FROM reminders WHERE created_by = $1 AND guild_id = $2",
+        """
+        SELECT COUNT(*) FROM reminders
+        WHERE created_by = $1 AND guild_id = $2 AND completed IS NOT TRUE
+        """,
         user_id,
         guild_id,
     )
@@ -54,38 +54,34 @@ async def _require_reminder_quota(conn: Any, user_id: int, guild_id: int) -> Non
         )
 
 
-async def _require_premium_image(
+async def _resolve_image_url_for_write(
     user_id: int,
     guild_id: int,
     image_url: str | None,
     *,
+    existing_url: str | None = None,
     feature_name: str = "Reminders with images",
-) -> str | None:
-    """Return stripped image URL or None; enforce premium + rate limit when set."""
+) -> tuple[str | None, bool]:
+    """Return (resolved_url, should_record_rate_limit).
+
+    Clearing image → (None, False). Same URL as existing → premium check only.
+    New/changed non-empty URL → premium + shared rate limit; caller records on success.
+    """
     resolved = (image_url or "").strip() or None
     if not resolved:
-        return None
+        return None, False
     if not await is_premium(user_id, guild_id):
         raise HTTPException(status_code=403, detail=premium_required_message(feature_name))
-    key = (user_id, guild_id)
-    now_ts = time_module.time()
-    timestamps = _image_reminder_timestamps.get(key, [])
-    recent = [t for t in timestamps if t > now_ts - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW]
-    if len(recent) >= IMAGE_REMINDER_RATE_LIMIT:
+    existing_norm = (existing_url or "").strip() or None
+    if existing_norm == resolved:
+        return resolved, False
+    if would_exceed_image_reminder_rate_limit(user_id, guild_id):
         raise HTTPException(
             status_code=429,
             detail="You can add at most 3 reminders with images per hour. Try again later.",
         )
-    return resolved
+    return resolved, True
 
-
-def _record_image_reminder(user_id: int, guild_id: int) -> None:
-    key = (user_id, guild_id)
-    now_ts = time_module.time()
-    ts_list = _image_reminder_timestamps.get(key, [])
-    ts_list = [t for t in ts_list if t > now_ts - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW]
-    ts_list.append(now_ts)
-    _image_reminder_timestamps[key] = ts_list[-config.IMAGE_REMINDER_RATE_LIMIT_COUNT :]
 
 def _dt_iso(value: Any) -> str | None:
     if value is None:
@@ -118,9 +114,12 @@ def _compute_reminder_times(session_time: str, offset_minutes: int) -> tuple[tim
 
 
 def _times_from_event_dt(event_dt: datetime, offset_minutes: int) -> tuple[time, time, datetime]:
-    """One-off: event timestamptz → (reminder time, call time, normalized event_dt)."""
+    """One-off: event timestamptz → (reminder time, call time, normalized event_dt).
+
+    Naive datetimes are treated as Europe/Brussels wall clock (same as recurring HH:MM).
+    """
     if event_dt.tzinfo is None:
-        event_dt = event_dt.replace(tzinfo=UTC)
+        event_dt = event_dt.replace(tzinfo=BRUSSELS_TZ)
     local = event_dt.astimezone(BRUSSELS_TZ)
     call_t = time(local.hour, local.minute)
     rem_t, _ = _compute_reminder_times(call_t.strftime("%H:%M"), offset_minutes)
@@ -130,7 +129,7 @@ def _times_from_event_dt(event_dt: datetime, offset_minutes: int) -> tuple[time,
 def _shift_event_dt_to_call_clock(event_dt: datetime, call_t: time) -> datetime:
     """Keep one-off calendar date (Brussels); move clock to call_t."""
     if event_dt.tzinfo is None:
-        event_dt = event_dt.replace(tzinfo=UTC)
+        event_dt = event_dt.replace(tzinfo=BRUSSELS_TZ)
     local = event_dt.astimezone(BRUSSELS_TZ)
     return local.replace(
         hour=call_t.hour,
@@ -386,7 +385,9 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
     ):
         pool = _require_pool()
         fields: dict[str, Any] = {}
-        image_to_record: str | None = None
+        pending_image: str | None = None
+        record_image_rate_limit = False
+        # image_url is resolved after we load the existing row (rate-limit only on change).
 
         if body.message is not None:
             fields["message"] = body.message
@@ -396,25 +397,27 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
             fields["channel_id"] = int(body.channel_id)
         if body.completed is not None:
             fields["completed"] = body.completed
-        if body.image_url is not None:
-            image_to_record = await _require_premium_image(
-                discord_admin_id,
-                guild_id,
-                body.image_url,
-            )
-            fields["image_url"] = image_to_record
         if body.days is not None:
             fields["days"] = [str(d) for d in body.days]
 
         try:
             async with pool.acquire() as conn:
                 existing = await conn.fetchrow(
-                    "SELECT event_time FROM reminders WHERE id = $1 AND guild_id = $2",
+                    "SELECT event_time, image_url FROM reminders WHERE id = $1 AND guild_id = $2",
                     reminder_id,
                     guild_id,
                 )
                 if existing is None:
                     raise HTTPException(status_code=404, detail="Reminder not found")
+
+                if body.image_url is not None:
+                    pending_image, record_image_rate_limit = await _resolve_image_url_for_write(
+                        discord_admin_id,
+                        guild_id,
+                        body.image_url,
+                        existing_url=existing.get("image_url"),
+                    )
+                    fields["image_url"] = pending_image
 
                 offset = await _get_reminder_offset_minutes(conn, guild_id)
                 was_one_off = existing["event_time"] is not None
@@ -500,8 +503,8 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                 row = await conn.fetchrow(sql, *values)
             if row is None:
                 raise HTTPException(status_code=404, detail="Reminder not found")
-            if image_to_record:
-                _record_image_reminder(discord_admin_id, guild_id)
+            if record_image_rate_limit:
+                record_image_reminder(discord_admin_id, guild_id)
             return {"success": True, "reminder": _serialize_reminder(row)}
         except HTTPException:
             raise
@@ -555,7 +558,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         if not day_numbers:
             raise HTTPException(status_code=400, detail="At least one day is required")
         try:
-            resolved_image = await _require_premium_image(
+            resolved_image, should_record_image = await _resolve_image_url_for_write(
                 discord_admin_id,
                 guild_id,
                 body.image_url,
@@ -582,8 +585,8 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                     discord_admin_id,
                     resolved_image,
                 )
-            if resolved_image:
-                _record_image_reminder(discord_admin_id, guild_id)
+            if should_record_image:
+                record_image_reminder(discord_admin_id, guild_id)
             return {"success": True, "reminderId": row["id"]}
         except HTTPException:
             raise

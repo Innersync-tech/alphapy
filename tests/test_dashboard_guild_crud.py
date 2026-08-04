@@ -190,16 +190,21 @@ class TestGuildRemindersDashboard:
         assert "Premium" in response.json()["detail"] or "premium" in response.json()["detail"].lower()
 
     def test_update_image_allowed_for_premium(self):
+        from utils.image_reminder_rate_limit import clear_image_reminder_timestamps_for_tests
+
+        clear_image_reminder_timestamps_for_tests()
         pool, conn = _mock_pool()
         conn.fetchval = AsyncMock(return_value="60")
-        existing = _fake_record(event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC))
+        existing = _fake_record(
+            event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+            image_url=None,
+        )
         updated = _reminder_row(image_url="https://example.com/banner.png")
         conn.fetchrow = AsyncMock(side_effect=[existing, updated])
         app = _make_dashboard_app()
         with (
             patch.object(api_module, "db_pool", pool),
             patch("dashboard_guild_crud.is_premium", new=AsyncMock(return_value=True)),
-            patch("dashboard_guild_crud._image_reminder_timestamps", {}),
         ):
             client = TestClient(app)
             response = client.put(
@@ -208,6 +213,86 @@ class TestGuildRemindersDashboard:
             )
         assert response.status_code == 200
         assert "https://example.com/banner.png" in conn.fetchrow.await_args_list[1].args
+
+    def test_update_same_image_does_not_consume_rate_limit(self):
+        from utils.image_reminder_rate_limit import (
+            clear_image_reminder_timestamps_for_tests,
+            recent_image_reminder_count,
+            record_image_reminder,
+        )
+
+        clear_image_reminder_timestamps_for_tests()
+        record_image_reminder(DISCORD_USER_ID, GUILD_ID)
+        record_image_reminder(DISCORD_USER_ID, GUILD_ID)
+        record_image_reminder(DISCORD_USER_ID, GUILD_ID)
+        assert recent_image_reminder_count(DISCORD_USER_ID, GUILD_ID) == 3
+
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        url = "https://example.com/same.png"
+        existing = _fake_record(
+            event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+            image_url=url,
+        )
+        updated = _reminder_row(image_url=url, message="updated")
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch("dashboard_guild_crud.is_premium", new=AsyncMock(return_value=True)),
+        ):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"image_url": url, "message": "updated"},
+            )
+        assert response.status_code == 200
+        assert recent_image_reminder_count(DISCORD_USER_ID, GUILD_ID) == 3
+
+    def test_naive_scheduled_time_is_brussels(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        conn.fetchrow = AsyncMock(return_value=_reminder_row(id=11))
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool), _patch_unlimited_tier():
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={
+                    "message": "once",
+                    "channel_id": "123",
+                    "scheduled_time": "2026-08-05T14:30:00",
+                },
+            )
+        assert response.status_code == 200
+        args = conn.fetchrow.await_args.args
+        assert args[4] == time(13, 30)
+        assert args[5] == time(14, 30)
+        event_dt = args[9]
+        assert event_dt.tzinfo is not None
+        local = event_dt.astimezone(BRUSSELS_TZ)
+        assert (local.hour, local.minute) == (14, 30)
+
+    def test_create_reminder_quota_ignores_completed(self):
+        pool, conn = _mock_pool()
+        # count of active (= incomplete) is under limit; completed rows ignored
+        conn.fetchval = AsyncMock(side_effect=[9, "60"])
+        conn.fetchrow = AsyncMock(return_value=_reminder_row(id=100))
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool), _patch_free_tier():
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={
+                    "message": "hi",
+                    "channel_id": "123",
+                    "time": "10:00",
+                    "days": ["0"],
+                },
+            )
+        assert response.status_code == 200
+        count_sql = conn.fetchval.await_args_list[0].args[0]
+        assert "completed IS NOT TRUE" in count_sql
 
     def test_clear_scheduled_time_also_clears_days(self):
         pool, conn = _mock_pool()
