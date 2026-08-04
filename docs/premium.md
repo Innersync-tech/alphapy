@@ -31,8 +31,8 @@ Payment and webhooks (Stripe/Lemon Squeezy) are out of scope for the initial rel
 | `PREMIUM_CACHE_TTL_SECONDS` | TTL in seconds for the in-memory premium cache (default: 300). |
 | `CORE_API_URL` | When set, the guard calls `POST {CORE_API_URL}/api/premium/verify` first (see below). |
 | `ALPHAPY_SERVICE_KEY` | API key for Core-API premium verify. |
-| `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Optional. Secret for `POST /webhooks/premium-invalidate` (Core notifies on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`. |
-| `FOUNDER_WEBHOOK_SECRET` | Optional. Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`. |
+| `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Optional. Secret for `POST /webhooks/premium-invalidate` (Core notifies on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`. |
+| `FOUNDER_WEBHOOK_SECRET` | Optional. Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`. |
 
 ## Guard behaviour
 

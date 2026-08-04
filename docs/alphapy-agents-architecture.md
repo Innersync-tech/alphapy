@@ -120,6 +120,7 @@ cogs/agents.py     /agent list|start|continue|end|status
 - Ephemeral buttons `1`–`5` + Skip; stable custom_ids `alphapy:fatigue:*`
 - Persistent View (`timeout=None`) registered in `utils/lifecycle.py` Phase 6 via `bot.add_view`
 - Pending `/agent start` context kept in-process for 120s; after restart, clicks ACK with “expired… run `/agent start` again”
+- Persist path: `save_fatigue_self_report` → `merge_agent_prefs_fields` into existing `app_user_settings.agent_prefs` (preserves App Tier 1 fields). Fails closed if prefs cannot be loaded — never writes energy-only overwrites.
 
 **Gates:**
 

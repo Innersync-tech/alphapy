@@ -19,9 +19,7 @@ All Alphapy API endpoints require authentication. This document explains how aut
 
 ## Authentication Methods
 
-The endpoint supports **two authentication methods**:
-
-### 1. Supabase JWT Token (Recommended)
+### 1. Supabase JWT Token (user identity)
 
 **Required Headers:**
 ```
@@ -31,6 +29,7 @@ Authorization: Bearer <supabase-jwt-token>
 **How it works:**
 - Alphapy validates the JWT token by calling `{SUPABASE_URL}/auth/v1/user`
 - The token must be valid for the **same Supabase project** that Alphapy is configured to use
+- User identity for user-scoped routes comes from the verified JWT `sub` only (`get_authenticated_user_id`)
 - Alphapy uses `SUPABASE_URL` and `SUPABASE_ANON_KEY` from its environment variables
 
 **Configuration in Alphapy:**
@@ -41,34 +40,43 @@ SUPABASE_ANON_KEY=<anon-key>
 
 **Important:** The Supabase project used by Alphapy **must be the same** as the one used by Mind. If they use different Supabase projects, the JWT token from Mind will not be valid for Alphapy.
 
-### 2. API Key + User ID (Fallback)
+### 2. API Key (service mode)
 
 **Required Headers:**
 ```
 X-API-Key: <api-key>
-X-User-Id: <user-id>
 ```
 
 **How it works:**
-- If Supabase JWT validation fails, Alphapy falls back to API key authentication
-- Requires `API_KEY` to be configured in Alphapy's environment variables
-- The `X-User-Id` header is required to identify the user
+- `verify_api_key` accepts a valid Supabase JWT **or** a bare `X-Api-Key` matching `API_KEY`
+- A bare API key does **not** bind a user id — it is for service/ops routes (e.g. `/api/observability`, `/api/hermit/growth-checkins`, metrics when configured)
+- There is **no** `X-User-Id` header. Do not send it; it is ignored and not trusted (see also [API Reference](../api/))
 
 **Configuration in Alphapy:**
 ```bash
 API_KEY=<your-secret-api-key>
 ```
 
+### 3. Dashboard Discord admin (control panel)
+
+Guild-admin dashboard routes (Sprint 3b CRUD, invalidate-cache, discord-meta, verification queue) use:
+
+```
+X-Api-Key: <api-key>
+X-Discord-User-Id: <discord-snowflake>
+```
+
+`verify_dashboard_discord_admin` checks the Discord user is an admin of the path `guild_id`. This is separate from Supabase JWT settings routes.
+
 ## Error: "Missing authentication context"
 
-This error occurs when:
-1. **No Authorization header** is provided, AND
-2. **No X-User-Id header** is provided
+This error occurs when no usable auth is present (no valid `Authorization: Bearer` JWT and no valid service `X-Api-Key` where allowed).
 
 **Solution:**
-- Ensure you're sending either:
-  - `Authorization: Bearer <supabase-jwt-token>` header, OR
-  - `X-User-Id: <user-id>` header (along with `X-API-Key` if API key auth is configured)
+- For user-scoped routes: send `Authorization: Bearer <supabase-jwt-token>`
+- For service routes: send `X-Api-Key: <api-key>`
+- For Discord-admin dashboard routes: send `X-Api-Key` + `X-Discord-User-Id`
+- Do **not** rely on `X-User-Id` — that header is not implemented
 
 ## Common Issues
 
@@ -263,25 +271,24 @@ ALPHAPY_BASE_URL=http://localhost:8000
 curl -H "Authorization: Bearer <supabase-jwt-token>" \
   http://localhost:8000/api/dashboard/metrics
 
-# Test with API Key
-curl -H "X-API-Key: <api-key>" \
-     -H "X-User-Id: test-user-123" \
-  http://localhost:8000/api/dashboard/metrics
+# Test with service API key (no user binding)
+curl -H "X-Api-Key: <api-key>" \
+  http://localhost:8000/api/observability
 ```
 
 ## Endpoint Details
 
-### All Dashboard Endpoints Use Same Authentication
+### Auth patterns by route family
 
-All `/api/dashboard/*` endpoints use the same authentication method:
-- **Required:** Supabase JWT token (via `Authorization: Bearer <token>` header)
-- **Optional Fallback:** API Key + User ID (if configured)
+- **JWT settings / history / onboarding (linked Discord admin):** `Authorization: Bearer <supabase_jwt>`
+- **Service metrics / observability / Hermit broker:** `X-Api-Key` (or JWT where the shared dependency allows both)
+- **Sprint 3b guild CRUD / invalidate-cache / discord-meta:** `X-Api-Key` + `X-Discord-User-Id`
 
 ### Main Endpoints for Mind
 
 #### `/api/dashboard/metrics` and `/api/metrics`
 
-**Authentication:** Required (Supabase JWT OR API Key + User ID)
+**Authentication:** Required (Supabase JWT or service `X-Api-Key`)
 
 **Query Parameters:**
 - `guild_id` (optional): Filter metrics by guild ID
@@ -342,6 +349,8 @@ All `/api/dashboard/*` endpoints use the same authentication method:
 
 4. **Guild Filtering**: The `guild_id` query parameter filters results for security. Use it when possible to limit data exposure.
 
+5. **Never trust `X-User-Id`**: User identity is JWT `sub` only. Dashboard Discord identity uses `X-Discord-User-Id`, not `X-User-Id`.
+
 ## Troubleshooting Checklist
 
 - [ ] Verify `SUPABASE_URL` in Alphapy matches `NEXT_PUBLIC_SUPABASE_URL` in Mind
@@ -350,4 +359,4 @@ All `/api/dashboard/*` endpoints use the same authentication method:
 - [ ] Verify the `Authorization` header format: `Bearer <token>`
 - [ ] Check Alphapy logs for detailed error messages
 - [ ] If using API key auth, verify `API_KEY` matches in both services
-- [ ] Ensure `X-User-Id` header is provided when using API key auth
+- [ ] For Discord-admin dashboard routes, send `X-Discord-User-Id` (not `X-User-Id`)
