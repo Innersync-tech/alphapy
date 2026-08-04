@@ -438,6 +438,67 @@ class TestGetGuildSettings:
         assert response.status_code == 403
 
 
+class TestUpdateGuildSettings:
+    """Tests for POST /api/dashboard/settings/{guild_id}."""
+
+    def test_encodes_boolean_settings_as_jsonb(self):
+        """Regression: str(True) is invalid JSON and used to 500 the Agents toggle."""
+        pool, conn = _mock_pool()
+        tx = AsyncMock()
+        tx.__aenter__ = AsyncMock(return_value=None)
+        tx.__aexit__ = AsyncMock(return_value=False)
+        conn.transaction = MagicMock(return_value=tx)
+
+        app = make_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch("api.log_operational_event"),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/settings/{GUILD_ID}",
+                json={"category": "agents", "settings": {"enabled": True}},
+            )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        insert_calls = [
+            call for call in conn.execute.await_args_list
+            if "INSERT INTO bot_settings" in call.args[0]
+        ]
+        assert len(insert_calls) == 1
+        sql, guild_id, scope, key, payload = insert_calls[0].args
+        assert "::jsonb" in sql
+        assert guild_id == GUILD_ID
+        assert scope == "agents"
+        assert key == "enabled"
+        assert payload == "true"
+
+    def test_persists_disabled_boolean_false(self):
+        pool, conn = _mock_pool()
+        tx = AsyncMock()
+        tx.__aenter__ = AsyncMock(return_value=None)
+        tx.__aexit__ = AsyncMock(return_value=False)
+        conn.transaction = MagicMock(return_value=tx)
+
+        app = make_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch("api.log_operational_event"),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/settings/{GUILD_ID}",
+                json={"category": "agents", "settings": {"enabled": False}},
+            )
+        assert response.status_code == 200
+        insert_calls = [
+            call for call in conn.execute.await_args_list
+            if "INSERT INTO bot_settings" in call.args[0]
+        ]
+        assert insert_calls[0].args[4] == "false"
+
+
 # ---------------------------------------------------------------------------
 # GET /api/dashboard/{guild_id}/automod/rules
 # ---------------------------------------------------------------------------

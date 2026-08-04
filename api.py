@@ -1,4 +1,5 @@
 import asyncio
+import json
 import math
 import os
 import time
@@ -2114,6 +2115,11 @@ class GuildSettingsResponse(BaseModel):
     onboarding: dict[str, Any] = {}
     ticketbot: dict[str, Any] = {}
     verification: dict[str, Any] = {}
+    growth: dict[str, Any] = {}
+    agents: dict[str, Any] = {}
+    engagement: dict[str, Any] = {}
+    fyi: dict[str, Any] = {}
+    custom_commands: dict[str, Any] = {}
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -2284,7 +2290,12 @@ async def get_guild_settings(
                 'automod': {},
                 'onboarding': {},
                 'ticketbot': {},
-                'verification': {}
+                'verification': {},
+                'growth': {},
+                'agents': {},
+                'engagement': {},
+                'fyi': {},
+                'custom_commands': {},
             }
 
             for row in rows:
@@ -2294,8 +2305,11 @@ async def get_guild_settings(
 
                 # Convert string values back to appropriate types
                 if scope in settings:
-                    if key in ['allow_everyone_mentions', 'enabled', 'log_actions', 'log_to_database', 'gpt_fallback_enabled', 'non_embed_enabled', 'process_bot_messages']:
-                        settings[scope][key] = value.lower() == 'true' if isinstance(value, str) else bool(value)
+                    if key in ['allow_everyone_mentions', 'enabled', 'log_actions', 'log_to_database', 'gpt_fallback_enabled', 'non_embed_enabled', 'process_bot_messages'] or key.endswith('_enabled'):
+                        if isinstance(value, str):
+                            settings[scope][key] = value.strip().lower() in ('true', '1', 'yes')
+                        else:
+                            settings[scope][key] = bool(value)
                     elif key in [
                         'log_channel_id',
                         'category_id',
@@ -2312,6 +2326,9 @@ async def get_guild_settings(
                         'reviewer_role_id',
                         'verified_log_channel_id',
                         'failed_parse_log_channel_id',
+                        'challenge_winner_role_id',
+                        'weekly_channel_id',
+                        'og_badge_role_id',
                     ]:
                         # Discord snowflakes must stay strings for JS clients
                         # (JSON numbers lose precision past Number.MAX_SAFE_INTEGER).
@@ -2369,16 +2386,18 @@ async def update_guild_settings(
                     guild_id, request.category
                 )
 
-                # Insert new settings
+                # Insert new settings (value column is JSONB — encode properly)
                 for key, value in request.settings.items():
-                    if value is not None and value != "":
-                        await conn.execute(
-                            """
-                            INSERT INTO bot_settings (guild_id, scope, key, value)
-                            VALUES ($1, $2, $3, $4);
-                            """,
-                            guild_id, request.category, key, str(value)
-                        )
+                    if value is None or value == "":
+                        continue
+                    payload = json.dumps(value)
+                    await conn.execute(
+                        """
+                        INSERT INTO bot_settings (guild_id, scope, key, value)
+                        VALUES ($1, $2, $3, $4::jsonb);
+                        """,
+                        guild_id, request.category, key, payload
+                    )
 
             # Log to operational events
             log_operational_event(
