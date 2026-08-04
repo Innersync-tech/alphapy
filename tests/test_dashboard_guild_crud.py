@@ -2,6 +2,7 @@
 
 from datetime import UTC, date, datetime, time
 from unittest.mock import AsyncMock, patch
+from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
@@ -13,6 +14,8 @@ from tests.test_api_endpoints import (
     _make_dashboard_app,
     _mock_pool,
 )
+
+BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
 
 
 def _reminder_row(**kwargs):
@@ -161,6 +164,66 @@ class TestGuildRemindersDashboard:
         assert "days" in update_sql
         assert [] in conn.fetchrow.await_args_list[1].args
 
+    def test_empty_schedule_on_recurring_preserves_days(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        existing = _fake_record(event_time=None)
+        updated = _reminder_row(event_time=None, days=["0", "1"])
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"scheduled_time": ""},
+            )
+        assert response.status_code == 200
+        update_args = conn.fetchrow.await_args_list[1].args
+        assert "days" not in update_args[0]
+
+    def test_one_off_scheduled_time_clears_days(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        existing = _fake_record(event_time=None)
+        updated = _reminder_row(days=[])
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"scheduled_time": "2026-08-05T14:30:00+02:00"},
+            )
+        assert response.status_code == 200
+        update_sql = conn.fetchrow.await_args_list[1].args[0]
+        assert "days" in update_sql
+        assert [] in conn.fetchrow.await_args_list[1].args
+
+    def test_one_off_call_time_syncs_event_time(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        existing = _fake_record(
+            event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+        )
+        updated = _reminder_row()
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"call_time": "16:45"},
+            )
+        assert response.status_code == 200
+        update_sql = conn.fetchrow.await_args_list[1].args[0]
+        assert "event_time" in update_sql
+        synced = next(
+            arg for arg in conn.fetchrow.await_args_list[1].args[1:]
+            if isinstance(arg, datetime)
+        )
+        local = synced.astimezone(BRUSSELS_TZ) if synced.tzinfo else synced
+        assert (local.hour, local.minute) == (16, 45)
+
     def test_reject_completed_on_recurring(self):
         pool, conn = _mock_pool()
         conn.fetchval = AsyncMock(return_value="60")
@@ -174,6 +237,24 @@ class TestGuildRemindersDashboard:
             )
         assert response.status_code == 400
         assert "one-off" in response.json()["detail"]
+
+    def test_completed_with_clear_schedule_on_one_off(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        existing = _fake_record(
+            event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+        )
+        updated = _reminder_row(event_time=None, completed=True, days=[])
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"completed": True, "scheduled_time": ""},
+            )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
 
     def test_delete_reminder_not_found(self):
         pool, conn = _mock_pool()

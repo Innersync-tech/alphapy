@@ -64,6 +64,19 @@ def _times_from_event_dt(event_dt: datetime, offset_minutes: int) -> tuple[time,
     return rem_t, call_t, event_dt
 
 
+def _shift_event_dt_to_call_clock(event_dt: datetime, call_t: time) -> datetime:
+    """Keep one-off calendar date (Brussels); move clock to call_t."""
+    if event_dt.tzinfo is None:
+        event_dt = event_dt.replace(tzinfo=UTC)
+    local = event_dt.astimezone(BRUSSELS_TZ)
+    return local.replace(
+        hour=call_t.hour,
+        minute=call_t.minute,
+        second=0,
+        microsecond=0,
+    )
+
+
 async def _get_reminder_offset_minutes(conn: Any, guild_id: int) -> int:
     raw = await conn.fetchval(
         """
@@ -335,14 +348,16 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                     raise HTTPException(status_code=404, detail="Reminder not found")
 
                 offset = await _get_reminder_offset_minutes(conn, guild_id)
+                was_one_off = existing["event_time"] is not None
                 effective_event_time = existing["event_time"]
 
                 if body.scheduled_time is not None:
                     if body.scheduled_time == "":
                         fields["event_time"] = None
                         effective_event_time = None
-                        # Clearing one-off schedule must not flip into recurring via leftover days.
-                        if body.days is None:
+                        # Only clear leftover weekdays when dismantling a one-off.
+                        # Do not wipe days on an already-recurring row.
+                        if body.days is None and was_one_off:
                             fields["days"] = []
                     else:
                         try:
@@ -358,8 +373,13 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                         fields["time"] = rem_t
                         fields["call_time"] = call_t
                         effective_event_time = event_dt
+                        # Converting to / refreshing a one-off must not keep weekday days.
+                        if body.days is None:
+                            fields["days"] = []
 
-                if body.completed is True and effective_event_time is None:
+                # completed is for one-offs: allow if row was or becomes a one-off
+                # (including clear-schedule + mark-done in one payload).
+                if body.completed is True and not was_one_off and effective_event_time is None:
                     raise HTTPException(
                         status_code=400,
                         detail="completed is only supported for one-off reminders",
@@ -372,6 +392,10 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                         raise HTTPException(status_code=400, detail=str(exc)) from exc
                     fields["time"] = rem_t
                     fields["call_time"] = call_t
+                    if effective_event_time is not None:
+                        synced = _shift_event_dt_to_call_clock(effective_event_time, call_t)
+                        fields["event_time"] = synced
+                        effective_event_time = synced
                 elif body.call_time is not None or body.time is not None:
                     # Prefer explicit call_time; otherwise treat `time` as event/call clock
                     # (same contract as create + ReminderModal).
@@ -383,6 +407,10 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                         raise HTTPException(status_code=400, detail=str(exc)) from exc
                     fields["time"] = rem_t
                     fields["call_time"] = call_t
+                    if effective_event_time is not None:
+                        synced = _shift_event_dt_to_call_clock(effective_event_time, call_t)
+                        fields["event_time"] = synced
+                        effective_event_time = synced
 
                 if not fields:
                     raise HTTPException(status_code=400, detail="No fields to update")
