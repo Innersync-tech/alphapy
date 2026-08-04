@@ -34,6 +34,55 @@ def _dt_iso(value: Any) -> str | None:
     return str(value)
 
 
+def _parse_hhmm(value: str) -> time:
+    parts = value.strip().split(":")
+    if len(parts) < 2:
+        raise ValueError("time must be HH:MM")
+    hours = int(parts[0])
+    minutes = int(parts[1])
+    if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:
+        raise ValueError("time must be HH:MM")
+    return time(hours, minutes)
+
+
+def _compute_reminder_times(session_time: str, offset_minutes: int) -> tuple[time, time]:
+    """Map event/session HH:MM → (reminder T−offset, call/event T0)."""
+    call = _parse_hhmm(session_time)
+    call_total = call.hour * 60 + call.minute
+    reminder_total = ((call_total - offset_minutes) % (24 * 60) + 24 * 60) % (24 * 60)
+    return time(reminder_total // 60, reminder_total % 60), call
+
+
+def _times_from_event_dt(event_dt: datetime, offset_minutes: int) -> tuple[time, time, datetime]:
+    """One-off: event timestamptz → (reminder time, call time, normalized event_dt)."""
+    if event_dt.tzinfo is None:
+        event_dt = event_dt.replace(tzinfo=UTC)
+    local = event_dt.astimezone(BRUSSELS_TZ)
+    call_t = time(local.hour, local.minute)
+    rem_t, _ = _compute_reminder_times(call_t.strftime("%H:%M"), offset_minutes)
+    return rem_t, call_t, event_dt
+
+
+async def _get_reminder_offset_minutes(conn: Any, guild_id: int) -> int:
+    raw = await conn.fetchval(
+        """
+        SELECT value FROM bot_settings
+        WHERE guild_id = $1 AND scope = 'embedwatcher' AND key = 'reminder_offset_minutes'
+        LIMIT 1
+        """,
+        guild_id,
+    )
+    if raw is None:
+        return 60
+    try:
+        if isinstance(raw, (int, float)):
+            return int(raw)
+        text = str(raw).strip().strip('"')
+        return int(text)
+    except (TypeError, ValueError):
+        return 60
+
+
 def _serialize_reminder(row: Any) -> dict[str, Any]:
     data = dict(row)
     event_time = data.get("event_time")
@@ -77,44 +126,6 @@ def _serialize_command(row: Any) -> dict[str, Any]:
         "created_at": _dt_iso(data.get("created_at")),
         "updated_at": _dt_iso(data.get("updated_at")),
     }
-
-
-def _parse_hhmm(value: str) -> time:
-    parts = value.strip().split(":")
-    if len(parts) < 2:
-        raise ValueError("time must be HH:MM")
-    hours = int(parts[0])
-    minutes = int(parts[1])
-    if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:
-        raise ValueError("time must be HH:MM")
-    return time(hours, minutes)
-
-
-def _compute_reminder_times(session_time: str, offset_minutes: int) -> tuple[time, time]:
-    call = _parse_hhmm(session_time)
-    call_total = call.hour * 60 + call.minute
-    reminder_total = ((call_total - offset_minutes) % (24 * 60) + 24 * 60) % (24 * 60)
-    return time(reminder_total // 60, reminder_total % 60), call
-
-
-async def _get_reminder_offset_minutes(conn: Any, guild_id: int) -> int:
-    raw = await conn.fetchval(
-        """
-        SELECT value FROM bot_settings
-        WHERE guild_id = $1 AND scope = 'embedwatcher' AND key = 'reminder_offset_minutes'
-        LIMIT 1
-        """,
-        guild_id,
-    )
-    if raw is None:
-        return 60
-    try:
-        if isinstance(raw, (int, float)):
-            return int(raw)
-        text = str(raw).strip().strip('"')
-        return int(text)
-    except (TypeError, ValueError):
-        return 60
 
 
 def _invalidate_custom_commands_cache(guild_id: int) -> None:
@@ -174,7 +185,7 @@ class CreateCustomCommandBody(BaseModel):
     response: str
     case_sensitive: bool = False
     delete_trigger: bool = False
-    reply_to_user: bool = False
+    reply_to_user: bool = True
 
 
 class UpdateCustomCommandBody(BaseModel):
@@ -229,40 +240,61 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         if channel_id is None:
             raise HTTPException(status_code=400, detail="channel_id is required")
 
-        days = [str(d) for d in body.days] if body.days is not None else None
-        event_time: datetime | None = None
-        reminder_time: time | None = None
-        if body.scheduled_time:
-            try:
-                event_time = datetime.fromisoformat(body.scheduled_time.replace("Z", "+00:00"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail="Invalid scheduled_time") from exc
-        if body.time:
-            try:
-                reminder_time = _parse_hhmm(body.time)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-
         name = (body.name or "Reminder").strip() or "Reminder"
         try:
             async with pool.acquire() as conn:
+                offset = await _get_reminder_offset_minutes(conn, guild_id)
+                event_time: datetime | None = None
+                reminder_time: time | None = None
+                call_time: time | None = None
+                days: list[str] | None = None
+
+                if body.scheduled_time:
+                    try:
+                        parsed = datetime.fromisoformat(body.scheduled_time.replace("Z", "+00:00"))
+                    except ValueError as exc:
+                        raise HTTPException(status_code=400, detail="Invalid scheduled_time") from exc
+                    reminder_time, call_time, event_time = _times_from_event_dt(parsed, offset)
+                    days = None
+                else:
+                    if not body.days:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="days is required for recurring reminders",
+                        )
+                    days = [str(d) for d in body.days]
+                    if not days:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="At least one day is required for recurring reminders",
+                        )
+                    try:
+                        # UI sends event (call) time; store T−offset + call_time like Discord.
+                        reminder_time, call_time = _compute_reminder_times(body.time or "", offset)
+                    except ValueError as exc:
+                        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
                 row = await conn.fetchrow(
                     """
                     INSERT INTO reminders
-                        (guild_id, name, channel_id, time, days, message, created_by, event_time, completed)
-                    VALUES ($1, $2, $3, $4, $5::text[], $6, $7, $8, FALSE)
+                        (guild_id, name, channel_id, time, call_time, days, message,
+                         created_by, event_time, completed)
+                    VALUES ($1, $2, $3, $4, $5, $6::text[], $7, $8, $9, FALSE)
                     RETURNING *
                     """,
                     guild_id,
                     name,
                     channel_id,
                     reminder_time,
+                    call_time,
                     days,
                     body.message,
                     discord_admin_id,
                     event_time,
                 )
             return {"success": True, "reminderId": row["id"], "reminder": _serialize_reminder(row)}
+        except HTTPException:
+            raise
         except Exception as exc:
             logger.error("[dashboard] create reminder failed guild=%s: %s", guild_id, exc)
             raise HTTPException(status_code=500, detail="Failed to create reminder") from exc
@@ -290,61 +322,63 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
             fields["image_url"] = body.image_url.strip() or None
         if body.days is not None:
             fields["days"] = [str(d) for d in body.days]
-        if body.scheduled_time is not None:
-            if body.scheduled_time == "":
-                fields["event_time"] = None
-            else:
-                try:
-                    fields["event_time"] = datetime.fromisoformat(
-                        body.scheduled_time.replace("Z", "+00:00")
-                    )
-                except ValueError as exc:
-                    raise HTTPException(status_code=400, detail="Invalid scheduled_time") from exc
-
-        resolved_time = body.time
-        resolved_call = body.call_time
-        if body.session_time:
-            try:
-                async with pool.acquire() as conn:
-                    offset = await _get_reminder_offset_minutes(conn, guild_id)
-                resolved_time_obj, resolved_call_obj = _compute_reminder_times(
-                    body.session_time, offset
-                )
-                fields["time"] = resolved_time_obj
-                fields["call_time"] = resolved_call_obj
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        else:
-            if resolved_time is not None:
-                try:
-                    fields["time"] = _parse_hhmm(resolved_time)
-                except ValueError as exc:
-                    raise HTTPException(status_code=400, detail=str(exc)) from exc
-            if resolved_call is not None:
-                try:
-                    fields["call_time"] = _parse_hhmm(resolved_call)
-                except ValueError as exc:
-                    raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-        if not fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
-
-        assignments = []
-        values: list[Any] = []
-        for idx, (key, value) in enumerate(fields.items(), start=1):
-            if key == "days":
-                assignments.append(f"{key} = ${idx}::text[]")
-            else:
-                assignments.append(f"{key} = ${idx}")
-            values.append(value)
-        values.extend([reminder_id, guild_id])
-        sql = (
-            f"UPDATE reminders SET {', '.join(assignments)} "
-            f"WHERE id = ${len(values) - 1} AND guild_id = ${len(values)} RETURNING *"
-        )
 
         try:
             async with pool.acquire() as conn:
+                offset = await _get_reminder_offset_minutes(conn, guild_id)
+
+                if body.scheduled_time is not None:
+                    if body.scheduled_time == "":
+                        fields["event_time"] = None
+                    else:
+                        try:
+                            parsed = datetime.fromisoformat(
+                                body.scheduled_time.replace("Z", "+00:00")
+                            )
+                        except ValueError as exc:
+                            raise HTTPException(
+                                status_code=400, detail="Invalid scheduled_time"
+                            ) from exc
+                        rem_t, call_t, event_dt = _times_from_event_dt(parsed, offset)
+                        fields["event_time"] = event_dt
+                        fields["time"] = rem_t
+                        fields["call_time"] = call_t
+
+                if body.session_time:
+                    try:
+                        rem_t, call_t = _compute_reminder_times(body.session_time, offset)
+                    except ValueError as exc:
+                        raise HTTPException(status_code=400, detail=str(exc)) from exc
+                    fields["time"] = rem_t
+                    fields["call_time"] = call_t
+                elif body.call_time is not None or body.time is not None:
+                    # Prefer explicit call_time; otherwise treat `time` as event/call clock
+                    # (same contract as create + ReminderModal).
+                    event_clock_raw = body.call_time if body.call_time is not None else body.time
+                    assert event_clock_raw is not None
+                    try:
+                        rem_t, call_t = _compute_reminder_times(event_clock_raw, offset)
+                    except ValueError as exc:
+                        raise HTTPException(status_code=400, detail=str(exc)) from exc
+                    fields["time"] = rem_t
+                    fields["call_time"] = call_t
+
+                if not fields:
+                    raise HTTPException(status_code=400, detail="No fields to update")
+
+                assignments = []
+                values: list[Any] = []
+                for idx, (key, value) in enumerate(fields.items(), start=1):
+                    if key == "days":
+                        assignments.append(f"{key} = ${idx}::text[]")
+                    else:
+                        assignments.append(f"{key} = ${idx}")
+                    values.append(value)
+                values.extend([reminder_id, guild_id])
+                sql = (
+                    f"UPDATE reminders SET {', '.join(assignments)} "
+                    f"WHERE id = ${len(values) - 1} AND guild_id = ${len(values)} RETURNING *"
+                )
                 row = await conn.fetchrow(sql, *values)
             if row is None:
                 raise HTTPException(status_code=404, detail="Reminder not found")
@@ -436,16 +470,9 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         del discord_admin_id
         pool = _require_pool()
 
-        async def safe_fetch(conn: Any, sql: str, *params: Any) -> list[Any]:
-            try:
-                return list(await conn.fetch(sql, *params))
-            except Exception:
-                return []
-
         try:
             async with pool.acquire() as conn:
-                active = await safe_fetch(
-                    conn,
+                active = await conn.fetch(
                     """
                     SELECT
                       c.id, c.title, c.mode, c.channel_id, c.started_at, c.ends_at,
@@ -458,8 +485,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                     """,
                     guild_id,
                 )
-                history = await safe_fetch(
-                    conn,
+                history = await conn.fetch(
                     """
                     SELECT
                       c.id, c.title, c.mode, c.winner_id, c.ended_at,
@@ -473,31 +499,26 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                     """,
                     guild_id,
                 )
-                og_claims = await safe_fetch(
-                    conn,
+                og_claims = await conn.fetch(
                     "SELECT COUNT(*)::text AS count FROM engagement_og_claims WHERE guild_id = $1",
                     guild_id,
                 )
-                og_setup = await safe_fetch(
-                    conn,
+                og_setup = await conn.fetch(
                     "SELECT message_id, channel_id FROM engagement_og_setup WHERE guild_id = $1",
                     guild_id,
                 )
-                badges = await safe_fetch(
-                    conn,
+                badges = await conn.fetch(
                     "SELECT COUNT(*)::text AS count FROM engagement_badges WHERE guild_id = $1",
                     guild_id,
                 )
-                streaks = await safe_fetch(
-                    conn,
+                streaks = await conn.fetch(
                     """
                     SELECT COUNT(*)::text AS count, MAX(current_days)::text AS max_streak
                     FROM engagement_streaks WHERE guild_id = $1
                     """,
                     guild_id,
                 )
-                weekly = await safe_fetch(
-                    conn,
+                weekly = await conn.fetch(
                     """
                     SELECT
                       wa.id, wa.week_start, wa.week_end,
@@ -579,7 +600,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         body: CreateCustomCommandBody,
         discord_admin_id: int = Depends(verify_dashboard_discord_admin),
     ):
-        name = body.name.strip()
+        name = body.name.strip().lower()
         trigger_value = body.trigger_value.strip()
         response = body.response.strip()
         if not name or not trigger_value or not response:
@@ -650,6 +671,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         discord_admin_id: int = Depends(verify_dashboard_discord_admin),
     ):
         del discord_admin_id
+        command_name = command_name.strip().lower()
         if body.trigger_type is not None and body.trigger_type not in VALID_TRIGGER_TYPES:
             raise HTTPException(status_code=400, detail="Invalid trigger_type")
         if body.trigger_value is not None and len(body.trigger_value) > 200:
@@ -717,6 +739,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         discord_admin_id: int = Depends(verify_dashboard_discord_admin),
     ):
         del discord_admin_id
+        command_name = command_name.strip().lower()
         pool = _require_pool()
         try:
             async with pool.acquire() as conn:

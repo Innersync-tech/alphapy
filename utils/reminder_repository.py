@@ -153,7 +153,8 @@ async def list_active(
                origin_channel_id, origin_message_id, event_time, days, call_time,
                last_sent_at, image_url, sent_message_id
         FROM reminders
-        WHERE (
+        WHERE completed IS NOT TRUE
+        AND (
             -- One-off at T-60: time col = reminder time, matches event date
             (
                 event_time IS NOT NULL

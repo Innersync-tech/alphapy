@@ -86,6 +86,7 @@ class TestGuildRemindersDashboard:
 
     def test_create_reminder(self):
         pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
         conn.fetchrow = AsyncMock(return_value=_reminder_row(id=99))
         app = _make_dashboard_app()
         with patch.object(api_module, "db_pool", pool):
@@ -102,6 +103,43 @@ class TestGuildRemindersDashboard:
             )
         assert response.status_code == 200
         assert response.json()["reminderId"] == 99
+        # Event 10:00 with 60m offset → reminder fire at 09:00
+        args = conn.fetchrow.await_args.args
+        assert args[4] == time(9, 0)
+        assert args[5] == time(10, 0)
+
+    def test_create_recurring_requires_days(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={"message": "hi", "channel_id": "123", "time": "10:00"},
+            )
+        assert response.status_code == 400
+
+    def test_create_one_off_sets_time_and_call_time(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        conn.fetchrow = AsyncMock(return_value=_reminder_row(id=11))
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={
+                    "message": "once",
+                    "channel_id": "123",
+                    "scheduled_time": "2026-08-05T14:30:00+02:00",
+                },
+            )
+        assert response.status_code == 200
+        args = conn.fetchrow.await_args.args
+        assert args[4] == time(13, 30)
+        assert args[5] == time(14, 30)
+        assert args[9] is not None
 
     def test_delete_reminder_not_found(self):
         pool, conn = _mock_pool()
@@ -173,7 +211,7 @@ class TestGuildCustomCommandsDashboard:
             response = client.post(
                 f"/api/dashboard/{GUILD_ID}/custom-commands",
                 json={
-                    "name": "hello",
+                    "name": "Hello",
                     "trigger_type": "exact",
                     "trigger_value": "!hello",
                     "response": "Hi",
@@ -181,6 +219,11 @@ class TestGuildCustomCommandsDashboard:
             )
         assert response.status_code == 201
         assert response.json()["command"]["name"] == "hello"
+        # Stored lowercase to match Discord /cc add
+        assert conn.execute.await_args.args[1] == GUILD_ID
+        assert conn.execute.await_args.args[2] == "hello"
+        # Default reply_to_user matches DB/cog default
+        assert conn.execute.await_args.args[8] is True
 
     def test_delete_command_not_found(self):
         pool, conn = _mock_pool()
