@@ -471,6 +471,67 @@ class TestGetAutomodRules:
 
 
 # ---------------------------------------------------------------------------
+# POST /api/dashboard/{guild_id}/automod/rules
+# ---------------------------------------------------------------------------
+
+
+class TestCreateAutomodRule:
+    """POST create must accept Discord-header actors (snowflake), not only JWT subs."""
+
+    def test_discord_actor_creates_without_link_lookup(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(side_effect=[11, 22])
+        conn.fetchrow = AsyncMock(
+            return_value=_fake_record(
+                id=22,
+                guild_id=GUILD_ID,
+                rule_type="spam",
+                name="Spam",
+                enabled=True,
+                config='{"max": 5}',
+                created_by=DISCORD_USER_ID,
+                created_at="2026-08-04T12:00:00",
+                updated_at="2026-08-04T12:00:00",
+                is_premium=False,
+                action_type="delete",
+                action_config="{}",
+                severity=1,
+            )
+        )
+        app = make_app(auth_user=str(DISCORD_USER_ID))
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch(
+                "utils.premium_guard.guild_has_premium",
+                new=AsyncMock(return_value=False),
+            ),
+            patch.object(
+                api_module,
+                "_require_discord_id_for_linked_innersync",
+                new=AsyncMock(side_effect=AssertionError("snowflake must skip link lookup")),
+            ),
+            patch.object(api_module, "_invalidate_automod_rules_cache"),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/automod/rules",
+                json={
+                    "rule_type": "spam",
+                    "name": "Spam",
+                    "enabled": True,
+                    "config": {"max": 5},
+                    "action_type": "delete",
+                    "action_config": {},
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["id"] == 22
+        assert response.json()["created_by"] == DISCORD_USER_ID
+        # created_by in INSERT should be the Discord snowflake
+        assert conn.fetchval.await_args_list[0].args[5] == DISCORD_USER_ID
+
+
+# ---------------------------------------------------------------------------
 # Dashboard verification queue / resolve
 # ---------------------------------------------------------------------------
 

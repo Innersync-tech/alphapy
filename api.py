@@ -137,6 +137,17 @@ async def _require_discord_id_for_linked_innersync(innersync_sub: str) -> int:
     return did
 
 
+async def _resolve_dashboard_actor_discord_id(actor_id: str) -> int:
+    """Map ``require_dashboard_guild_actor`` result to a Discord snowflake.
+
+    Discord-header auth already returns ``str(snowflake)``; JWT auth returns an
+    Innersync ``sub`` that must be resolved via ``alphapy_discord_links``.
+    """
+    if actor_id.isdigit():
+        return int(actor_id)
+    return await _require_discord_id_for_linked_innersync(actor_id)
+
+
 # ---------------------------------------------------------------------------
 # FastAPI app bootstrap
 # ---------------------------------------------------------------------------
@@ -3028,13 +3039,13 @@ async def create_automod_rule(
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        # Get user's Discord ID (Innersync JWT sub → Discord via alphapy_discord_links)
-        user_id = await _require_discord_id_for_linked_innersync(auth_user_id)
-        
+        # Discord-header actor is already a snowflake; JWT actor needs link resolution.
+        user_id = await _resolve_dashboard_actor_discord_id(auth_user_id)
+
         # Rule metadata reflects guild entitlement, not the caller's personal subscription
         from utils.premium_guard import guild_has_premium
         is_premium = await guild_has_premium(guild_id)
-        
+
         async with db_pool.acquire() as conn:
             # Create action first
             import json
