@@ -2160,7 +2160,12 @@ def _coerce_dashboard_setting_value(key: str, value: Any) -> Any:
     if _is_dashboard_snowflake_setting_key(key):
         # Discord snowflakes must stay strings (JSON numbers lose precision past
         # Number.MAX_SAFE_INTEGER). weekly_food_channel_ids (plural) is excluded.
-        return "" if value is None else str(value)
+        # Unwrap redundant JSON quote layers from legacy double-encoded JSONB.
+        from utils.settings_service import _unwrap_quoted_scalar_str
+
+        if value is None:
+            return ""
+        return _unwrap_quoted_scalar_str(str(value))
 
     if key in _DASHBOARD_INT_SETTING_KEYS:
         try:

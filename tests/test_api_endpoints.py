@@ -364,6 +364,7 @@ class TestGetGuildSettings:
             {"scope": "engagement", "key": "weekly_food_channel_ids", "value": f"{snowflake},1"},
             {"scope": "gpt", "key": "max_tokens", "value": "512"},
             {"scope": "agents", "key": "agents_enabled", "value": "true"},
+            {"scope": "gdpr", "key": "channel_id", "value": f'"{snowflake}"'},
         ])
         app = make_app()
         with patch.object(api_module, "db_pool", pool):
@@ -386,6 +387,8 @@ class TestGetGuildSettings:
         assert data["engagement"]["weekly_food_channel_ids"] == f"{snowflake},1"
         assert data["gpt"]["max_tokens"] == 512
         assert data["agents"]["agents_enabled"] is True
+        assert data["gdpr"]["channel_id"] == snowflake
+        assert '"' not in data["gdpr"]["channel_id"]
 
     def test_automod_settings_keep_log_channel_as_string(self):
         snowflake = "1439387968321228800"
