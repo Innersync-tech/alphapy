@@ -3073,6 +3073,11 @@ async def get_automod_rules(
                         rule_dict['action_config'] = json.loads(rule_dict['action_config'])
                     except (ValueError, TypeError):
                         pass
+
+                for ts_key in ("created_at", "updated_at"):
+                    ts_val = rule_dict.get(ts_key)
+                    if ts_val is not None and hasattr(ts_val, "isoformat"):
+                        rule_dict[ts_key] = ts_val.isoformat()
                 
                 rules.append(AutoModRule(**rule_dict))
             
@@ -3408,7 +3413,7 @@ async def get_automod_violations(
                   AND timestamp >= NOW() - ($2::text || ' days')::interval
                 ORDER BY timestamp DESC
                 LIMIT $3
-            """, guild_id, days, limit)
+            """, guild_id, str(days), limit)
             
             violations = []
             for row in rows:
@@ -3578,7 +3583,20 @@ async def invalidate_guild_settings_cache(
     settings = getattr(bot_instance, "settings", None) if bot_instance else None
     if settings is None or not callable(getattr(settings, "reload_guild", None)):
         raise HTTPException(status_code=503, detail="Bot settings service unavailable")
-    loaded = await settings.reload_guild(guild_id)
+
+    # SettingsService pool lives on the bot event loop — must not await it from FastAPI's loop.
+    async def runner() -> int:
+        return await settings.reload_guild(guild_id)
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(runner(), bot_instance.loop)
+        loaded = await asyncio.wait_for(asyncio.wrap_future(future), timeout=10.0)
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Settings reload timed out.") from exc
+    except Exception as exc:
+        logger.error(f"[ERROR] Failed to reload settings cache for guild {guild_id}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to reload settings cache") from exc
+
     return {"success": True, "loaded": loaded}
 
 
