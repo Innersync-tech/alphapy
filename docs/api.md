@@ -351,7 +351,22 @@ Command usage analytics endpoint.
 
 ### Dashboard Configuration Endpoints
 
-These endpoints are used by the web dashboard (Mind) for configuration management.
+These endpoints are used by the Alphapy control panel (and related dashboards) for guild configuration.
+
+**Sprint 3b (guild CRUD via Discord admin headers):** reminders, engagement stats, and custom commands under `/api/dashboard/{guild_id}/…` authenticate with `X-Api-Key` + `X-Discord-User-Id` (`verify_dashboard_discord_admin`), not Supabase JWT.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET/POST | `/dashboard/{guild_id}/reminders` | List / create guild reminders |
+| PUT/DELETE | `/dashboard/{guild_id}/reminders/{reminder_id}` | Update / delete |
+| POST | `/dashboard/{guild_id}/reminders/live-sessions` | Live-session preset |
+| GET | `/dashboard/{guild_id}/engagement` | Challenges / OG / badges / streaks / weekly |
+| GET/POST | `/dashboard/{guild_id}/custom-commands` | List / create (invalidates cog cache) |
+| PUT/DELETE | `/dashboard/{guild_id}/custom-commands/{command_name}` | Update / delete |
+
+#### Settings (JWT admin)
+
+These endpoints continue to use Supabase JWT + linked Discord admin for configuration management.
 
 #### `GET /api/dashboard/settings/{guild_id}`
 

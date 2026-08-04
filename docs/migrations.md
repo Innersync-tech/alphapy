@@ -192,7 +192,7 @@ If a migration fails partway through:
 
 ## Current Schema
 
-**Current migration head:** `025_growth_checkins_content`
+**Current migration head:** `026_reminders_completed_flag`
 
 Tables added across all migrations:
 
@@ -223,6 +223,7 @@ Tables added across all migrations:
 | `023_alphapy_discord_links` | Adds `alphapy_discord_links` table for Innersync UUID ↔ Discord snowflake mapping used by `/link`, API reminder resolution, and Discord identity webhooks. |
 | `024_agent_session_usage` | Adds `agent_session_usage` for per-user daily `/agent start` quota (tier-based limits in `utils/premium_tiers.py`). |
 | `025_growth_checkins_content` | Adds `goal` / `obstacle` / `feeling` / `grok_response` on `growth_checkins` for plaintext `/growthhistory` (must not use encrypted Supabase vault `reflections`). |
+| `026_reminders_completed_flag` | Adds `reminders.completed` for Dashboard mark-done; backfills `event_time` from legacy `scheduled_time` when present. |
 
 ## References
 

@@ -1,5 +1,4 @@
 import re
-import time as time_module
 from datetime import datetime, timedelta
 from typing import Any, Protocol, cast
 
@@ -10,7 +9,6 @@ from discord import app_commands
 from discord.app_commands import checks as app_checks
 from discord.ext import commands, tasks
 
-import config
 import utils.reminder_repository as reminder_repo
 
 # from config import GUILD_ID  # Removed - no longer needed for multi-guild support
@@ -18,8 +16,14 @@ from cogs.embed_watcher import parse_embed_for_reminder
 from utils.cog_base import AlphaCog
 from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
+from utils.image_reminder_rate_limit import (
+    record_image_reminder,
+    sweep_stale_image_reminder_timestamps,
+    would_exceed_image_reminder_rate_limit,
+)
 from utils.logger import log_database_event, log_guild_action, log_with_guild, logger
 from utils.parsers import format_days_for_display, parse_days_string, parse_time_string
+from utils.reminder_quota import get_reminder_quota_block_message
 from utils.sanitizer import safe_embed_text
 from utils.timezone import BRUSSELS_TZ
 from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
@@ -49,8 +53,6 @@ class ReminderCog(AlphaCog):
     def __init__(self, bot: commands.Bot):
         super().__init__(bot)
         self.db: asyncpg.Pool | None = None
-        # Rate limit: max 3 image reminders per hour per (user_id, guild_id)
-        self._image_reminder_timestamps: dict[tuple[int, int], list[float]] = {}
         self.bot.loop.create_task(self.setup())
 
     def cog_load(self) -> None:
@@ -207,24 +209,16 @@ class ReminderCog(AlphaCog):
             return
 
         # Tier-based reminder limit (free users: max 10 active reminders)
-        from utils.premium_guard import get_user_tier
-        from utils.premium_tiers import REMINDER_LIMIT
-        tier = await get_user_tier(interaction.user.id, interaction.guild.id)
-        limit = REMINDER_LIMIT.get(tier)
-        if limit is not None:
-            async with acquire_safe(self.db) as conn:
-                count = await conn.fetchval(
-                    "SELECT COUNT(*) FROM reminders WHERE created_by = $1 AND guild_id = $2",
-                    interaction.user.id,
-                    interaction.guild.id,
-                )
-            if count >= limit:
-                await interaction.followup.send(
-                    f"You have reached the maximum of {limit} reminders for your tier. "
-                    "Upgrade via `/premium` to create unlimited reminders.",
-                    ephemeral=True,
-                )
-                return
+        if not self.db:
+            await interaction.followup.send(ERR_DB, ephemeral=True)
+            return
+        async with acquire_safe(self.db) as conn:
+            quota_msg = await get_reminder_quota_block_message(
+                conn, interaction.user.id, interaction.guild.id
+            )
+        if quota_msg:
+            await interaction.followup.send(quota_msg, ephemeral=True)
+            return
 
         # Premium gate: reminders with image require premium
         resolved_image_url: str | None = (image.url if image else None) or (image_url.strip() if image_url and image_url.strip() else None)
@@ -237,11 +231,7 @@ class ReminderCog(AlphaCog):
                 )
                 return
             # Rate limit: max 3 image reminders per hour per user per guild
-            key = (interaction.user.id, interaction.guild.id)
-            now_ts = time_module.time()
-            timestamps = self._image_reminder_timestamps.get(key, [])
-            recent = [t for t in timestamps if t > now_ts - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW]
-            if len(recent) >= 3:
+            if would_exceed_image_reminder_rate_limit(interaction.user.id, interaction.guild.id):
                 await interaction.followup.send(
                     "You can add at most 3 reminders with images per hour. Try again later.",
                     ephemeral=True,
@@ -395,12 +385,7 @@ class ReminderCog(AlphaCog):
                 logger.info(f"🟢 Reminder created (ID={rid}): {name} @ {time_obj} days={days_list} channel={channel_id}")
                 # Rate limit tracking: record image reminder for this user/guild
                 if resolved_image_url:
-                    rkey = (interaction.user.id, interaction.guild.id)
-                    now_ts = time_module.time()
-                    ts_list = self._image_reminder_timestamps.get(rkey, [])
-                    ts_list = [t for t in ts_list if t > now_ts - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW]
-                    ts_list.append(now_ts)
-                    self._image_reminder_timestamps[rkey] = ts_list[-config.IMAGE_REMINDER_RATE_LIMIT_COUNT:]
+                    record_image_reminder(interaction.user.id, interaction.guild.id)
         except RuntimeError:
             await interaction.followup.send(ERR_DB, ephemeral=True)
             return
@@ -471,11 +456,7 @@ class ReminderCog(AlphaCog):
                     ephemeral=True,
                 )
                 return
-            key = (interaction.user.id, interaction.guild.id)
-            now_ts = time_module.time()
-            timestamps = self._image_reminder_timestamps.get(key, [])
-            recent = [t for t in timestamps if t > now_ts - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW]
-            if len(recent) >= 3:
+            if would_exceed_image_reminder_rate_limit(interaction.user.id, interaction.guild.id):
                 await interaction.followup.send(
                     "You can add at most 3 reminders with images per hour. Try again later.",
                     ephemeral=True,
@@ -531,6 +512,12 @@ class ReminderCog(AlphaCog):
 
         try:
             async with acquire_safe(self.db) as conn:
+                quota_msg = await get_reminder_quota_block_message(
+                    conn, interaction.user.id, guild_id
+                )
+                if quota_msg:
+                    await interaction.followup.send(quota_msg, ephemeral=True)
+                    return
                 await reminder_repo.create(
                     conn,
                     guild_id=guild_id,
@@ -544,12 +531,7 @@ class ReminderCog(AlphaCog):
                     image_url=resolved_image_url,
                 )
             if resolved_image_url:
-                rkey = (interaction.user.id, interaction.guild.id)
-                now_ts = time_module.time()
-                ts_list = self._image_reminder_timestamps.get(rkey, [])
-                ts_list = [t for t in ts_list if t > now_ts - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW]
-                ts_list.append(now_ts)
-                self._image_reminder_timestamps[rkey] = ts_list[-config.IMAGE_REMINDER_RATE_LIMIT_COUNT:]
+                record_image_reminder(interaction.user.id, interaction.guild.id)
         except Exception:
             logger.exception("Error creating live session reminder")
             await interaction.followup.send("❌ Failed to create live session. Please try again.", ephemeral=True)
@@ -1159,10 +1141,7 @@ class ReminderCog(AlphaCog):
             return
 
         # Sweep stale entries from the rate-limit dict to prevent unbounded growth
-        sweep_cutoff = time_module.time() - config.IMAGE_REMINDER_RATE_LIMIT_WINDOW
-        stale_keys = [k for k, v in self._image_reminder_timestamps.items() if not any(t > sweep_cutoff for t in v)]
-        for k in stale_keys:
-            del self._image_reminder_timestamps[k]
+        sweep_stale_image_reminder_timestamps()
 
         now = datetime.now(BRUSSELS_TZ).replace(second=0, microsecond=0)
         current_time_str = now.strftime("%H:%M:%S")

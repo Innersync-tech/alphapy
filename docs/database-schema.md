@@ -75,6 +75,7 @@ Scheduled reminders (recurring and one-off events).
 - `last_sent_at` (TIMESTAMPTZ): Last send timestamp (for idempotency)
 - `image_url` (TEXT): Optional image or banner URL (Premium feature)
 - `sent_message_id` (BIGINT): Discord message ID of the T-60 offset reminder send; used to delete it when the T0 on-time reminder fires
+- `completed` (BOOLEAN, default false): Dashboard mark-done flag for one-offs (Alembic `026_reminders_completed_flag`)
 
 **Indexes:**
 - `idx_reminders_time` on `time`
@@ -84,6 +85,7 @@ Scheduled reminders (recurring and one-off events).
 **Notes:**
 - One-off events: `event_time` is set, `days` is empty
 - Recurring events: `event_time` is NULL, `days` contains weekday numbers
+- Dashboard JSON may expose `scheduled_time` as an alias of `event_time`
 - `time` is the reminder trigger time (T−60), `call_time` is the event time (T0)
 - Premium: reminders with `image_url` require an active premium subscription for the creator
 

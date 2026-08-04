@@ -192,7 +192,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ## 🌐 API Agent: FastAPI Dashboard Endpoint
 - **Path**: `api.py`, `agents/http_routes.py`, `hermit_api.py`
 - **Purpose**: Exposes reminders, agent sessions, Hermit broker data, and realtime metrics for Mind/App/Core
-- **Endpoints**: `/api/reminders/*`, `/api/agents/sessions*`, `/api/hermit/growth-checkins` (service `API_KEY`), `/api/dashboard/metrics`, `/api/dashboard/logs`
+- **API**: Dashboard guild CRUD for reminders / engagement / custom-commands lives in `dashboard_guild_crud.py` (`verify_dashboard_discord_admin`); control-panel proxies via `lib/alphapyDashboardProxy.ts` (Sprint 3b).
 
 ---
 
