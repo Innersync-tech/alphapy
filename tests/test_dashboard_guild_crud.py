@@ -18,6 +18,14 @@ from tests.test_api_endpoints import (
 BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
 
 
+def _patch_unlimited_tier():
+    return patch("dashboard_guild_crud.get_user_tier", new=AsyncMock(return_value="lifetime"))
+
+
+def _patch_free_tier():
+    return patch("dashboard_guild_crud.get_user_tier", new=AsyncMock(return_value="free"))
+
+
 def _reminder_row(**kwargs):
     defaults = {
         "id": 42,
@@ -92,7 +100,7 @@ class TestGuildRemindersDashboard:
         conn.fetchval = AsyncMock(return_value="60")
         conn.fetchrow = AsyncMock(return_value=_reminder_row(id=99))
         app = _make_dashboard_app()
-        with patch.object(api_module, "db_pool", pool):
+        with patch.object(api_module, "db_pool", pool), _patch_unlimited_tier():
             client = TestClient(app)
             response = client.post(
                 f"/api/dashboard/{GUILD_ID}/reminders",
@@ -115,7 +123,7 @@ class TestGuildRemindersDashboard:
         pool, conn = _mock_pool()
         conn.fetchval = AsyncMock(return_value="60")
         app = _make_dashboard_app()
-        with patch.object(api_module, "db_pool", pool):
+        with patch.object(api_module, "db_pool", pool), _patch_unlimited_tier():
             client = TestClient(app)
             response = client.post(
                 f"/api/dashboard/{GUILD_ID}/reminders",
@@ -128,7 +136,7 @@ class TestGuildRemindersDashboard:
         conn.fetchval = AsyncMock(return_value="60")
         conn.fetchrow = AsyncMock(return_value=_reminder_row(id=11))
         app = _make_dashboard_app()
-        with patch.object(api_module, "db_pool", pool):
+        with patch.object(api_module, "db_pool", pool), _patch_unlimited_tier():
             client = TestClient(app)
             response = client.post(
                 f"/api/dashboard/{GUILD_ID}/reminders",
@@ -143,6 +151,63 @@ class TestGuildRemindersDashboard:
         assert args[4] == time(13, 30)
         assert args[5] == time(14, 30)
         assert args[9] is not None
+
+    def test_create_reminder_enforces_free_tier_limit(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value=10)
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool), _patch_free_tier():
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={
+                    "message": "hi",
+                    "channel_id": "123",
+                    "time": "10:00",
+                    "days": ["0"],
+                },
+            )
+        assert response.status_code == 403
+        assert "maximum of 10" in response.json()["detail"]
+
+    def test_update_image_requires_premium(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        conn.fetchrow = AsyncMock(
+            return_value=_fake_record(event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC))
+        )
+        app = _make_dashboard_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch("dashboard_guild_crud.is_premium", new=AsyncMock(return_value=False)),
+        ):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"image_url": "https://example.com/banner.png"},
+            )
+        assert response.status_code == 403
+        assert "Premium" in response.json()["detail"] or "premium" in response.json()["detail"].lower()
+
+    def test_update_image_allowed_for_premium(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        existing = _fake_record(event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC))
+        updated = _reminder_row(image_url="https://example.com/banner.png")
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch("dashboard_guild_crud.is_premium", new=AsyncMock(return_value=True)),
+            patch("dashboard_guild_crud._image_reminder_timestamps", {}),
+        ):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"image_url": "https://example.com/banner.png"},
+            )
+        assert response.status_code == 200
+        assert "https://example.com/banner.png" in conn.fetchrow.await_args_list[1].args
 
     def test_clear_scheduled_time_also_clears_days(self):
         pool, conn = _mock_pool()
@@ -270,7 +335,7 @@ class TestGuildRemindersDashboard:
         conn.fetchval = AsyncMock(return_value="60")
         conn.fetchrow = AsyncMock(return_value=_fake_record(id=55))
         app = _make_dashboard_app()
-        with patch.object(api_module, "db_pool", pool):
+        with patch.object(api_module, "db_pool", pool), _patch_unlimited_tier():
             client = TestClient(app)
             response = client.post(
                 f"/api/dashboard/{GUILD_ID}/reminders/live-sessions",
@@ -278,6 +343,25 @@ class TestGuildRemindersDashboard:
             )
         assert response.status_code == 200
         assert response.json()["reminderId"] == 55
+
+    def test_live_session_image_requires_premium(self):
+        pool, _conn = _mock_pool()
+        app = _make_dashboard_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            _patch_unlimited_tier(),
+            patch("dashboard_guild_crud.is_premium", new=AsyncMock(return_value=False)),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders/live-sessions",
+                json={
+                    "time": "19:30",
+                    "channel_id": "999",
+                    "image_url": "https://example.com/live.png",
+                },
+            )
+        assert response.status_code == 403
 
 
 class TestGuildEngagementDashboard:
