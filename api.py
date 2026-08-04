@@ -137,6 +137,17 @@ async def _require_discord_id_for_linked_innersync(innersync_sub: str) -> int:
     return did
 
 
+async def _resolve_dashboard_actor_discord_id(actor_id: str) -> int:
+    """Map ``require_dashboard_guild_actor`` result to a Discord snowflake.
+
+    Discord-header auth already returns ``str(snowflake)``; JWT auth returns an
+    Innersync ``sub`` that must be resolved via ``alphapy_discord_links``.
+    """
+    if actor_id.isdigit():
+        return int(actor_id)
+    return await _require_discord_id_for_linked_innersync(actor_id)
+
+
 # ---------------------------------------------------------------------------
 # FastAPI app bootstrap
 # ---------------------------------------------------------------------------
@@ -2177,13 +2188,74 @@ async def verify_guild_admin_access(
     logger.info(f"Admin access granted: user={auth_user_id}, discord_id={discord_id}, guild={guild_id}")
 
 
+async def _verify_discord_snowflake_is_guild_admin(discord_id: int, guild_id: int) -> None:
+    """Raise 403/503 if Discord snowflake is not a guild admin (bot loop check)."""
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise HTTPException(status_code=503, detail="Bot not available for permission check.")
+
+    loop = bot_instance.loop
+
+    async def runner() -> bool:
+        return await _check_guild_admin_on_bot_loop(discord_id, guild_id)
+
+    try:
+        future = asyncio.run_coroutine_threadsafe(runner(), loop)
+        is_admin = await asyncio.wait_for(asyncio.wrap_future(future), timeout=5.0)
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Permission check timed out.") from exc
+    except Exception as exc:
+        logger.debug(f"Dashboard guild admin check failed: {exc}")
+        raise HTTPException(status_code=403, detail="Could not verify guild admin access.") from exc
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="You do not have admin access to this guild.")
+
+
+async def require_dashboard_guild_actor(
+    guild_id: int,
+    request: Request,
+    authorization: str | None = Header(None),
+    x_discord_user_id: str | None = Header(None, alias="X-Discord-User-Id"),
+    x_api_key: str | None = Header(None, alias="X-Api-Key"),
+) -> str:
+    """Authorize guild-admin access for control-panel proxy or Mind JWT.
+
+    Control panel sends ``X-Api-Key`` + ``X-Discord-User-Id``.
+    Mind / JWT clients send ``Authorization: Bearer …``.
+
+    Returns an actor id string for audit logs (Discord snowflake or JWT ``sub``).
+    """
+    # Prefer Discord service auth when the control-panel header is present.
+    if x_discord_user_id:
+        configured_key = getattr(config, "API_KEY", None)
+        if not configured_key or x_api_key != configured_key:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        try:
+            discord_id = int(x_discord_user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid Discord user id") from exc
+        await _verify_discord_snowflake_is_guild_admin(discord_id, guild_id)
+        logger.info(
+            "Admin access granted via Discord headers: discord_id=%s guild=%s",
+            discord_id,
+            guild_id,
+        )
+        return str(discord_id)
+
+    auth_user_id = await get_authenticated_user_id(request, authorization)
+    await verify_guild_admin_access(guild_id, auth_user_id)
+    return auth_user_id
+
+
 @router.get("/dashboard/settings/{guild_id}", response_model=GuildSettingsResponse)
 async def get_guild_settings(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor),
 ):
     """Get all settings for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
+    del auth_user_id
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2248,10 +2320,9 @@ async def get_guild_settings(
 async def update_guild_settings(
     guild_id: int,
     request: UpdateSettingsRequest,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor),
 ):
     """Update settings for a specific guild category."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2317,10 +2388,9 @@ async def update_guild_settings(
 @router.get("/dashboard/{guild_id}/gdpr")
 async def get_gdpr_dashboard(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id),
+    auth_user_id: str = Depends(require_dashboard_guild_actor),
 ):
     """Return GDPR acceptance statistics for the guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2363,10 +2433,9 @@ class OnboardingRule(BaseModel):
 @router.get("/dashboard/{guild_id}/onboarding/questions", response_model=list[OnboardingQuestion])
 async def get_guild_onboarding_questions(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get all onboarding questions for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2407,10 +2476,9 @@ async def get_guild_onboarding_questions(
 async def save_guild_onboarding_question(
     guild_id: int,
     question: OnboardingQuestion,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Save or update an onboarding question for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2453,10 +2521,9 @@ async def save_guild_onboarding_question(
 async def delete_guild_onboarding_question(
     guild_id: int,
     question_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Delete an onboarding question for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2483,10 +2550,9 @@ async def delete_guild_onboarding_question(
 @router.get("/dashboard/{guild_id}/onboarding/rules", response_model=list[OnboardingRule])
 async def get_guild_onboarding_rules(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get all onboarding rules for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2526,10 +2592,9 @@ async def get_guild_onboarding_rules(
 async def save_guild_onboarding_rule(
     guild_id: int,
     rule: OnboardingRule,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Save or update an onboarding rule for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2570,10 +2635,9 @@ async def save_guild_onboarding_rule(
 async def delete_guild_onboarding_rule(
     guild_id: int,
     rule_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Delete an onboarding rule for a specific guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2605,10 +2669,9 @@ class ReorderRequest(BaseModel):
 async def reorder_onboarding_items(
     guild_id: int,
     request: ReorderRequest,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Reorder onboarding questions and rules."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -2661,7 +2724,7 @@ async def get_settings_history(
     scope: str | None = None,
     key: str | None = None,
     limit: int = 50,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get settings change history for a specific guild."""
     global db_pool
@@ -2722,7 +2785,7 @@ async def get_settings_history(
 async def rollback_setting_change(
     guild_id: int,
     history_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Rollback a setting to a previous value from history."""
     global db_pool
@@ -2890,11 +2953,10 @@ async def get_dashboard_logs(
     guild_id: int,
     limit: int = 50,
     event_types: str | None = None,
-    auth_user_id: str = Depends(get_authenticated_user_id),
+    auth_user_id: str = Depends(require_dashboard_guild_actor),
 ):
     """Get operational logs (reconnect, disconnect, etc.) for the Mind dashboard.
     Requires guild admin access. Global events (no guild_id) are included for any guild request."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     limit = min(limit, 100)
     types_list: list[str] | None = None
     if event_types:
@@ -2909,10 +2971,9 @@ async def get_dashboard_logs(
 @router.get("/dashboard/{guild_id}/automod/rules", response_model=list[AutoModRule])
 async def get_automod_rules(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get all auto-moderation rules for a guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -2969,23 +3030,22 @@ async def get_automod_rules(
 async def create_automod_rule(
     guild_id: int,
     rule: AutoModRuleCreate,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Create a new auto-moderation rule."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        # Get user's Discord ID (Innersync JWT sub → Discord via alphapy_discord_links)
-        user_id = await _require_discord_id_for_linked_innersync(auth_user_id)
-        
+        # Discord-header actor is already a snowflake; JWT actor needs link resolution.
+        user_id = await _resolve_dashboard_actor_discord_id(auth_user_id)
+
         # Rule metadata reflects guild entitlement, not the caller's personal subscription
         from utils.premium_guard import guild_has_premium
         is_premium = await guild_has_premium(guild_id)
-        
+
         async with db_pool.acquire() as conn:
             # Create action first
             import json
@@ -3034,10 +3094,9 @@ async def update_automod_rule(
     guild_id: int,
     rule_id: int,
     update: AutoModRuleUpdate,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Update an existing auto-moderation rule."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -3143,10 +3202,9 @@ async def update_automod_rule(
 async def delete_automod_rule(
     guild_id: int,
     rule_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Delete an auto-moderation rule."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -3195,10 +3253,9 @@ async def delete_automod_rule(
 @router.get("/dashboard/{guild_id}/automod/stats", response_model=AutoModStats)
 async def get_automod_stats(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get auto-moderation statistics for a guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -3269,10 +3326,9 @@ async def get_automod_violations(
     guild_id: int,
     limit: int = 50,
     days: int = 7,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get recent auto-moderation violations for a guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -3331,10 +3387,9 @@ async def get_automod_violations(
 @router.get("/dashboard/{guild_id}/automod/settings", response_model=AutoModSettings)
 async def get_automod_settings(
     guild_id: int,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Get auto-moderation settings for a guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -3375,10 +3430,9 @@ async def get_automod_settings(
 async def update_automod_settings(
     guild_id: int,
     settings: AutoModSettings,
-    auth_user_id: str = Depends(get_authenticated_user_id)
+    auth_user_id: str = Depends(require_dashboard_guild_actor)
 ):
     """Update auto-moderation settings for a guild."""
-    await verify_guild_admin_access(guild_id, auth_user_id)
     
     global db_pool
     if db_pool is None:
@@ -3442,28 +3496,7 @@ async def verify_dashboard_discord_admin(
         discord_id = int(x_discord_user_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid Discord user id") from exc
-
-    from gpt.helpers import bot_instance
-
-    if bot_instance is None:
-        raise HTTPException(status_code=503, detail="Bot not available for permission check.")
-
-    loop = bot_instance.loop
-
-    async def runner() -> bool:
-        return await _check_guild_admin_on_bot_loop(discord_id, guild_id)
-
-    try:
-        future = asyncio.run_coroutine_threadsafe(runner(), loop)
-        is_admin = await asyncio.wait_for(asyncio.wrap_future(future), timeout=5.0)
-    except TimeoutError as exc:
-        raise HTTPException(status_code=503, detail="Permission check timed out.") from exc
-    except Exception as exc:
-        logger.debug(f"Dashboard guild admin check failed: {exc}")
-        raise HTTPException(status_code=403, detail="Could not verify guild admin access.") from exc
-
-    if not is_admin:
-        raise HTTPException(status_code=403, detail="You do not have admin access to this guild.")
+    await _verify_discord_snowflake_is_guild_admin(discord_id, guild_id)
     return discord_id
 
 

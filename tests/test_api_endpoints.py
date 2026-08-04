@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import api as api_module
 from api import (
     get_authenticated_user_id,
+    require_dashboard_guild_actor,
     require_observability_api_key,
     router,
     verify_api_key,
@@ -39,6 +40,8 @@ def make_app(auth_user: str = AUTH_SUB) -> FastAPI:
     app.include_router(router)
     app.dependency_overrides[verify_api_key] = lambda: None
     app.dependency_overrides[get_authenticated_user_id] = lambda: auth_user
+    # Guild dashboard routes use dual-auth; override so unit tests skip bot loop checks.
+    app.dependency_overrides[require_dashboard_guild_actor] = lambda: auth_user
     return app
 
 
@@ -323,10 +326,7 @@ class TestGetGuildSettings:
 
     def test_returns_503_when_db_unavailable(self):
         app = make_app()
-        with (
-            patch.object(api_module, "db_pool", None),
-            patch("api.verify_guild_admin_access", new=AsyncMock()),
-        ):
+        with patch.object(api_module, "db_pool", None):
             client = TestClient(app)
             response = client.get(f"/api/dashboard/settings/{GUILD_ID}")
         assert response.status_code == 503
@@ -338,10 +338,7 @@ class TestGetGuildSettings:
             {"scope": "embedwatcher", "key": "enabled", "value": "true"},
         ])
         app = make_app()
-        with (
-            patch.object(api_module, "db_pool", pool),
-            patch("api.verify_guild_admin_access", new=AsyncMock()),
-        ):
+        with patch.object(api_module, "db_pool", pool):
             client = TestClient(app)
             response = client.get(f"/api/dashboard/settings/{GUILD_ID}")
         assert response.status_code == 200
@@ -349,20 +346,77 @@ class TestGetGuildSettings:
         assert data["system"]["log_channel_id"] == 123
         assert data["embedwatcher"]["enabled"] is True
 
+    def test_accepts_discord_service_headers(self):
+        """Control-panel proxy auth: X-Api-Key + X-Discord-User-Id (no JWT)."""
+        pool, conn = _mock_pool()
+        conn.fetch = AsyncMock(return_value=[
+            {"scope": "reminders", "key": "enabled", "value": "true"},
+        ])
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[verify_api_key] = lambda: None
+        # Do not override require_dashboard_guild_actor — exercise Discord path.
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch.object(api_module.config, "API_KEY", "dash-key"),
+            patch(
+                "api._verify_discord_snowflake_is_guild_admin",
+                new=AsyncMock(),
+            ),
+        ):
+            client = TestClient(app)
+            response = client.get(
+                f"/api/dashboard/settings/{GUILD_ID}",
+                headers={
+                    "X-Api-Key": "dash-key",
+                    "X-Discord-User-Id": str(DISCORD_USER_ID),
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["reminders"]["enabled"] is True
+
     def test_non_admin_gets_403(self):
-        """verify_guild_admin_access raises 403 for non-admins."""
+        """require_dashboard_guild_actor raises 403 for non-admins."""
         from fastapi import HTTPException
 
-        app = make_app()
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[verify_api_key] = lambda: None
+
+        async def _deny(_guild_id: int = GUILD_ID):
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        app.dependency_overrides[require_dashboard_guild_actor] = _deny
+        with patch.object(api_module, "db_pool", MagicMock()):
+            client = TestClient(app, raise_server_exceptions=False)
+            response = client.get(f"/api/dashboard/settings/{GUILD_ID}")
+        assert response.status_code == 403
+
+    def test_discord_non_admin_gets_403(self):
+        """Discord header path returns 403 when snowflake is not a guild admin."""
+        from fastapi import HTTPException
+
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[verify_api_key] = lambda: None
         with (
             patch.object(api_module, "db_pool", MagicMock()),
+            patch.object(api_module.config, "API_KEY", "dash-key"),
             patch(
-                "api.verify_guild_admin_access",
-                new=AsyncMock(side_effect=HTTPException(status_code=403, detail="Forbidden")),
+                "api._verify_discord_snowflake_is_guild_admin",
+                new=AsyncMock(
+                    side_effect=HTTPException(status_code=403, detail="You do not have admin access to this guild.")
+                ),
             ),
         ):
             client = TestClient(app, raise_server_exceptions=False)
-            response = client.get(f"/api/dashboard/settings/{GUILD_ID}")
+            response = client.get(
+                f"/api/dashboard/settings/{GUILD_ID}",
+                headers={
+                    "X-Api-Key": "dash-key",
+                    "X-Discord-User-Id": str(DISCORD_USER_ID),
+                },
+            )
         assert response.status_code == 403
 
 
@@ -384,10 +438,7 @@ class TestGetAutomodRules:
 
     def test_returns_503_when_db_unavailable(self):
         app = make_app()
-        with (
-            patch.object(api_module, "db_pool", None),
-            patch("api.verify_guild_admin_access", new=AsyncMock()),
-        ):
+        with patch.object(api_module, "db_pool", None):
             client = TestClient(app)
             response = client.get(f"/api/dashboard/{GUILD_ID}/automod/rules")
         assert response.status_code == 503
@@ -396,10 +447,7 @@ class TestGetAutomodRules:
         pool, conn = _mock_pool()
         conn.fetch = AsyncMock(return_value=[])
         app = make_app()
-        with (
-            patch.object(api_module, "db_pool", pool),
-            patch("api.verify_guild_admin_access", new=AsyncMock()),
-        ):
+        with patch.object(api_module, "db_pool", pool):
             client = TestClient(app)
             response = client.get(f"/api/dashboard/{GUILD_ID}/automod/rules")
         assert response.status_code == 200
@@ -408,17 +456,79 @@ class TestGetAutomodRules:
     def test_non_admin_gets_403(self):
         from fastapi import HTTPException
 
-        app = make_app()
-        with (
-            patch.object(api_module, "db_pool", MagicMock()),
-            patch(
-                "api.verify_guild_admin_access",
-                new=AsyncMock(side_effect=HTTPException(status_code=403, detail="Forbidden")),
-            ),
-        ):
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[verify_api_key] = lambda: None
+
+        async def _deny(_guild_id: int = GUILD_ID):
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        app.dependency_overrides[require_dashboard_guild_actor] = _deny
+        with patch.object(api_module, "db_pool", MagicMock()):
             client = TestClient(app, raise_server_exceptions=False)
             response = client.get(f"/api/dashboard/{GUILD_ID}/automod/rules")
         assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# POST /api/dashboard/{guild_id}/automod/rules
+# ---------------------------------------------------------------------------
+
+
+class TestCreateAutomodRule:
+    """POST create must accept Discord-header actors (snowflake), not only JWT subs."""
+
+    def test_discord_actor_creates_without_link_lookup(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(side_effect=[11, 22])
+        conn.fetchrow = AsyncMock(
+            return_value=_fake_record(
+                id=22,
+                guild_id=GUILD_ID,
+                rule_type="spam",
+                name="Spam",
+                enabled=True,
+                config='{"max": 5}',
+                created_by=DISCORD_USER_ID,
+                created_at="2026-08-04T12:00:00",
+                updated_at="2026-08-04T12:00:00",
+                is_premium=False,
+                action_type="delete",
+                action_config="{}",
+                severity=1,
+            )
+        )
+        app = make_app(auth_user=str(DISCORD_USER_ID))
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch(
+                "utils.premium_guard.guild_has_premium",
+                new=AsyncMock(return_value=False),
+            ),
+            patch.object(
+                api_module,
+                "_require_discord_id_for_linked_innersync",
+                new=AsyncMock(side_effect=AssertionError("snowflake must skip link lookup")),
+            ),
+            patch.object(api_module, "_invalidate_automod_rules_cache"),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/automod/rules",
+                json={
+                    "rule_type": "spam",
+                    "name": "Spam",
+                    "enabled": True,
+                    "config": {"max": 5},
+                    "action_type": "delete",
+                    "action_config": {},
+                },
+            )
+        assert response.status_code == 200
+        assert response.json()["id"] == 22
+        assert response.json()["created_by"] == DISCORD_USER_ID
+        # created_by in INSERT should be the Discord snowflake
+        assert conn.fetchval.await_args_list[0].args[5] == DISCORD_USER_ID
 
 
 # ---------------------------------------------------------------------------
