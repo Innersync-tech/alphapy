@@ -1,6 +1,6 @@
 """Sprint 3b guild dashboard CRUD endpoint tests."""
 
-from datetime import time
+from datetime import UTC, date, datetime, time
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -141,6 +141,40 @@ class TestGuildRemindersDashboard:
         assert args[5] == time(14, 30)
         assert args[9] is not None
 
+    def test_clear_scheduled_time_also_clears_days(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        existing = _fake_record(
+            event_time=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+        )
+        updated = _reminder_row(event_time=None, days=[])
+        conn.fetchrow = AsyncMock(side_effect=[existing, updated])
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"scheduled_time": ""},
+            )
+        assert response.status_code == 200
+        update_sql = conn.fetchrow.await_args_list[1].args[0]
+        assert "days" in update_sql
+        assert [] in conn.fetchrow.await_args_list[1].args
+
+    def test_reject_completed_on_recurring(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(return_value="60")
+        conn.fetchrow = AsyncMock(return_value=_fake_record(event_time=None))
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"completed": True},
+            )
+        assert response.status_code == 400
+        assert "one-off" in response.json()["detail"]
+
     def test_delete_reminder_not_found(self):
         pool, conn = _mock_pool()
         conn.fetchrow = AsyncMock(return_value=None)
@@ -175,8 +209,8 @@ class TestGuildEngagementDashboard:
             [],
             [_fake_record(count="1")],
             [_fake_record(count="4", max_streak="12")],
-            [],
         ])
+        conn.fetchrow = AsyncMock(return_value=None)  # no weekly awards
         app = _make_dashboard_app()
         with patch.object(api_module, "db_pool", pool):
             client = TestClient(app)
@@ -188,6 +222,37 @@ class TestGuildEngagementDashboard:
         assert data["streaks_count"] == 4
         assert data["max_streak"] == 12
         assert data["active_challenges"] == []
+        assert data["latest_weekly"] is None
+
+    def test_engagement_latest_weekly_all_results(self):
+        pool, conn = _mock_pool()
+        conn.fetch = AsyncMock(side_effect=[
+            [],
+            [],
+            [_fake_record(count="0")],
+            [],
+            [_fake_record(count="0")],
+            [_fake_record(count="0", max_streak=None)],
+            [
+                _fake_record(award_key=f"award_{i}", user_id=1000 + i, metric=i)
+                for i in range(25)
+            ],
+        ])
+        conn.fetchrow = AsyncMock(
+            return_value=_fake_record(
+                id=9,
+                week_start=date(2026, 7, 28),
+                week_end=date(2026, 8, 3),
+            )
+        )
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.get(f"/api/dashboard/{GUILD_ID}/engagement")
+        assert response.status_code == 200
+        latest = response.json()["latest_weekly"]
+        assert latest["id"] == 9
+        assert len(latest["results"]) == 25
 
 
 class TestGuildCustomCommandsDashboard:
@@ -202,7 +267,7 @@ class TestGuildCustomCommandsDashboard:
 
     def test_create_command(self):
         pool, conn = _mock_pool()
-        conn.fetchval = AsyncMock(return_value=1)
+        conn.fetchval = AsyncMock(side_effect=[1, None])  # count, existing name
         conn.execute = AsyncMock()
         conn.fetchrow = AsyncMock(return_value=_command_row())
         app = _make_dashboard_app()
@@ -224,6 +289,41 @@ class TestGuildCustomCommandsDashboard:
         assert conn.execute.await_args.args[2] == "hello"
         # Default reply_to_user matches DB/cog default
         assert conn.execute.await_args.args[8] is True
+
+    def test_create_duplicate_command_returns_400(self):
+        pool, conn = _mock_pool()
+        conn.fetchval = AsyncMock(side_effect=[1, 7])  # count, existing id
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/custom-commands",
+                json={
+                    "name": "hello",
+                    "trigger_type": "exact",
+                    "trigger_value": "!hello",
+                    "response": "Hi",
+                },
+            )
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+
+    def test_update_regex_type_validates_existing_value(self):
+        pool, conn = _mock_pool()
+        conn.fetchrow = AsyncMock(
+            side_effect=[
+                _fake_record(trigger_type="exact", trigger_value="(unclosed"),
+            ]
+        )
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/custom-commands/hello",
+                json={"trigger_type": "regex"},
+            )
+        assert response.status_code == 400
+        assert "Invalid regex" in response.json()["detail"]
 
     def test_delete_command_not_found(self):
         pool, conn = _mock_pool()

@@ -10,6 +10,7 @@ from datetime import UTC, datetime, time
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -325,11 +326,24 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
 
         try:
             async with pool.acquire() as conn:
+                existing = await conn.fetchrow(
+                    "SELECT event_time FROM reminders WHERE id = $1 AND guild_id = $2",
+                    reminder_id,
+                    guild_id,
+                )
+                if existing is None:
+                    raise HTTPException(status_code=404, detail="Reminder not found")
+
                 offset = await _get_reminder_offset_minutes(conn, guild_id)
+                effective_event_time = existing["event_time"]
 
                 if body.scheduled_time is not None:
                     if body.scheduled_time == "":
                         fields["event_time"] = None
+                        effective_event_time = None
+                        # Clearing one-off schedule must not flip into recurring via leftover days.
+                        if body.days is None:
+                            fields["days"] = []
                     else:
                         try:
                             parsed = datetime.fromisoformat(
@@ -343,6 +357,13 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                         fields["event_time"] = event_dt
                         fields["time"] = rem_t
                         fields["call_time"] = call_t
+                        effective_event_time = event_dt
+
+                if body.completed is True and effective_event_time is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="completed is only supported for one-off reminders",
+                    )
 
                 if body.session_time:
                     try:
@@ -518,18 +539,29 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                     """,
                     guild_id,
                 )
-                weekly = await conn.fetch(
+                # Fetch latest week first, then all of its results (no join LIMIT truncation).
+                latest_week = await conn.fetchrow(
                     """
-                    SELECT
-                      wa.id, wa.week_start, wa.week_end,
-                      wr.award_key, wr.user_id, wr.metric
-                    FROM engagement_weekly_awards wa
-                    LEFT JOIN engagement_weekly_results wr ON wr.week_id = wa.id
-                    WHERE wa.guild_id = $1
-                    ORDER BY wa.week_start DESC, wr.award_key ASC
-                    LIMIT 20
+                    SELECT id, week_start, week_end
+                    FROM engagement_weekly_awards
+                    WHERE guild_id = $1
+                    ORDER BY week_start DESC
+                    LIMIT 1
                     """,
                     guild_id,
+                )
+                weekly_results = (
+                    await conn.fetch(
+                        """
+                        SELECT award_key, user_id, metric
+                        FROM engagement_weekly_results
+                        WHERE week_id = $1
+                        ORDER BY award_key ASC
+                        """,
+                        latest_week["id"],
+                    )
+                    if latest_week
+                    else []
                 )
 
             def row_dict(row: Any) -> dict[str, Any]:
@@ -541,23 +573,21 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                         out[key] = str(value)
                 return out
 
-            weekly_rows = [row_dict(r) for r in weekly]
-            latest = weekly_rows[0] if weekly_rows else None
             latest_weekly = None
-            if latest:
-                week_id = latest["id"]
+            if latest_week:
+                week = row_dict(latest_week)
                 latest_weekly = {
-                    "id": week_id,
-                    "week_start": latest.get("week_start"),
-                    "week_end": latest.get("week_end"),
+                    "id": week["id"],
+                    "week_start": week.get("week_start"),
+                    "week_end": week.get("week_end"),
                     "results": [
                         {
                             "award_key": r.get("award_key"),
-                            "user_id": r.get("user_id"),
+                            "user_id": str(r["user_id"]) if r.get("user_id") is not None else None,
                             "metric": r.get("metric"),
                         }
-                        for r in weekly_rows
-                        if r.get("id") == week_id and r.get("award_key")
+                        for r in weekly_results
+                        if r.get("award_key")
                     ],
                 }
 
@@ -633,6 +663,16 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                         status_code=400,
                         detail=f"Maximum of {MAX_CUSTOM_COMMANDS_PER_GUILD} custom commands per guild",
                     )
+                existing = await conn.fetchval(
+                    "SELECT id FROM custom_commands WHERE guild_id = $1 AND name = $2",
+                    guild_id,
+                    name,
+                )
+                if existing:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"A command named '{name}' already exists",
+                    )
                 await conn.execute(
                     """
                     INSERT INTO custom_commands
@@ -659,6 +699,11 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
             return {"command": _serialize_command(row)}
         except HTTPException:
             raise
+        except asyncpg.UniqueViolationError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A command named '{name}' already exists",
+            ) from exc
         except Exception as exc:
             logger.error("[dashboard] create custom command failed guild=%s: %s", guild_id, exc)
             raise HTTPException(status_code=500, detail="Failed to create custom command") from exc
@@ -678,11 +723,6 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
             raise HTTPException(status_code=400, detail="trigger_value max 200 chars")
         if body.response is not None and len(body.response) > 1900:
             raise HTTPException(status_code=400, detail="response max 1900 chars")
-        if body.trigger_type == "regex" and body.trigger_value:
-            try:
-                re.compile(body.trigger_value)
-            except re.error as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid regex: {exc}") from exc
 
         fields: dict[str, Any] = {}
         if body.trigger_type is not None:
@@ -702,20 +742,46 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         if not fields:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        assignments = ["updated_at = NOW()"]
-        values: list[Any] = []
-        for idx, (key, value) in enumerate(fields.items(), start=1):
-            assignments.append(f"{key} = ${idx}")
-            values.append(value)
-        values.extend([guild_id, command_name])
-        sql = (
-            f"UPDATE custom_commands SET {', '.join(assignments)} "
-            f"WHERE guild_id = ${len(values) - 1} AND name = ${len(values)} RETURNING *"
-        )
-
         pool = _require_pool()
         try:
             async with pool.acquire() as conn:
+                existing = await conn.fetchrow(
+                    "SELECT trigger_type, trigger_value FROM custom_commands "
+                    "WHERE guild_id = $1 AND name = $2",
+                    guild_id,
+                    command_name,
+                )
+                if existing is None:
+                    raise HTTPException(status_code=404, detail="Command not found")
+
+                effective_type = (
+                    body.trigger_type
+                    if body.trigger_type is not None
+                    else existing["trigger_type"]
+                )
+                effective_value = (
+                    body.trigger_value.strip()
+                    if body.trigger_value is not None
+                    else existing["trigger_value"]
+                )
+                if effective_type == "regex":
+                    try:
+                        re.compile(effective_value)
+                    except re.error as exc:
+                        raise HTTPException(
+                            status_code=400, detail=f"Invalid regex: {exc}"
+                        ) from exc
+
+                assignments = ["updated_at = NOW()"]
+                values: list[Any] = []
+                for idx, (key, value) in enumerate(fields.items(), start=1):
+                    assignments.append(f"{key} = ${idx}")
+                    values.append(value)
+                values.extend([guild_id, command_name])
+                sql = (
+                    f"UPDATE custom_commands SET {', '.join(assignments)} "
+                    f"WHERE guild_id = ${len(values) - 1} AND name = ${len(values)} RETURNING *"
+                )
                 row = await conn.fetchrow(sql, *values)
             if row is None:
                 raise HTTPException(status_code=404, detail="Command not found")
