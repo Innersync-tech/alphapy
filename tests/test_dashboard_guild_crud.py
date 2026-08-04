@@ -1,12 +1,15 @@
 """Sprint 3b guild dashboard CRUD endpoint tests."""
 
 from datetime import UTC, date, datetime, time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import api as api_module
+import dashboard_guild_crud as crud
 from tests.test_api_endpoints import (
     DISCORD_USER_ID,
     GUILD_ID,
@@ -16,6 +19,13 @@ from tests.test_api_endpoints import (
 )
 
 BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
+
+
+@pytest.fixture(autouse=True)
+def _allow_any_reminder_channel():
+    """Default: skip Discord guild membership check (covered by dedicated tests)."""
+    with patch("dashboard_guild_crud._ensure_channel_in_guild", new=AsyncMock()):
+        yield
 
 
 def _patch_unlimited_tier():
@@ -111,6 +121,62 @@ class TestGuildRemindersDashboard:
             )
         assert response.status_code == 400
         assert "channel_id" in response.json()["detail"]
+
+    def test_create_reminder_rejects_foreign_guild_channel(self):
+        pool, _conn = _mock_pool()
+        app = _make_dashboard_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            _patch_unlimited_tier(),
+            patch(
+                "dashboard_guild_crud._ensure_channel_in_guild",
+                new=AsyncMock(
+                    side_effect=HTTPException(
+                        status_code=400,
+                        detail="channel_id must belong to this guild",
+                    )
+                ),
+            ),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={
+                    "message": "spam",
+                    "channel_id": "999888777",
+                    "time": "10:00",
+                    "days": ["0"],
+                },
+            )
+        assert response.status_code == 400
+        assert "belong to this guild" in response.json()["detail"]
+
+    def test_update_reminder_rejects_foreign_guild_channel(self):
+        pool, conn = _mock_pool()
+        conn.fetchrow = AsyncMock(
+            return_value=_fake_record(event_time=None, image_url=None)
+        )
+        app = _make_dashboard_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch(
+                "dashboard_guild_crud._ensure_channel_in_guild",
+                new=AsyncMock(
+                    side_effect=HTTPException(
+                        status_code=400,
+                        detail="channel_id must belong to this guild",
+                    )
+                ),
+            ),
+        ):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/reminders/42",
+                json={"channel_id": "999888777"},
+            )
+        assert response.status_code == 400
+        assert "belong to this guild" in response.json()["detail"]
+        conn.fetchrow.assert_not_awaited()
 
     def test_create_reminder(self):
         pool, conn = _mock_pool()
@@ -600,3 +666,43 @@ class TestGuildCustomCommandsDashboard:
             client = TestClient(app)
             response = client.delete(f"/api/dashboard/{GUILD_ID}/custom-commands/missing")
         assert response.status_code == 404
+
+
+class TestChannelBelongsToGuild:
+    @pytest.mark.asyncio
+    async def test_accepts_channel_in_guild(self):
+        guild = MagicMock()
+        guild.id = GUILD_ID
+        channel = MagicMock()
+        channel.guild = guild
+        guild.get_channel.return_value = channel
+        bot = MagicMock()
+        bot.get_guild.return_value = guild
+        with patch("gpt.helpers.bot_instance", bot):
+            assert await crud._channel_belongs_to_guild_on_bot_loop(GUILD_ID, 123) is True
+
+    @pytest.mark.asyncio
+    async def test_rejects_channel_from_other_guild(self):
+        guild = MagicMock()
+        guild.id = GUILD_ID
+        guild.get_channel.return_value = None
+        other_guild = MagicMock()
+        other_guild.id = GUILD_ID + 1
+        foreign = MagicMock()
+        foreign.guild = other_guild
+        bot = MagicMock()
+        bot.get_guild.return_value = guild
+        bot.fetch_channel = AsyncMock(return_value=foreign)
+        with patch("gpt.helpers.bot_instance", bot):
+            assert await crud._channel_belongs_to_guild_on_bot_loop(GUILD_ID, 999) is False
+
+    @pytest.mark.asyncio
+    async def test_rejects_missing_channel(self):
+        guild = MagicMock()
+        guild.id = GUILD_ID
+        guild.get_channel.return_value = None
+        bot = MagicMock()
+        bot.get_guild.return_value = guild
+        bot.fetch_channel = AsyncMock(side_effect=Exception("not found"))
+        with patch("gpt.helpers.bot_instance", bot):
+            assert await crud._channel_belongs_to_guild_on_bot_loop(GUILD_ID, 404) is False
