@@ -1,8 +1,8 @@
-# 🧬 Innersync • Alphapy Roadmap v3.9.0 "Reflection Loop"
+# 🧬 Innersync • Alphapy Roadmap v3.13.0 "Reflection Loop"
 
-**Release v3.9.0 Complete!** 🤖 Alphapy Agents MVP — `/agent` for linked users, Supabase sessions/memory, safety policy, jailbreak-tested.
+**Current release: v3.13.0** 🤖 Alphapy Agents MVP shipped earlier (v3.9.0) — `/agent` for linked users, Supabase sessions/memory, safety policy, jailbreak-tested. This roadmap tracks work from that baseline forward.
 
-This document outlines the evolution from v3.9.0 forward.
+This document outlines the evolution from the Agents MVP forward.
 
 ## ✅ COMPLETED: Alphapy Agents MVP (v3.9.0)
 

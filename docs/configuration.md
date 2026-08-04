@@ -380,7 +380,7 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 - `ALPHAPY_MEMORY_GRAPH_PUSH`: When `1`/`true`, push Tier-2 insight labels to Core Memory Vault graph on `/agent end`. Default: enabled whenever `CORE_API_URL` and `ALPHAPY_SERVICE_KEY` are set; set `0` to disable in local tests.
 
 ### Optional - Innersync identity (Discord link webhook)
-- `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.
+- `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`. (`WEBHOOK_SECRET` is not loaded in `config.py` — do not rely on it.)
 
 ### Optional - Premium tier
 - `PREMIUM_CHECKOUT_URL`: Checkout page URL for the "Get Premium" button in `/premium`. If unset, buttons are disabled.
@@ -395,15 +395,20 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 - `PRICE_LIFETIME_REGULAR`: Lifetime plan regular price label, shown after early bird sells out (default: `€99.99`).
 
 ### Optional - App reflections (Core-API webhooks)
-- `APP_REFLECTIONS_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/app-reflections` and `POST /webhooks/revoke-reflection`. If unset, falls back to `WEBHOOK_SECRET` or `SUPABASE_WEBHOOK_SECRET`.
+- `APP_REFLECTIONS_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/app-reflections` and `POST /webhooks/revoke-reflection`. If unset, falls back to `SUPABASE_WEBHOOK_SECRET`.
 
 ### Optional - Premium / Founder webhooks (Core → Alphapy)
-- `PREMIUM_INVALIDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/premium-invalidate` (cache invalidation on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`.
-- `FOUNDER_WEBHOOK_SECRET`: Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`.
+- `PREMIUM_INVALIDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/premium-invalidate` (cache invalidation on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.
+- `FOUNDER_WEBHOOK_SECRET`: Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.
 
 ### Optional - Legal update notifications
-- `LEGAL_UPDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/legal-update` (GitHub Action notifies on PP/ToS change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`.
+- `LEGAL_UPDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/legal-update` (GitHub Action notifies on PP/ToS change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`.
 - `LEGAL_UPDATES_CHANNEL_ID`: Channel ID in the main guild where legal update embeds are posted. Falls back to `system.log_channel_id` for `MAIN_GUILD_ID` if unset.
+
+### Optional - Reminder quotas and image rate limits
+- Free-tier active reminder cap is `REMINDER_LIMIT` in `utils/premium_tiers.py` (free: **10**; premium tiers unlimited). Enforced for Discord (`cogs/reminders.py`) and dashboard create (`utils/reminder_quota.py`). Completed one-offs (`reminders.completed`) are excluded from the count.
+- `IMAGE_REMINDER_RATE_LIMIT_WINDOW`: Sliding window in seconds for image reminder attaches (default: `3600`). Hard cap is **3** attaches per user+guild per window (`utils/image_reminder_rate_limit.py`).
+- `IMAGE_REMINDER_RATE_LIMIT_COUNT`: Max retained timestamps per user+guild key (default: `100`; retention only — enforcement uses the hard cap of 3).
 
 ### Optional - API observability and idempotency
 - `GET /api/observability` (internal endpoint) returns rolling request success-rate and p50/p95/p99 latency for API and webhook traffic.

@@ -35,6 +35,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Purpose**: Detects new embeds in the announcements channel and automatically creates reminders
 - **Triggers**: `on_message` → embed parsing
 - **Storage**: PostgreSQL (reminders table)
+- **Enable gate**: `embedwatcher.enabled` (default true). When false, the watcher does not create reminders; shared `MODULE_DISABLED_MSG` for related user surfaces. See `docs/configuration.md` module enable contract.
 - **Special parsing**: Title, time, days, location via NLP
 - **Helper**: `parse_embed_for_reminder()` + `_short_title_for_reminder_name()`
 - **Message formatting**: `_format_message_paragraphs()` for readable paragraphs + timezone bullet splits
@@ -44,10 +45,13 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🧾 Agent: ReminderManager
-- **Path**: `cogs/reminders.py`
-- **Purpose**: Slash commands for manual reminder management
+- **Path**: `cogs/reminders.py`, `utils/reminder_quota.py`, `dashboard_guild_crud.py` (Sprint 3b)
+- **Purpose**: Slash commands for manual reminder management + dashboard guild CRUD
 - **Commands**: `/add_reminder`, `/add_live_session`, `/edit_live_session`, `/delete_live_session`, `/reminder_list`, `/reminder_edit`, `/reminder_delete`
 - **LiveSessionPresets**: `/add_live_session` creates a recurring live-session reminder (fixed message, optional image; premium for images); `/edit_live_session` and `/delete_live_session` manage preset entries directly
+- **Quota**: Free tier `REMINDER_LIMIT` (10 active; `completed IS NOT TRUE` rows count) via `get_reminder_quota_block_message` — shared by Discord and dashboard create
+- **Mark-done**: `reminders.completed` (migration `026`); dashboard `PUT …/reminders/{id}` accepts `completed` for one-offs
+- **Dashboard**: Sprint 3b routes under `/api/dashboard/{guild_id}/reminders*`; `channel_id` must belong to the guild (`_ensure_channel_in_guild` → `400` / `503`)
 - **Interaction**: Shares parser with EmbedReminderWatcher
 - **Embeds**: Title max 240 chars, location max 1024 chars
 
@@ -56,6 +60,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ## 🚀 Agent: GrokInteraction
 - **Purpose**: AI functionality with Grok
 - **Commands**: `/create_caption`, `/learn_topic`, `/gptstatus`
+- **Enable gate**: `gpt.enabled` (default true). When false, `/create_caption` and `/learn_topic` refuse with `MODULE_DISABLED_MSG`. `/gptstatus` remains available for ops.
 - **Outages**: `gpt/errors.py` classifies credits / bad key / 5xx as `offline` (`ERR_GROK_OFFLINE`); rate limits as `rate_limited`. `ask_gpt` raises `GrokUnavailableError` (never returns fallback text as a model reply). Operators see last `kind` on `/gptstatus`.
 
 ---
@@ -81,7 +86,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Purpose**: Per-user agent sessions with modular skills, durable memory, and Hermit event emission — distinct from personal **Hermes** (Nous Research) on VPS
 - **Commands**: `/agent list`, `/agent start`, `/agent continue`, `/agent end`, `/agent status`
 - **Admin config**: `/config agents show`, `/config agents toggle`
-- **Energy check-in**: When energy prefs are missing or older than 24h, `/agent start` shows an ephemeral 1–5 + Skip prompt (`FatigueQuickCheckView`). Persistent View (`timeout=None`, `alphapy:fatigue:*` custom_ids) registered in `utils/lifecycle.py` Phase 6; pending start state is in-process (120s TTL). After redeploy, expired prompts ask the user to run `/agent start` again.
+- **Energy check-in**: When energy prefs are missing or older than 24h, `/agent start` shows an ephemeral 1–5 + Skip prompt (`FatigueQuickCheckView`). Persistent View (`timeout=None`, `alphapy:fatigue:*` custom_ids) registered in `utils/lifecycle.py` Phase 6; pending start state is in-process (120s TTL). After redeploy, expired prompts ask the user to run `/agent start` again. Saves merge into existing `app_user_settings.agent_prefs` via `merge_agent_prefs_fields` (fail-closed if prefs cannot be loaded — never overwrites App Tier 1 fields with energy-only data).
 - **Safety policy**: `agents/policy.py` (`AGENT_SAFETY_RULES` + `build_agent_system_prompt()`); see `docs/agents-safety-guidelines.md` and [Innersync-meta AGENT-SAFETY-POLICY](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md)
 - **Agents**: `reflection` (journal sync; trade agents deferred)
 - **Skills**: `inner_voice`, `inner_critic_dialogue`, `avoidance_processor`, `fatigue_check`, `chain_breaker_micro`, `journal_sync` (`trade_insight` skill file kept dormant for later)
@@ -141,12 +146,14 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Identity check**: The Discord display name and username are injected into the AI prompt. The AI returns `identifier_match: "match" | "mismatch" | "not_visible"`. A `"mismatch"` (visible name/ID in screenshot doesn't match the Discord user) is a hard server-side reject. A `"not_visible"` escalates an otherwise-confident AI decision to manual review. The intro embed instructs users to ensure their name or account username is visible.
 - **Key**: Conservative vision model, no screenshots stored; log summaries contain no payment details (user, outcome, resolver, timestamp only)
 - **Premium**: Only guilds with an active Alphapy premium subscription can use verification (`guild_has_premium`). The member clicking Start verification does not need Alphapy premium—they are proving payment to the guild to get the verified role.
+- **Enable gate**: `verification.enabled` (default true). When false, member verification start refuses with `MODULE_DISABLED_MSG`; admin `/verification` config commands stay available.
 
 ---
 
 ## 📜 Agent: Onboarding
 - **Path**: `cogs/onboarding.py` + reaction_roles + configuration
 - **Purpose**: Configurable onboarding flow with rules, questions and personalization
+- **Enable gate**: `onboarding.enabled` / `rules.enabled` where applicable (see `docs/configuration.md`); reaction-role rules respect `rules.enabled`
 - **Helper**: `get_user_personalization()` for opt-in + preferred language
 - **API**: Dashboard endpoints ready (`/api/dashboard/{guild_id}/onboarding/*`)
 
@@ -177,6 +184,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ## �💡 Contextual FYI tips
 - **Path**: `utils/fyi_tips.py`
 - **Purpose**: One-time context-sensitive tips on first events per guild (24h cooldown)
+- **Enable gate**: `fyi.enabled` (default true)
 - **Phase 1 live**: `first_guild_join`, `first_onboarding_done`, `first_config_wizard_complete`, `first_reminder`, `first_ticket`
 
 ---
@@ -190,9 +198,13 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## 🌐 API Agent: FastAPI Dashboard Endpoint
-- **Path**: `api.py`, `agents/http_routes.py`, `hermit_api.py`
+- **Path**: `api.py`, `agents/http_routes.py`, `hermit_api.py`, `dashboard_guild_crud.py`
 - **Purpose**: Exposes reminders, agent sessions, Hermit broker data, and realtime metrics for Mind/App/Core
 - **API**: Dashboard guild CRUD for reminders / engagement / custom-commands lives in `dashboard_guild_crud.py` (`verify_dashboard_discord_admin`); control-panel proxies via `lib/alphapyDashboardProxy.ts` (Sprint 3b).
+- **Discord meta**: `GET /api/dashboard/{guild_id}/discord-meta` — channels + assignable roles for pickers
+- **Cache reload**: `POST /api/dashboard/{guild_id}/settings/invalidate-cache` after Dashboard Disable / settings writes
+- **Snowflake JSON**: GET settings / automod settings return Discord snowflakes as **strings** (`_coerce_dashboard_setting_value`); unwraps legacy quoted JSONB encodings
+- **Observability**: `GET /api/observability` includes `hermit_context` stats from `get_hermit_context_stats()`
 
 ---
 
@@ -254,12 +266,13 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Settings scope**: `engagement.*` (all registered in `bot.py`)
 - **Triggers**: `on_message` (challenge counts + weekly indexing + streaks), `on_raw_reaction_add` (weekly reactions + OG claims), `on_ready` (challenge rehydration + OG message ID cache)
 - **Caching**: Feature toggles (`*_enabled`) and weekly food channels are cached with short TTLs in-process, with invalidation on `engagement.*` setting updates via global settings listener
-
+- **Enable gate**: `engagement.enabled` master flag (default true) AND per-feature flags (`challenges_enabled`, etc.). Master false silences all engagement features; shared `MODULE_DISABLED_MSG` where applicable.
 ---
 
 ## 💬 Agent: Custom Commands
 - **Path**: `cogs/custom_commands.py`
 - **Purpose**: Guild-defined automated message responses triggered by message patterns
+- **Enable gate**: `custom_commands.enabled` (default true). When false, trigger evaluation is skipped / member surfaces refuse with `MODULE_DISABLED_MSG`.
 - **Triggers**: `on_message` → trigger evaluation → response send + optional message delete
 - **Storage**: PostgreSQL (`custom_commands` table)
 - **Trigger types**: `exact`, `starts_with`, `contains`, `regex`

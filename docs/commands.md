@@ -7,6 +7,16 @@ description: Discord slash commands for the Alphapy bot.
 
 Complete reference for all Discord slash commands available in the Alphapy bot.
 
+## Module disabled (Dashboard)
+
+When an admin disables a module in the Alphapy Dashboard (`{scope}.enabled = false`), member-facing commands for that module refuse with an ephemeral message:
+
+> This module is disabled in this server. Ask an admin to enable it in the Alphapy Dashboard.
+
+Shared constant: `MODULE_DISABLED_MSG` in `utils/settings_helpers.py`. Affected scopes include growth, verification, ticketbot, embedwatcher, custom_commands, gpt, faq, rules, fyi, and engagement (master AND with per-feature flags). Admin config commands for the same scope usually remain available. See [Configuration — module enable contract](../configuration/).
+
+---
+
 ## Command Categories
 
 - [Core Utilities](#core-utilities)
@@ -95,6 +105,8 @@ Shows central profile fields from Core when available (`display_name`, `avatar_u
 ### `/add_reminder`
 Schedule a recurring or one-off reminder via form or message link.
 
+**Quota:** Free tier is limited to **10** active reminders per user+guild (`REMINDER_LIMIT`; completed one-offs excluded). Same helper as the dashboard (`utils/reminder_quota.py` / `get_reminder_quota_block_message`). Premium tiers are unlimited.
+
 **Parameters:**
 - `name` (required): Name of the reminder
 - `channel` (optional): Channel where reminder should be sent (uses default if not set)
@@ -112,6 +124,8 @@ Schedule a recurring or one-off reminder via form or message link.
 
 ### `/add_live_session`
 Create a recurring "live session" reminder with a fixed message ("Live session starting now!"). Optional image (Premium required for images).
+
+**Quota:** Counts toward the same free-tier `REMINDER_LIMIT` (10 active) as `/add_reminder`. Images require premium and are rate-limited (3 attaches per user+guild per hour window).
 
 **Parameters:**
 - `days` (required): Days of the week (e.g. "mon,wed,fri")
@@ -722,7 +736,7 @@ Start a multi-turn reflection agent session (first turn).
 
 **Behavior:** Creates an `active` session, gathers skill context, runs Grok, stores the turn in `agent_session_messages`, and returns an ephemeral embed. Session stays open until `/agent end`.
 
-**Energy check-in (optional):** When your energy self-report is missing or older than 24 hours, the bot first sends an ephemeral **Quick energy check-in** (buttons `1`–`5` + **Skip**). Choosing a level saves Tier 1 `agent_prefs` (`energy_level` / `fatigue_reported_at`) then starts the session; Skip starts without updating prefs. You can also set energy in Innersync App → Settings → Agent memory. Buttons use a persistent View (`alphapy:fatigue:*`); after a bot redeploy an old prompt may expire — run `/agent start` again.
+**Energy check-in (optional):** When your energy self-report is missing or older than 24 hours, the bot first sends an ephemeral **Quick energy check-in** (buttons `1`–`5` + **Skip**). Choosing a level merges `energy_level` / `fatigue_reported_at` into existing App Tier 1 `agent_prefs` via `merge_agent_prefs_fields` (preserves `display_name`, `persona`, learning toggles, etc.) then starts the session; Skip starts without updating prefs. If existing prefs cannot be loaded, save fails closed (`RuntimeError`) so energy-only fields do not wipe App settings. You can also set energy in Innersync App → Settings → Agent memory. Buttons use a persistent View (`alphapy:fatigue:*`); after a bot redeploy an old prompt may expire — run `/agent start` again.
 
 **Example:**
 ```

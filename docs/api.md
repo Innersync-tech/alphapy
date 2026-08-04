@@ -15,10 +15,10 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 
 - **Health & Status**: Basic health checks and monitoring (`/api/health`, `/api/health/history`)
 - **Metrics & Analytics**: Dashboard metrics and command analytics (`/api/dashboard/metrics`, `/top-commands`)
-- **Dashboard Configuration**: Web dashboard endpoints for managing settings, onboarding, auto-moderation (requires Supabase JWT)
+- **Dashboard Configuration**: Web dashboard endpoints for managing settings, onboarding, auto-moderation (JWT admin or Discord-admin headers depending on route)
 - **Auto-Moderation**: Complete auto-moderation rule management with analytics (`/api/dashboard/{guild_id}/automod/*`)
 - **Onboarding Management**: Questions, rules, and flow configuration (`/api/dashboard/{guild_id}/onboarding/*`)
-- **Reminder Management**: User-facing reminder CRUD operations (requires Supabase JWT subject match)
+- **Reminder Management**: User-facing reminder CRUD (`/api/reminders/*`, Supabase JWT `sub` match) plus guild-admin Sprint 3b CRUD (`/api/dashboard/{guild_id}/reminders*`)
 - **Agent Sessions**: Cross-platform `/agent` REST API for App/Mind (requires Supabase JWT + Discord link)
 - **Hermit broker**: Core/Hermit progress data from Railway (`/api/hermit/*`; service `X-API-Key` = `API_KEY`)
 - **Verification Queue**: Dashboard manual-review tickets (requires dashboard Discord admin auth)
@@ -113,9 +113,21 @@ Returns rolling in-memory request metrics for API and webhook traffic:
     "requests": 45,
     "success_rate": 1.0,
     "latency_ms": { "p50": 7.1, "p95": 18.0, "p99": 28.3 }
+  },
+  "hermit_context": {
+    "hermit_context_attempts": 12,
+    "hermit_context_success": 10,
+    "hermit_context_failure": 2,
+    "hermit_context_cache_hits": 8,
+    "hermit_context_cache_misses": 4,
+    "hermit_context_stale_hits": 1,
+    "hermit_prompt_applied": 9,
+    "hermit_prompt_omitted": 1
   }
 }
 ```
+
+The `hermit_context` block comes from `get_hermit_context_stats()` (in-memory Hermit context fetch/prompt counters). See also [Hermit Core rollout](../hermit-core-rollout/).
 
 All responses now include an `X-Request-ID` header for request correlation.
 
@@ -357,12 +369,36 @@ These endpoints are used by the Alphapy control panel (and related dashboards) f
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET/POST | `/dashboard/{guild_id}/reminders` | List / create guild reminders |
-| PUT/DELETE | `/dashboard/{guild_id}/reminders/{reminder_id}` | Update / delete |
-| POST | `/dashboard/{guild_id}/reminders/live-sessions` | Live-session preset |
-| GET | `/dashboard/{guild_id}/engagement` | Challenges / OG / badges / streaks / weekly |
-| GET/POST | `/dashboard/{guild_id}/custom-commands` | List / create (invalidates cog cache) |
-| PUT/DELETE | `/dashboard/{guild_id}/custom-commands/{command_name}` | Update / delete |
+| GET/POST | `/api/dashboard/{guild_id}/reminders` | List / create guild reminders |
+| PUT/DELETE | `/api/dashboard/{guild_id}/reminders/{reminder_id}` | Update / delete |
+| POST | `/api/dashboard/{guild_id}/reminders/live-sessions` | Live-session preset |
+| GET | `/api/dashboard/{guild_id}/engagement` | Challenges / OG / badges / streaks / weekly |
+| GET/POST | `/api/dashboard/{guild_id}/custom-commands` | List / create (invalidates cog cache) |
+| PUT/DELETE | `/api/dashboard/{guild_id}/custom-commands/{command_name}` | Update / delete |
+
+##### Sprint 3b reminder CRUD detail
+
+Implemented in `dashboard_guild_crud.py`. Auth: `X-Api-Key` + `X-Discord-User-Id` (guild admin).
+
+**Create (`POST …/reminders`)** body:
+- `message` (required)
+- `scheduled_time` (ISO datetime) **or** `time` (HH:MM) + `days` (recurring)
+- `name` (optional), `channel_id` (required; Discord snowflake as string or number)
+
+**Update (`PUT …/reminders/{id}`)** body (all optional):
+- `message`, `name`, `channel_id`, `days`, `time` / `session_time` / `call_time`, `scheduled_time`, `image_url`
+- `completed` (bool) — mark-done for **one-off** reminders (`reminders.completed`, migration `026`). Completed one-offs do not count toward free-tier quota.
+
+**Live session (`POST …/reminders/live-sessions`)** body:
+- `time` (required), `channel_id` (required), `days` (optional), `image_url` (optional; premium + rate limit)
+
+**Channel validation:** `channel_id` must belong to the path `guild_id` (`_ensure_channel_in_guild`). Foreign channel → `400` (`channel_id must belong to this guild`). Bot unavailable / timeout → `503`.
+
+**Quota / limits:**
+- Free tier: max `REMINDER_LIMIT` active reminders per user+guild (default **10**; rows with `completed IS NOT TRUE` count). Exceeded → `403`.
+- Image attach: premium required; rate limit **3** image writes per user+guild per `IMAGE_REMINDER_RATE_LIMIT_WINDOW` (default 3600s) → `429`.
+
+**Serialized reminder fields** include string snowflakes (`guild_id`, `channel_id`, `created_by`), `scheduled_time`, `completed`, and timestamps.
 
 #### Settings (JWT admin)
 
@@ -377,21 +413,23 @@ Get all settings for a specific guild, organized by category.
 **Path Parameters:**
 - `guild_id` (required): Discord guild ID
 
+**Snowflake JSON convention:** Discord IDs (`*_channel_id`, `*_role_id`, `*_message_id`, bare `channel_id` / `category_id`, `badge_role_*`) are returned as **strings** so JavaScript clients keep full precision past `Number.MAX_SAFE_INTEGER`. Coercion also unwraps legacy double-encoded JSONB quote layers (e.g. stored `"\"123…\""` → `"123…"`), matching `SettingsService` decode via `_unwrap_quoted_scalar_str`. Plural lists such as `weekly_food_channel_ids` are not coerced as single snowflakes.
+
 **Response:**
 ```json
 {
   "system": {
-    "log_channel_id": 123456789,
-    "rules_channel_id": 987654321,
+    "log_channel_id": "123456789012345678",
+    "rules_channel_id": "987654321098765432",
     "log_level": "verbose"
   },
   "reminders": {
     "enabled": true,
-    "default_channel_id": 111222333,
+    "default_channel_id": "111222333444555666",
     "allow_everyone_mentions": false
   },
   "embedwatcher": {
-    "announcements_channel_id": 444555666,
+    "announcements_channel_id": "444555666777888999",
     "reminder_offset_minutes": 60,
     "gpt_fallback_enabled": true,
     "non_embed_enabled": false,
@@ -403,40 +441,60 @@ Get all settings for a specific guild, organized by category.
   },
   "invites": {
     "enabled": true,
-    "announcement_channel_id": 123456789,
+    "announcement_channel_id": "123456789012345678",
     "with_inviter_template": "{member} joined! {inviter} now has {count} invites.",
     "no_inviter_template": "{member} joined, but no inviter data found."
   },
   "gdpr": {
     "enabled": true,
-    "channel_id": 123456789
+    "channel_id": "123456789012345678"
   },
   "automod": {
     "enabled": false,
-    "log_channel_id": 123456789,
+    "log_channel_id": "123456789012345678",
     "log_actions": true,
     "log_to_database": true
   },
   "onboarding": {
     "enabled": true,
     "mode": "rules_with_questions",
-    "completion_role_id": 123456789,
-    "join_role_id": 987654321
+    "completion_role_id": "123456789012345678",
+    "join_role_id": "987654321098765432"
   },
   "ticketbot": {
-    "category_id": 123456789,
-    "staff_role_id": 987654321,
-    "escalation_role_id": 555666777,
+    "category_id": "123456789012345678",
+    "staff_role_id": "987654321098765432",
+    "escalation_role_id": "555666777888999000",
     "idle_days_threshold": 5,
     "auto_close_days_threshold": 14
   },
   "verification": {
-    "verified_role_id": 123456789,
-    "category_id": 987654321,
+    "verified_role_id": "123456789012345678",
+    "category_id": "987654321098765432",
     "vision_model": "grok-3"
+  },
+  "growth": {
+    "enabled": true,
+    "log_channel_id": "123456789012345678"
+  },
+  "agents": {
+    "enabled": false
+  },
+  "engagement": {
+    "enabled": true,
+    "challenges_enabled": false,
+    "weekly_enabled": false
+  },
+  "fyi": {
+    "enabled": true
+  },
+  "custom_commands": {
+    "enabled": true
   }
 }
 ```
+
+Note: `fyi` appears on GET (read from `bot_settings`) but is **not** a valid POST category — FYI toggles are written via internal `set_raw` / other admin paths.
 
 #### `POST /api/dashboard/settings/{guild_id}`
 
@@ -447,12 +505,14 @@ Update settings for a specific guild category.
 **Path Parameters:**
 - `guild_id` (required): Discord guild ID
 
+**Valid `category` values:** `system`, `reminders`, `embedwatcher`, `gpt`, `invites`, `gdpr`, `automod`, `onboarding`, `ticketbot`, `verification`, `growth`, `agents`, `engagement`, `custom_commands`.
+
 **Request Body:**
 ```json
 {
   "category": "reminders",
   "settings": {
-    "default_channel_id": "111222333",
+    "default_channel_id": "111222333444555666",
     "allow_everyone_mentions": false
   }
 }
@@ -717,6 +777,36 @@ Reload the bot's in-memory `bot_settings` snapshot for a guild after Dashboard w
 }
 ```
 
+#### `GET /api/dashboard/{guild_id}/discord-meta`
+
+List guild channels and assignable roles for control-panel pickers (channel/role dropdowns).
+
+**Authentication:** Required (`X-Api-Key` + `X-Discord-User-Id` with guild admin access)
+
+**Response:**
+```json
+{
+  "channels": [
+    {
+      "id": "123456789012345678",
+      "name": "announcements",
+      "type": "text",
+      "parent_id": "987654321098765432"
+    }
+  ],
+  "roles": [
+    {
+      "id": "111222333444555666",
+      "name": "Verified",
+      "color": 3447003,
+      "position": 5
+    }
+  ]
+}
+```
+
+**Errors:** `503` when the bot is unavailable; `504` on Discord fetch timeout; `400` when the guild is not found / not reachable.
+
 #### `GET /api/dashboard/{guild_id}/verification/queue`
 
 List verification tickets awaiting manual review (no screenshot content).
@@ -831,11 +921,13 @@ Get auto-moderation specific settings.
 ```json
 {
   "enabled": false,
-  "log_channel_id": 123456789,
+  "log_channel_id": "123456789012345678",
   "log_actions": true,
   "log_to_database": true
 }
 ```
+
+`log_channel_id` is `str | null` (empty string on GET is coerced to `null` in some handlers). Same snowflake-as-string convention as guild settings.
 
 #### `POST /api/dashboard/{guild_id}/automod/settings`
 
@@ -847,7 +939,7 @@ Update auto-moderation settings.
 ```json
 {
   "enabled": true,
-  "log_channel_id": 123456789,
+  "log_channel_id": "123456789012345678",
   "log_actions": true,
   "log_to_database": true
 }
@@ -1084,7 +1176,7 @@ Supabase Auth lifecycle webhook used for profile sync and GDPR-style cleanup wor
 
 Triggered by a GitHub Action when `docs/terms-of-service.md` or `docs/privacy-policy.md` changes on main. Posts a formatted embed in the configured channel of the main guild (`MAIN_GUILD_ID`).
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `LEGAL_UPDATE_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `LEGAL_UPDATE_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`)
 
 **Request body:**
 ```json
@@ -1106,7 +1198,7 @@ Triggered by a GitHub Action when `docs/terms-of-service.md` or `docs/privacy-po
 
 Clears the premium cache for a user so the next check refetches from Core-API/DB. Sent by Core-API on subscription changes (new purchase, cancellation, transfer).
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `PREMIUM_INVALIDATE_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `PREMIUM_INVALIDATE_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
 
 **Request body:**
 ```json
@@ -1126,7 +1218,7 @@ Clears the premium cache for a user so the next check refetches from Core-API/DB
 
 Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or deletes `alphapy_discord_links` and may send the user a confirmation DM.
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `DISCORD_LINK_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `DISCORD_LINK_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
 
 **Link request body:**
 ```json
@@ -1160,7 +1252,7 @@ Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or 
 
 Sends a founder welcome DM to a Discord user. Triggered by Core-API when a founder purchase is confirmed.
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `FOUNDER_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `FOUNDER_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
 
 **Request body:**
 ```json
@@ -1207,6 +1299,8 @@ Version information is included in health check responses and can be queried via
 
 ### Settings Categories
 
+Valid POST `category` values (see `POST /api/dashboard/settings/{guild_id}`):
+
 - **system**: Log channels, log level
 - **reminders**: Reminder functionality, default channels
 - **embedwatcher**: Embed parsing, reminder offsets
@@ -1217,8 +1311,12 @@ Version information is included in health check responses and can be queried via
 - **onboarding**: User onboarding flow
 - **ticketbot**: Ticket system configuration
 - **verification**: Payment verification setup
+- **growth**: Growth Check-in channel / enable flag
+- **agents**: `/agent` guild enable flag (default false)
 - **engagement**: Challenges, weekly awards, streaks, badges, OG claims
-- **growth**: Growth Check-in channel
+- **custom_commands**: Custom-commands module enable flag
+
+GET may also include **fyi** (read-only in this endpoint; not a POST category).
 
 ### Auto-Moderation Rule Types
 
