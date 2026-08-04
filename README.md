@@ -2,8 +2,6 @@
 
 Modular Discord bot for conscious communities: server tools, AI coaching, knowledge search, tickets, and reminders.
 
-**Related:** [alphapy-dashboard](https://github.com/bryntje/alphapy-dashboard) — Next.js config UI and metrics.
-
 ---
 
 ## Overview
