@@ -26,6 +26,7 @@ from cogs.reminders import (
     get_reminders_for_user,
     update_reminder,
 )
+from dashboard_guild_crud import register_dashboard_guild_crud
 from utils import core_ingress as core_ingress_module
 from utils.hermit_context import get_hermit_context_stats
 from utils.logger import get_gpt_status_logs, logger
@@ -3782,8 +3783,6 @@ async def get_dashboard_discord_meta(
         logger.error(f"[ERROR] Failed to fetch discord meta for guild {guild_id}: {exc}")
         raise HTTPException(status_code=500, detail="Failed to fetch discord meta") from exc
 
-
-from dashboard_guild_crud import register_dashboard_guild_crud
 
 register_dashboard_guild_crud(router, verify_dashboard_discord_admin)
 

@@ -1,13 +1,11 @@
 """Sprint 3b guild dashboard CRUD endpoint tests."""
 
 from datetime import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 import api as api_module
-from api import verify_dashboard_discord_admin
 from tests.test_api_endpoints import (
     DISCORD_USER_ID,
     GUILD_ID,
