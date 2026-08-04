@@ -2295,16 +2295,36 @@ async def get_guild_settings(
                 # Convert string values back to appropriate types
                 if scope in settings:
                     if key in ['allow_everyone_mentions', 'enabled', 'log_actions', 'log_to_database', 'gpt_fallback_enabled', 'non_embed_enabled', 'process_bot_messages']:
-                        settings[scope][key] = value.lower() == 'true'
-                    elif key in ['embed_watcher_offset_hours', 'max_tokens', 'log_channel_id', 'reminder_offset_minutes', 'category_id', 'staff_role_id', 'escalation_role_id', 'idle_days_threshold', 'auto_close_days_threshold', 'completion_role_id', 'join_role_id', 'verified_role_id']:
+                        settings[scope][key] = value.lower() == 'true' if isinstance(value, str) else bool(value)
+                    elif key in [
+                        'log_channel_id',
+                        'category_id',
+                        'staff_role_id',
+                        'escalation_role_id',
+                        'completion_role_id',
+                        'join_role_id',
+                        'verified_role_id',
+                        'onboarding_channel_id',
+                        'rules_channel_id',
+                        'announcements_channel_id',
+                        'default_channel_id',
+                        'channel_id',
+                        'reviewer_role_id',
+                        'verified_log_channel_id',
+                        'failed_parse_log_channel_id',
+                    ]:
+                        # Discord snowflakes must stay strings for JS clients
+                        # (JSON numbers lose precision past Number.MAX_SAFE_INTEGER).
+                        settings[scope][key] = "" if value is None else str(value)
+                    elif key in ['embed_watcher_offset_hours', 'max_tokens', 'reminder_offset_minutes', 'idle_days_threshold', 'auto_close_days_threshold']:
                         try:
                             settings[scope][key] = int(value)
-                        except ValueError:
+                        except (TypeError, ValueError):
                             settings[scope][key] = value
                     elif key in ['temperature']:
                         try:
                             settings[scope][key] = float(value)
-                        except ValueError:
+                        except (TypeError, ValueError):
                             settings[scope][key] = value
                     else:
                         settings[scope][key] = value
