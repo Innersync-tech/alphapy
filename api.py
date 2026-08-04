@@ -2327,9 +2327,9 @@ async def get_guild_settings(
                         'verified_log_channel_id',
                         'failed_parse_log_channel_id',
                         'challenge_winner_role_id',
-                        'weekly_channel_id',
-                        'og_badge_role_id',
-                    ]:
+                        # engagement (bot_settings keys — not weekly_channel_id / og_badge_role_id)
+                        'weekly_award_channel_id',
+                    ] or key.startswith('badge_role_'):
                         # Discord snowflakes must stay strings for JS clients
                         # (JSON numbers lose precision past Number.MAX_SAFE_INTEGER).
                         settings[scope][key] = "" if value is None else str(value)

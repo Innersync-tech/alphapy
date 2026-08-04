@@ -349,10 +349,16 @@ class TestGetGuildSettings:
     def test_keeps_large_snowflake_ids_as_strings(self):
         """JS Number cannot safely hold 19-digit Discord snowflakes."""
         snowflake = "1439387968321228800"
+        snowflake_int = int(snowflake)
         pool, conn = _mock_pool()
         conn.fetch = AsyncMock(return_value=[
             {"scope": "system", "key": "log_channel_id", "value": snowflake},
-            {"scope": "onboarding", "key": "completion_role_id", "value": int(snowflake)},
+            {"scope": "onboarding", "key": "completion_role_id", "value": snowflake_int},
+            # engagement uses weekly_award_channel_id + badge_role_* (not weekly_channel_id / og_badge_role_id)
+            {"scope": "engagement", "key": "weekly_award_channel_id", "value": snowflake_int},
+            {"scope": "engagement", "key": "badge_role_og", "value": snowflake_int},
+            {"scope": "engagement", "key": "badge_role_motivator", "value": snowflake_int},
+            {"scope": "engagement", "key": "challenge_winner_role_id", "value": snowflake_int},
         ])
         app = make_app()
         with patch.object(api_module, "db_pool", pool):
@@ -363,6 +369,12 @@ class TestGetGuildSettings:
         assert data["system"]["log_channel_id"] == snowflake
         assert data["onboarding"]["completion_role_id"] == snowflake
         assert isinstance(data["system"]["log_channel_id"], str)
+        assert data["engagement"]["weekly_award_channel_id"] == snowflake
+        assert data["engagement"]["badge_role_og"] == snowflake
+        assert data["engagement"]["badge_role_motivator"] == snowflake
+        assert data["engagement"]["challenge_winner_role_id"] == snowflake
+        assert isinstance(data["engagement"]["weekly_award_channel_id"], str)
+        assert isinstance(data["engagement"]["badge_role_og"], str)
 
     def test_accepts_discord_service_headers(self):
         """Control-panel proxy auth: X-Api-Key + X-Discord-User-Id (no JWT)."""
