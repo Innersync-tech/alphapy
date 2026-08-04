@@ -19,8 +19,8 @@ from utils.image_reminder_rate_limit import (
     would_exceed_image_reminder_rate_limit,
 )
 from utils.logger import logger
-from utils.premium_guard import get_user_tier, is_premium, premium_required_message
-from utils.premium_tiers import REMINDER_LIMIT
+from utils.premium_guard import is_premium, premium_required_message
+from utils.reminder_quota import get_reminder_quota_block_message
 
 BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
 
@@ -31,27 +31,25 @@ VALID_TRIGGER_TYPES = frozenset({"exact", "starts_with", "contains", "regex"})
 
 
 async def _require_reminder_quota(conn: Any, user_id: int, guild_id: int) -> None:
-    """Mirror Discord /add_reminder free-tier REMINDER_LIMIT for (created_by, guild)."""
-    tier = await get_user_tier(user_id, guild_id)
-    limit = REMINDER_LIMIT.get(tier)
-    if limit is None:
-        return
-    count = await conn.fetchval(
-        """
-        SELECT COUNT(*) FROM reminders
-        WHERE created_by = $1 AND guild_id = $2 AND completed IS NOT TRUE
-        """,
-        user_id,
-        guild_id,
-    )
-    if int(count or 0) >= limit:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                f"You have reached the maximum of {limit} reminders for your tier. "
-                "Upgrade via /premium to create unlimited reminders."
-            ),
-        )
+    """Mirror Discord free-tier REMINDER_LIMIT for (created_by, guild)."""
+    message = await get_reminder_quota_block_message(conn, user_id, guild_id)
+    if message:
+        raise HTTPException(status_code=403, detail=message)
+
+
+def _parse_channel_id(
+    value: str | int | None,
+    *,
+    required: bool = False,
+) -> int | None:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        if required:
+            raise HTTPException(status_code=400, detail="channel_id is required")
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid channel_id") from exc
 
 
 async def _resolve_image_url_for_write(
@@ -312,9 +310,8 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                 detail="scheduled_time (one-off) or time (recurring) is required",
             )
         pool = _require_pool()
-        channel_id = int(body.channel_id) if body.channel_id is not None else None
-        if channel_id is None:
-            raise HTTPException(status_code=400, detail="channel_id is required")
+        channel_id = _parse_channel_id(body.channel_id, required=True)
+        assert channel_id is not None
 
         name = (body.name or "Reminder").strip() or "Reminder"
         try:
@@ -394,7 +391,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         if body.name is not None:
             fields["name"] = body.name
         if body.channel_id is not None:
-            fields["channel_id"] = int(body.channel_id)
+            fields["channel_id"] = _parse_channel_id(body.channel_id, required=True)
         if body.completed is not None:
             fields["completed"] = body.completed
         if body.days is not None:
@@ -557,6 +554,8 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
         day_numbers = [d for d in day_numbers if 0 <= int(d) <= 6]
         if not day_numbers:
             raise HTTPException(status_code=400, detail="At least one day is required")
+        channel_id = _parse_channel_id(body.channel_id, required=True)
+        assert channel_id is not None
         try:
             resolved_image, should_record_image = await _resolve_image_url_for_write(
                 discord_admin_id,
@@ -577,7 +576,7 @@ def register_dashboard_guild_crud(router: APIRouter, verify_dashboard_discord_ad
                     """,
                     guild_id,
                     LIVE_SESSION_NAME,
-                    int(body.channel_id),
+                    channel_id,
                     reminder_time,
                     call_time,
                     [str(d) for d in day_numbers],

@@ -23,6 +23,7 @@ from utils.image_reminder_rate_limit import (
 )
 from utils.logger import log_database_event, log_guild_action, log_with_guild, logger
 from utils.parsers import format_days_for_display, parse_days_string, parse_time_string
+from utils.reminder_quota import get_reminder_quota_block_message
 from utils.sanitizer import safe_embed_text
 from utils.timezone import BRUSSELS_TZ
 from utils.user_messages import ERR_DB, ERR_GUILD_ONLY
@@ -208,24 +209,16 @@ class ReminderCog(AlphaCog):
             return
 
         # Tier-based reminder limit (free users: max 10 active reminders)
-        from utils.premium_guard import get_user_tier
-        from utils.premium_tiers import REMINDER_LIMIT
-        tier = await get_user_tier(interaction.user.id, interaction.guild.id)
-        limit = REMINDER_LIMIT.get(tier)
-        if limit is not None:
-            async with acquire_safe(self.db) as conn:
-                count = await conn.fetchval(
-                    "SELECT COUNT(*) FROM reminders WHERE created_by = $1 AND guild_id = $2",
-                    interaction.user.id,
-                    interaction.guild.id,
-                )
-            if count >= limit:
-                await interaction.followup.send(
-                    f"You have reached the maximum of {limit} reminders for your tier. "
-                    "Upgrade via `/premium` to create unlimited reminders.",
-                    ephemeral=True,
-                )
-                return
+        if not self.db:
+            await interaction.followup.send(ERR_DB, ephemeral=True)
+            return
+        async with acquire_safe(self.db) as conn:
+            quota_msg = await get_reminder_quota_block_message(
+                conn, interaction.user.id, interaction.guild.id
+            )
+        if quota_msg:
+            await interaction.followup.send(quota_msg, ephemeral=True)
+            return
 
         # Premium gate: reminders with image require premium
         resolved_image_url: str | None = (image.url if image else None) or (image_url.strip() if image_url and image_url.strip() else None)
@@ -519,6 +512,12 @@ class ReminderCog(AlphaCog):
 
         try:
             async with acquire_safe(self.db) as conn:
+                quota_msg = await get_reminder_quota_block_message(
+                    conn, interaction.user.id, guild_id
+                )
+                if quota_msg:
+                    await interaction.followup.send(quota_msg, ephemeral=True)
+                    return
                 await reminder_repo.create(
                     conn,
                     guild_id=guild_id,

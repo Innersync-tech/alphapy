@@ -19,11 +19,11 @@ BRUSSELS_TZ = ZoneInfo("Europe/Brussels")
 
 
 def _patch_unlimited_tier():
-    return patch("dashboard_guild_crud.get_user_tier", new=AsyncMock(return_value="lifetime"))
+    return patch("utils.reminder_quota.get_user_tier", new=AsyncMock(return_value="lifetime"))
 
 
 def _patch_free_tier():
-    return patch("dashboard_guild_crud.get_user_tier", new=AsyncMock(return_value="free"))
+    return patch("utils.reminder_quota.get_user_tier", new=AsyncMock(return_value="free"))
 
 
 def _reminder_row(**kwargs):
@@ -94,6 +94,23 @@ class TestGuildRemindersDashboard:
                 json={"message": "hi", "channel_id": "123"},
             )
         assert response.status_code == 400
+
+    def test_create_reminder_invalid_channel_id(self):
+        pool, _conn = _mock_pool()
+        app = _make_dashboard_app()
+        with patch.object(api_module, "db_pool", pool), _patch_unlimited_tier():
+            client = TestClient(app)
+            response = client.post(
+                f"/api/dashboard/{GUILD_ID}/reminders",
+                json={
+                    "message": "hi",
+                    "channel_id": "not-a-channel",
+                    "time": "10:00",
+                    "days": ["0"],
+                },
+            )
+        assert response.status_code == 400
+        assert "channel_id" in response.json()["detail"]
 
     def test_create_reminder(self):
         pool, conn = _mock_pool()
