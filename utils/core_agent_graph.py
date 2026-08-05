@@ -83,7 +83,7 @@ def build_agent_chat_progress_payload(
     for theme in active_themes or []:
         _add(theme)
 
-    themes = themes[:5]
+    themes = themes[:8]
     if not themes:
         return None
 
@@ -91,7 +91,7 @@ def build_agent_chat_progress_payload(
     if not _DAY_RE.match(day_s):
         day_s = datetime.now(UTC).date().isoformat()
 
-    theme_keys = [_theme_key(t) for t in themes if _theme_key(t)][:5]
+    theme_keys = [_theme_key(t) for t in themes if _theme_key(t)][:8]
     label = f"progress {day_s}: {', '.join(themes[:3])}"[:500]
     return {
         "user_id": str(int(discord_user_id)),
