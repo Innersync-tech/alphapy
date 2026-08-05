@@ -148,6 +148,7 @@ def build_agent_profile_block(
     tier3: dict[str, Any],
     *,
     derived_profile: dict[str, Any] | None = None,
+    platform_locale: str | None = None,
 ) -> str:
     """Format [agent_profile] context for the LLM (no journal text)."""
     lines: list[str] = []
@@ -164,9 +165,14 @@ def build_agent_profile_block(
     if isinstance(default_focus, str) and default_focus:
         lines.append(f"Default reflection focus: {default_focus}")
 
-    language_pref = prefs.get("language_pref")
-    if isinstance(language_pref, str) and language_pref:
-        lines.append(f"Preferred language: {language_pref}")
+    from utils.platform_locale import normalize_platform_locale
+
+    if platform_locale is not None:
+        lines.append(f"Preferred language: {normalize_platform_locale(platform_locale)}")
+    else:
+        language_pref = prefs.get("language_pref")
+        if isinstance(language_pref, str) and language_pref:
+            lines.append(f"Preferred language: {language_pref}")
 
     if derived_profile:
         insights = derived_profile.get("insights") or []

@@ -113,7 +113,7 @@ async def fetch_innersync_profile_for_discord(discord_user_id: int) -> dict[str,
     Fetch central profile for a Discord user (GET with query param).
 
     Expected JSON keys (all optional): display_name, avatar_url, email,
-    innersync_user_id.
+    innersync_user_id, locale (nl-BE | en from Innersync ID preferences).
     """
     base = _base_url()
     key = _service_key()

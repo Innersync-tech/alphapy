@@ -94,12 +94,14 @@ def _assemble_prompt(
     tier3: dict[str, Any],
     derived_profile: dict[str, Any] | None = None,
     pattern_context: str | None = None,
+    platform_locale: str | None = None,
 ) -> str:
     parts: list[str] = []
     profile_block = build_agent_profile_block(
         prefs,
         tier3,
         derived_profile=derived_profile,
+        platform_locale=platform_locale,
     )
     if profile_block.strip():
         parts.append("[agent_profile]\n" + safe_prompt(profile_block[:1500]))
@@ -129,9 +131,10 @@ def _build_llm_messages(
     user_request: str,
     prior_turns: list[dict[str, Any]],
     include_context: bool,
+    platform_locale: str = "en",
 ) -> list[dict[str, str]]:
     messages: list[dict[str, str]] = [
-        {"role": "system", "content": build_agent_system_prompt()},
+        {"role": "system", "content": build_agent_system_prompt(locale=platform_locale)},
     ]
     for turn in prior_turns:
         role = str(turn.get("role", ""))
@@ -176,6 +179,9 @@ async def _run_agent_turn(
     prior_turns: list[dict[str, Any]],
     include_context: bool,
 ) -> tuple[str, dict[str, str], str]:
+    from utils.platform_locale import resolve_locale_for_discord
+
+    platform_locale = await resolve_locale_for_discord(ctx.discord_user_id, prefs)
     skill_blocks = await _build_skill_context(ctx)
     ctx.skill_blocks = skill_blocks
     pattern_context = await load_pattern_context(ctx.innersync_user_id, prefs)
@@ -185,12 +191,14 @@ async def _run_agent_turn(
         tier3=tier3,
         derived_profile=derived_profile,
         pattern_context=pattern_context,
+        platform_locale=platform_locale,
     )
     messages = _build_llm_messages(
         context_blob=context_blob,
         user_request=user_message,
         prior_turns=prior_turns,
         include_context=include_context,
+        platform_locale=platform_locale,
     )
     summary = await ask_gpt(
         messages,
@@ -503,6 +511,9 @@ async def end_agent_session(
     ctx.metadata["prefs"] = prefs
 
     if learn_from_shared_enabled(prefs) and consent_ids and tier0_context.strip():
+        from utils.platform_locale import resolve_locale_for_discord
+
+        platform_locale = await resolve_locale_for_discord(discord_user_id, prefs)
         merged_profile = await distill_session_profile(
             tier0_context=tier0_context,
             user_message=user_transcript or "Session ended.",
@@ -511,6 +522,7 @@ async def end_agent_session(
             existing=derived_profile,
             discord_user_id=discord_user_id,
             guild_id=guild_id,
+            platform_locale=platform_locale,
         )
         if merged_profile:
             memory_patch[TIER2_ROOT_KEY] = merged_profile

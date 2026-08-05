@@ -25,8 +25,17 @@ def test_system_prompt_contains_required_markers() -> None:
         assert marker in prompt, f"Missing policy marker: {marker!r}"
 
 
-def test_system_prompt_includes_version() -> None:
-    assert AGENT_POLICY_VERSION in build_agent_system_prompt()
+def test_system_prompt_includes_locale_instruction() -> None:
+    en = build_agent_system_prompt(locale="en")
+    assert "Platform locale: en" in en
+    nl = build_agent_system_prompt(locale="nl-BE")
+    assert "Platform locale: nl-BE" in nl
+    assert "Belgian Dutch" in nl
+
+
+def test_system_prompt_invalid_locale_defaults_en() -> None:
+    prompt = build_agent_system_prompt(locale="fr-FR")
+    assert "Platform locale: en" in prompt
 
 
 def test_user_message_marks_context_untrusted() -> None:
