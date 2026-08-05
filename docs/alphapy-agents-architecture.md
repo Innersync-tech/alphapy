@@ -94,7 +94,7 @@ alphapy/agents/
   base.py          AgentContext, AgentSkill protocol
   registry.py      Agent definitions + skill wiring
   memory.py        Supabase sessions + memory (in-memory fallback)
-  pattern_loader.py  Tier-2 pattern context from agent_graph_nodes (learn_from_patterns)
+  pattern_loader.py  Tier-2 pattern context from agent_memory derived_profile (learn_from_patterns)
   runtime.py       Closed-loop orchestration
   skills/
     journal_sync.py
@@ -177,7 +177,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 
 ### Pattern learning (agent graph)
 
-When `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`), `agents/pattern_loader.py` fetches up to five `agent_graph_nodes` rows (`node_type=pattern`) and injects a `[learned_patterns]` block into the runtime prompt. Tier-2-safe summaries only — no encrypted journal text.
+When `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`), `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` from Supabase `agent_memory` (`agent_name=reflection`) and injects a `[learned_patterns]` block into the runtime prompt. Tier-2-safe insight labels only — no encrypted journal text and no graph-node theme tokens.
 
 ### `agent_sessions`
 
