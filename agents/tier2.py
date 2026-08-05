@@ -340,6 +340,7 @@ async def distill_session_profile(
     existing: dict[str, Any],
     discord_user_id: int,
     guild_id: int | None,
+    platform_locale: str = "en",
 ) -> dict[str, Any] | None:
     """
     Run LLM distill step; return merged derived_profile or None (fail closed).
@@ -350,6 +351,9 @@ async def distill_session_profile(
     blocklist = build_blocklist_from_tier0(tier0_context)
     consent_epoch = _now_iso()
 
+    from utils.platform_locale import locale_output_instruction, normalize_platform_locale
+
+    loc = normalize_platform_locale(platform_locale)
     system = (
         "You extract generalized reflection patterns for a private coaching agent. "
         "Return ONLY valid JSON, no markdown. Schema:\n"
@@ -358,7 +362,8 @@ async def distill_session_profile(
         '"active_themes":["short theme"],'
         '"open_loops":["optional gentle follow-up without quotes"]}\n'
         "Rules: NO quotes from journals; NO dates; NO mantras; NO names; "
-        "labels must be abstract patterns only; omit insights below 0.6 confidence."
+        "labels must be abstract patterns only; omit insights below 0.6 confidence. "
+        f"{locale_output_instruction(loc)}"
     )
     user = (
         f"Ephemeral journal context (do not quote):\n{tier0_context[:2000]}\n\n"
