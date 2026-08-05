@@ -92,12 +92,12 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Skills**: `inner_voice`, `inner_critic_dialogue`, `avoidance_processor`, `fatigue_check`, `chain_breaker_micro`, `journal_sync` (`trade_insight` skill file kept dormant for later)
 - **Tier 2 dialogue skills**: mirror inner-conflict patterns + one micro-step; avoidance/chain-break skills may append validated insights on `/agent end` when learning is enabled
 - **Session timeline**: `agent_sessions.memory_patch.session_insight_snapshot` (max 5 insight chips per session for App BFF)
-- **Memory Vault graph push**: on `/agent end`, Tier-2 insight labels (+ `active_themes`) → Core `POST /integrations/platform/agent-graph/write` (`source=agent_chat`, metadata only). Gate: `ALPHAPY_MEMORY_GRAPH_PUSH` (default on when `CORE_API_URL` + `ALPHAPY_SERVICE_KEY` set). Fail-open — never blocks session end. Client: `utils/core_agent_graph.py`
+- **Memory Vault graph push**: on `/agent end`, Tier-2 insight labels (+ `active_themes`) → Core `POST /integrations/platform/agent-graph/write` (`source=agent_chat`, `theme_source=tier2`, metadata only). Gate: `ALPHAPY_MEMORY_GRAPH_PUSH` (default on when `CORE_API_URL` + `ALPHAPY_SERVICE_KEY` set). Fail-open — never blocks session end. Client: `utils/core_agent_graph.py` (`theme_key` parity with Core `_theme_key`).
+- **Pattern context**: `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` only (never graph progress labels); prefs `learn_from_patterns` / fallback `learn_from_shared`
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
 - **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`
 - **GDPR**: `purge_agent_user_data()` on Supabase `USER_DELETED` and `/delete_my_data`; see `agents/memory.py`
-- **Pattern learning**: `agents/pattern_loader.py` injects Tier-2-safe summaries from Supabase `agent_graph_nodes` when `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`)
 
 ---
 

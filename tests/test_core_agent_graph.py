@@ -68,6 +68,20 @@ def test_build_payload_empty_returns_none() -> None:
     )
 
 
+def test_build_payload_theme_source_is_tier2_not_heuristic() -> None:
+    payload = build_agent_chat_progress_payload(
+        discord_user_id=1,
+        session_id="source-test",
+        insight_snapshot=[{"type": "theme", "label": "Evening wind-down routine"}],
+        day="2026-08-06",
+    )
+    assert payload is not None
+    theme_source = payload["nodes"][0]["metadata"]["theme_source"]
+    assert theme_source == "tier2"
+    assert theme_source != "heuristic"
+    assert theme_source != "none"
+
+
 def test_build_payload_rejects_short_labels() -> None:
     assert (
         build_agent_chat_progress_payload(

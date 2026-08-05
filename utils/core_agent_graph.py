@@ -20,9 +20,6 @@ except ImportError:
 from utils.logger import logger
 
 _TIMEOUT = 12.0
-# Lowercase labels before match; one Latin-1 letter range avoids CodeQL py/overly-large-range
-# (à-ÿ and À-Ÿ overlapped in the same class).
-_TOKEN_RE = re.compile(r"[a-z0-9à-ÿ]+")
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -43,9 +40,9 @@ def memory_graph_push_enabled() -> bool:
 
 
 def _theme_key(label: str) -> str:
-    parts = _TOKEN_RE.findall((label or "").strip().lower())
-    key = "-".join(parts)
-    return key[:64].strip("-")
+    """Canonical theme_key — parity with Core ``agent_graph._theme_key``."""
+    key = re.sub(r"[^a-z0-9]+", "-", (label or "").strip().lower()).strip("-")
+    return key[:64]
 
 
 def build_agent_chat_progress_payload(
