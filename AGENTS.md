@@ -25,6 +25,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Storage**: PostgreSQL table `alphapy_discord_links` (Railway; migration `023_alphapy_discord_links`)
 - **Commands**: `/link` (Core link-session URL, rate limited), `/unlink` (Core `POST /integrations/discord/unlink` + Railway sync via webhook), `/profile` (Core bot-profile when configured)
 - **API**: Reminder and dashboard flows resolve JWT `sub` → Discord via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int` / `get_innersync_id_for_discord`; both default `allow_profile_fallback=False`). Legacy `profiles.discord_id` is opt-in only (e.g. `/unlink` hint). One-off backfill: `scripts/backfill_discord_links_from_profiles.py` — run before flipping prod to links-only.
+- **Locale**: `utils/platform_locale.py` reads Core `bot-profile.locale` (`nl-BE` \| `en`, default `en`). Unlinked Discord → `en`. Used by agent system prompt + Tier-2 distill (not Discord guild language).
 - **Webhooks**: `POST /webhooks/discord-link` (HMAC `DISCORD_LINK_WEBHOOK_SECRET`) — Core sends `event: link` or `event: unlink`; upserts or deletes `alphapy_discord_links`; may DM the user
 - **GDPR**: `alphapy_discord_links` rows purged with other Railway PII in `webhooks/supabase.py` user delete handler; Supabase `agent_sessions` / `agent_memory` purged via `agents/memory.purge_agent_user_data()`
 
@@ -93,7 +94,8 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Tier 2 dialogue skills**: mirror inner-conflict patterns + one micro-step; avoidance/chain-break skills may append validated insights on `/agent end` when learning is enabled
 - **Session timeline**: `agent_sessions.memory_patch.session_insight_snapshot` (max 5 insight chips per session for App BFF)
 - **Memory Vault graph push**: on `/agent end`, Tier-2 insight labels (+ `active_themes`) → Core `POST /integrations/platform/agent-graph/write` (`source=agent_chat`, `theme_source=tier2`, metadata only). Gate: `ALPHAPY_MEMORY_GRAPH_PUSH` (default on when `CORE_API_URL` + `ALPHAPY_SERVICE_KEY` set). Fail-open — never blocks session end. Client: `utils/core_agent_graph.py` (`theme_key` parity with Core `_theme_key`).
-- **Pattern context**: `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` only (never graph progress labels); prefs `learn_from_patterns` / fallback `learn_from_shared`
+- **Pattern context**: `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` only (never graph progress / heuristic labels); prefs `learn_from_patterns` / fallback `learn_from_shared`
+- **Output locale**: agent replies + Tier-2 distill follow Innersync ID `preferences.locale` via `utils/platform_locale.py` (see InnersyncIdentity)
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
 - **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`

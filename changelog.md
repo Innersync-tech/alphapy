@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Locale Output (#356)** — `utils/platform_locale.py` resolves Innersync ID locale from Core `bot-profile` (`nl-BE` \| `en`, default `en`; unlinked → `en`). Agent system prompt and Tier-2 distill use ID locale (soft override when the user clearly writes in another language).
+
 ### Changed
+- **Pattern Pipeline Clean (#355)** — `agents/pattern_loader.py` loads Tier-2 `derived_profile.insights` only (never graph progress / heuristic labels); `theme_key` parity with Core `_theme_key` on Memory Vault graph push (`source=agent_chat`, `theme_source=tier2`).
 - **Docs audit catch-up (#327–#351)** — Aligned `docs/api.md` (Sprint 3b `/api` paths, string snowflakes, reminder CRUD/quota/channel validation, `discord-meta`, observability `hermit_context`), auth docs (JWT-only user identity; no `X-User-Id`), webhook fallbacks (removed dead `WEBHOOK_SECRET`), commands/configuration/AGENTS for module gates, reminder quota, and fatigue prefs merge.
 
 ## [3.13.0] - 2026-07-25
