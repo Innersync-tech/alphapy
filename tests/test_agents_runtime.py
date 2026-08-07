@@ -300,41 +300,42 @@ async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
     assert ended.turn_count == 2
     assert await get_active_session(user_id, "reflection") is None
 
+    from agents.runtime import drain_end_background_jobs
+
+    await drain_end_background_jobs()
+
     stored = await get_user_memory(user_id, "reflection")
     assert stored.get("session_count") == 1
 
 
 @pytest.mark.asyncio
-async def test_end_agent_session_graph_push_is_background(monkeypatch) -> None:
-    """Session end must not wait on Core graph HTTP (create_task fail-open)."""
+async def test_end_agent_session_finalize_is_background(monkeypatch) -> None:
+    """End must return before Tier-2 distill / graph (background finalize)."""
     import asyncio
 
     import config
-    from agents.memory import clear_local_store
+    from agents.memory import clear_local_store, get_active_session
     from agents.runtime import end_agent_session, start_agent_session
 
     monkeypatch.setattr(config, "ALPHAPY_AGENTS_MEMORY_BACKEND", "memory")
     clear_local_store()
 
     user_id = "cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee"
-    push_started = asyncio.Event()
-    push_release = asyncio.Event()
-    push_done = asyncio.Event()
+    finalize_started = asyncio.Event()
+    finalize_release = asyncio.Event()
+    finalize_done = asyncio.Event()
 
     async def _fake_ask_gpt(messages, user_id=None, **kwargs):
         return "Turn done."
 
-    async def _slow_push(**kwargs):
-        push_started.set()
-        await push_release.wait()
-        push_done.set()
+    async def _slow_finalize(**kwargs):
+        finalize_started.set()
+        await finalize_release.wait()
+        finalize_done.set()
 
     monkeypatch.setattr("agents.skills.journal_sync.load_agent_reflection_context", lambda *a, **k: "")
     monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
-    monkeypatch.setattr(
-        "agents.runtime._push_agent_graph_progress_background",
-        _slow_push,
-    )
+    monkeypatch.setattr("agents.runtime._finalize_session_end_background", _slow_finalize)
 
     await start_agent_session(
         innersync_user_id=user_id,
@@ -350,11 +351,12 @@ async def test_end_agent_session_graph_push_is_background(monkeypatch) -> None:
         agent_name="reflection",
     )
     assert ended.summary
-    # End returned while background push still blocked.
-    assert not push_done.is_set()
-    await asyncio.wait_for(push_started.wait(), timeout=1.0)
-    push_release.set()
-    await asyncio.wait_for(push_done.wait(), timeout=1.0)
+    # Active slot already freed on critical path.
+    assert await get_active_session(user_id, "reflection") is None
+    assert not finalize_done.is_set()
+    await asyncio.wait_for(finalize_started.wait(), timeout=1.0)
+    finalize_release.set()
+    await asyncio.wait_for(finalize_done.wait(), timeout=1.0)
 
 
 @pytest.mark.asyncio
@@ -456,6 +458,10 @@ async def test_end_agent_session_stores_insight_snapshot(monkeypatch) -> None:
         agent_name="reflection",
     )
     assert ended.session_id == started.session_id
+
+    from agents.runtime import drain_end_background_jobs
+
+    await drain_end_background_jobs()
 
     session_row = await get_session_by_id(started.session_id)
     assert session_row is not None
