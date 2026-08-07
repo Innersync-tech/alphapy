@@ -734,10 +734,23 @@ async def run_agent_session(
     )
     if not finalize:
         return result
-    return await end_agent_session(
+    ended = await end_agent_session(
         innersync_user_id=innersync_user_id,
         discord_user_id=discord_user_id,
         guild_id=guild_id,
         agent_name=agent_name,
         metadata=metadata,
     )
+    # Fast end returns empty skill_blocks; one-shot callers still want start's skill map
+    # (e.g. Discord "skills used" footer / tests).
+    if result.skill_blocks and not ended.skill_blocks:
+        return AgentResult(
+            agent_name=ended.agent_name,
+            session_id=ended.session_id,
+            summary=ended.summary,
+            skill_blocks=result.skill_blocks,
+            memory_patch=ended.memory_patch,
+            display_name=ended.display_name,
+            turn_count=ended.turn_count,
+        )
+    return ended
