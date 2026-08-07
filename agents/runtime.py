@@ -303,7 +303,14 @@ async def start_agent_session(
         innersync_user_id,
         agent_name,
     )
-    prompt = user_message or "Give a short reflection based on the context."
+    # Empty start: open a dialogue — do not dump a full context summary (that caused echo loops).
+    prompt = (user_message or "").strip() or (
+        "The user started a reflection session without a specific question. "
+        "Respond in their language if clear from context, otherwise English. "
+        "Open briefly: at most one short greeting and either one open question OR one single "
+        "light hook from context — never list or summarize multiple context items. "
+        "Do not invent a full reflection essay; invite them to set the focus."
+    )
 
     session_metadata = dict(metadata or {})
     if channel is not None:
