@@ -4,6 +4,25 @@ All notable releases of Alphapy will be documented in this file.
 
 ---
 
+## [3.14.0] - 2026-08-08 — Agent fitness & fast end
+
+### Minor Release: multi-turn quality, CAS, true fast `/agent end`
+
+Ships conversation policy v1.2–v1.6 (anti-somatic / template / theory / echo), agent memory CAS, Pattern Pipeline Clean, and Locale Output.
+
+#### Highlights
+- **Fast end** — durable complete on critical path; distill/skills/graph finalize in background
+- **Continue context** — skill/profile re-injected on `/agent continue`
+- **Anti-echo (v1.6)** — no multi-item recap loops; empty start invites focus
+- **CAS** — `agent_memory` optimistic concurrency vs App Patterns distill
+- **Locale** — Innersync ID `nl-BE` | `en` for agent + Tier-2 distill
+
+#### PRs
+- [#355](https://github.com/Innersync-tech/alphapy/pull/355)–[#363](https://github.com/Innersync-tech/alphapy/pull/363) fitness train
+- [#364](https://github.com/Innersync-tech/alphapy/pull/364) changelog catch-up
+
+---
+
 ## [3.11.0] - 2026-07-04 - "Phase 4 Observability"
 
 ### Minor Release: Agent session limits, skills, GDPR, Mind telemetry
