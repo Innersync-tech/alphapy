@@ -42,6 +42,8 @@ def test_system_prompt_includes_shape_examples() -> None:
     assert "Deepen the same practice" in prompt
     assert "Anti-theory-loop" in prompt
     assert "flip detector" in prompt
+    assert "Anti-repetition" in prompt or "anti-echo" in prompt
+    assert "paraphrase your previous" in prompt or "Do NOT paraphrase" in prompt
 
 
 def test_system_prompt_includes_locale_instruction() -> None:

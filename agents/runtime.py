@@ -303,7 +303,12 @@ async def start_agent_session(
         innersync_user_id,
         agent_name,
     )
-    prompt = user_message or "Give a short reflection based on the context."
+    # Empty start (App / Discord with no message): intentional default user prompt.
+    # Continuations must not re-echo that first reflection (policy anti-repetition).
+    prompt = (user_message or "").strip() or (
+        "Give a short reflection based on the context. "
+        "Prefer depth on one or two themes over listing everything you see."
+    )
 
     session_metadata = dict(metadata or {})
     if channel is not None:
