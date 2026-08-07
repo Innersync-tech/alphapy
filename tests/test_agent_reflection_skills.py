@@ -99,7 +99,7 @@ async def test_avoidance_processor_low_energy_branch(monkeypatch) -> None:
         derived_profile=_sample_profile(("trigger", "avoidance when overwhelmed")),
     )
     body = await AvoidanceProcessorSkill().gather(ctx)
-    assert "Soft entry" in body
+    assert "Energy looks low" in body
     assert "avoidance when overwhelmed" in body
 
 
@@ -121,7 +121,7 @@ async def test_avoidance_processor_high_energy_branch(monkeypatch) -> None:
         derived_profile=_sample_profile(("habit", "delay hard tasks until late")),
     )
     body = await AvoidanceProcessorSkill().gather(ctx)
-    assert "Higher energy window" in body
+    assert "Energy allows depth" in body
 
 
 def test_chain_breaker_enabled_with_journal_block() -> None:
@@ -151,5 +151,6 @@ async def test_chain_breaker_gather_includes_micro_habit_rule() -> None:
         derived_profile=_sample_profile(("habit", "suppress feelings until burnout")),
     )
     body = await ChainBreakerMicroSkill().gather(ctx)
-    assert "ONE concrete micro-habit" in body
+    assert "micro-habit" in body
+    assert "not required every reply" in body
     assert "suppress feelings" in body
