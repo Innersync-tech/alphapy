@@ -305,6 +305,59 @@ async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_end_agent_session_graph_push_is_background(monkeypatch) -> None:
+    """Session end must not wait on Core graph HTTP (create_task fail-open)."""
+    import asyncio
+
+    import config
+    from agents.memory import clear_local_store
+    from agents.runtime import end_agent_session, start_agent_session
+
+    monkeypatch.setattr(config, "ALPHAPY_AGENTS_MEMORY_BACKEND", "memory")
+    clear_local_store()
+
+    user_id = "cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee"
+    push_started = asyncio.Event()
+    push_release = asyncio.Event()
+    push_done = asyncio.Event()
+
+    async def _fake_ask_gpt(messages, user_id=None, **kwargs):
+        return "Turn done."
+
+    async def _slow_push(**kwargs):
+        push_started.set()
+        await push_release.wait()
+        push_done.set()
+
+    monkeypatch.setattr("agents.skills.journal_sync.load_agent_reflection_context", lambda *a, **k: "")
+    monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
+    monkeypatch.setattr(
+        "agents.runtime._push_agent_graph_progress_background",
+        _slow_push,
+    )
+
+    await start_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=99,
+        guild_id=1,
+        agent_name="reflection",
+        user_message="hi",
+    )
+    ended = await end_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=99,
+        guild_id=1,
+        agent_name="reflection",
+    )
+    assert ended.summary
+    # End returned while background push still blocked.
+    assert not push_done.is_set()
+    await asyncio.wait_for(push_started.wait(), timeout=1.0)
+    push_release.set()
+    await asyncio.wait_for(push_done.wait(), timeout=1.0)
+
+
+@pytest.mark.asyncio
 async def test_end_agent_session_stores_insight_snapshot(monkeypatch) -> None:
     import config
     from agents.memory import (

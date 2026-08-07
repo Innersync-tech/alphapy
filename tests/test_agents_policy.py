@@ -34,6 +34,14 @@ def test_system_prompt_includes_conversation_fitness_rules() -> None:
     assert "canned structure" in prompt or "fixed reply skeleton" in prompt
 
 
+def test_system_prompt_includes_shape_examples() -> None:
+    prompt = build_agent_system_prompt()
+    assert "Shape examples" in prompt
+    assert "BAD:" in prompt
+    assert "GOOD:" in prompt
+    assert "Deepen the same practice" in prompt
+
+
 def test_system_prompt_includes_locale_instruction() -> None:
     en = build_agent_system_prompt(locale="en")
     assert "Platform locale: en" in en
