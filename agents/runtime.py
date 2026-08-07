@@ -442,6 +442,32 @@ async def continue_agent_session(
     )
 
 
+# Pending end-finalize tasks (tests can drain; production fire-and-forget).
+_pending_end_finalize_tasks: set[asyncio.Task[Any]] = set()
+
+
+def _schedule_end_finalize(coro: Any, *, name: str) -> asyncio.Task[Any]:
+    task: asyncio.Task[Any] = asyncio.create_task(coro, name=name)
+    _pending_end_finalize_tasks.add(task)
+
+    def _done(t: asyncio.Task[Any]) -> None:
+        _pending_end_finalize_tasks.discard(t)
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.warning("end-session background finalize failed: %s", exc, exc_info=exc)
+
+    task.add_done_callback(_done)
+    return task
+
+
+async def drain_end_background_jobs() -> None:
+    """Await all pending end-finalize jobs (tests / graceful shutdown)."""
+    while _pending_end_finalize_tasks:
+        await asyncio.gather(*list(_pending_end_finalize_tasks), return_exceptions=True)
+
+
 async def end_agent_session(
     *,
     innersync_user_id: str,
@@ -451,7 +477,13 @@ async def end_agent_session(
     metadata: dict[str, Any] | None = None,
     channel: AgentChannel | None = None,
 ) -> AgentResult:
-    """Finalize an active session: distill Tier 2, patch Tier 3, delete ephemeral messages."""
+    """End session fast: complete + clear active path, heavy work in background.
+
+    Critical path (user-visible): load turns, Tier-3 session bookkeeping, mark completed,
+    delete ephemeral messages, return last assistant text.
+
+    Background: skill gather, Tier-2 distill, skill execute, insight snapshot, Core graph.
+    """
     agent = resolve_agent(agent_name)
     if agent is None:
         raise ValueError(f"Unknown agent: {agent_name}")
@@ -475,6 +507,13 @@ async def end_agent_session(
 
     prior_turns = await get_session_messages(session_id)
     turn_count = max((int(row.get("turn_index", 0)) for row in prior_turns), default=-1) + 1
+    user_transcript, assistant_transcript = _transcript_from_messages(prior_turns)
+
+    last_assistant = ""
+    for row in reversed(prior_turns):
+        if row.get("role") == "assistant":
+            last_assistant = str(row.get("content", ""))
+            break
 
     prefs, tier3, derived_profile, prior_session_count = await _load_durable_state(
         innersync_user_id,
@@ -484,6 +523,71 @@ async def end_agent_session(
         {TIER2_ROOT_KEY: derived_profile} if derived_profile else {}
     )
 
+    # Fast Tier-3 only — free the active session slot before any LLM work.
+    memory_patch = tier3_memory_patch(
+        session_id=session_id,
+        agent_name=agent_name,
+        prior_session_count=prior_session_count,
+    )
+    quick_summary = (last_assistant or "Session ended.")[:500]
+    await complete_session(
+        session_id,
+        status="completed",
+        summary=quick_summary,
+        memory_patch=memory_patch,
+    )
+    await delete_session_messages(session_id)
+
+    # Persist session_count immediately so concurrent starts see correct Tier-3.
+    updated_memory = await patch_user_memory(innersync_user_id, agent_name, memory_patch)
+
+    _schedule_end_finalize(
+        _finalize_session_end_background(
+            innersync_user_id=innersync_user_id,
+            discord_user_id=discord_user_id,
+            guild_id=guild_id,
+            agent_name=agent_name,
+            session_id=session_id,
+            session_metadata=session_metadata or dict(metadata or {}),
+            prefs=prefs,
+            tier3=tier3,
+            derived_profile=derived_profile,
+            profile_before=profile_before,
+            memory_patch=dict(memory_patch),
+            user_transcript=user_transcript,
+            assistant_transcript=assistant_transcript,
+        ),
+        name=f"agent-end-finalize:{session_id}",
+    )
+
+    return _result_from_turn(
+        agent_name=agent_name,
+        session_id=session_id,
+        summary=last_assistant or "Session ended.",
+        skill_blocks={},
+        prefs=prefs,
+        turn_count=turn_count,
+        memory_patch=updated_memory,
+    )
+
+
+async def _finalize_session_end_background(
+    *,
+    innersync_user_id: str,
+    discord_user_id: int,
+    guild_id: int | None,
+    agent_name: str,
+    session_id: str,
+    session_metadata: dict[str, Any],
+    prefs: dict[str, str | bool],
+    tier3: dict[str, Any],
+    derived_profile: dict[str, Any],
+    profile_before: dict[str, Any],
+    memory_patch: dict[str, Any],
+    user_transcript: str,
+    assistant_transcript: str,
+) -> None:
+    """LLM distill, skill side-effects, snapshot, graph — after user already got end ACK."""
     ctx = AgentContext(
         innersync_user_id=innersync_user_id,
         discord_user_id=discord_user_id,
@@ -492,26 +596,20 @@ async def end_agent_session(
         session_id=session_id,
         memory=tier3,
         derived_profile=derived_profile,
-        metadata=session_metadata or dict(metadata or {}),
+        metadata=dict(session_metadata),
     )
 
     skill_blocks = await _build_skill_context(ctx)
     ctx.skill_blocks = skill_blocks
-
-    memory_patch = tier3_memory_patch(
-        session_id=session_id,
-        agent_name=agent_name,
-        prior_session_count=prior_session_count,
-    )
-
-    session_summary = session_summary_from_profile(derived_profile)
     consent_ids = await _fetch_active_consent_reflection_ids(innersync_user_id)
     tier0_context = skill_blocks.get("journal_sync", "")
-    user_transcript, assistant_transcript = _transcript_from_messages(prior_turns)
     ctx.metadata["user_transcript"] = user_transcript
     ctx.metadata["assistant_transcript"] = assistant_transcript
     ctx.metadata["consent_ids"] = sorted(consent_ids)
     ctx.metadata["prefs"] = prefs
+
+    session_summary = session_summary_from_profile(derived_profile)
+    updated_memory: dict[str, Any] = dict(memory_patch)
 
     if learn_from_shared_enabled(prefs) and consent_ids and tier0_context.strip():
         from utils.platform_locale import resolve_locale_for_discord
@@ -569,45 +667,24 @@ async def end_agent_session(
     if snapshot:
         memory_patch[SESSION_INSIGHT_SNAPSHOT_KEY] = snapshot
 
+    # Enrich completed session row (status already completed on critical path).
     await complete_session(
         session_id,
         status="completed",
-        summary=session_summary,
+        summary=session_summary or (assistant_transcript[:500] if assistant_transcript else "Session ended."),
         memory_patch=memory_patch,
     )
-    await delete_session_messages(session_id)
 
-    # Memory Vault Phase 2: Tier-2 labels → Core agent_graph (fail-open, off critical path).
     themes: list[Any] = []
     if isinstance(derived_profile, dict):
         raw_themes = derived_profile.get("active_themes")
         if isinstance(raw_themes, list):
             themes = list(raw_themes)
-    insight_for_graph = snapshot if isinstance(snapshot, list) else None
-    asyncio.create_task(
-        _push_agent_graph_progress_background(
-            discord_user_id=discord_user_id,
-            session_id=session_id,
-            insight_snapshot=insight_for_graph,
-            active_themes=themes,
-        ),
-        name=f"agent-graph-push:{session_id}",
-    )
-
-    last_assistant = ""
-    for row in reversed(prior_turns):
-        if row.get("role") == "assistant":
-            last_assistant = str(row.get("content", ""))
-            break
-
-    return _result_from_turn(
-        agent_name=agent_name,
+    await _push_agent_graph_progress_background(
+        discord_user_id=discord_user_id,
         session_id=session_id,
-        summary=last_assistant or "Session ended.",
-        skill_blocks=skill_blocks,
-        prefs=prefs,
-        turn_count=turn_count,
-        memory_patch=updated_memory,
+        insight_snapshot=snapshot if isinstance(snapshot, list) else None,
+        active_themes=themes,
     )
 
 
