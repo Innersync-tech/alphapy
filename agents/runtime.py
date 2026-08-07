@@ -1,6 +1,7 @@
 """Agent session orchestration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -576,23 +577,22 @@ async def end_agent_session(
     )
     await delete_session_messages(session_id)
 
-    # Memory Vault Phase 2: Tier-2 labels → Core agent_graph (fail-open).
-    try:
-        from utils.core_agent_graph import push_agent_chat_progress
-
-        themes = []
-        if isinstance(derived_profile, dict):
-            raw_themes = derived_profile.get("active_themes")
-            if isinstance(raw_themes, list):
-                themes = raw_themes
-        await push_agent_chat_progress(
+    # Memory Vault Phase 2: Tier-2 labels → Core agent_graph (fail-open, off critical path).
+    themes: list[Any] = []
+    if isinstance(derived_profile, dict):
+        raw_themes = derived_profile.get("active_themes")
+        if isinstance(raw_themes, list):
+            themes = list(raw_themes)
+    insight_for_graph = snapshot if isinstance(snapshot, list) else None
+    asyncio.create_task(
+        _push_agent_graph_progress_background(
             discord_user_id=discord_user_id,
             session_id=session_id,
-            insight_snapshot=snapshot if isinstance(snapshot, list) else None,
+            insight_snapshot=insight_for_graph,
             active_themes=themes,
-        )
-    except Exception:
-        logger.warning("agent-graph progress push failed after session end", exc_info=True)
+        ),
+        name=f"agent-graph-push:{session_id}",
+    )
 
     last_assistant = ""
     for row in reversed(prior_turns):
@@ -609,6 +609,31 @@ async def end_agent_session(
         turn_count=turn_count,
         memory_patch=updated_memory,
     )
+
+
+async def _push_agent_graph_progress_background(
+    *,
+    discord_user_id: int,
+    session_id: str,
+    insight_snapshot: list[dict[str, Any]] | None,
+    active_themes: list[Any] | None,
+) -> None:
+    """Best-effort Core graph write after session end; never blocks the end response."""
+    try:
+        from utils.core_agent_graph import push_agent_chat_progress
+
+        await push_agent_chat_progress(
+            discord_user_id=discord_user_id,
+            session_id=session_id,
+            insight_snapshot=insight_snapshot,
+            active_themes=active_themes,
+        )
+    except Exception:
+        logger.warning(
+            "agent-graph progress push failed after session end (background) session=%s",
+            session_id,
+            exc_info=True,
+        )
 
 
 async def run_agent_session(

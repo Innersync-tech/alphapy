@@ -5,7 +5,7 @@ docs/agents-safety-guidelines.md
 """
 from __future__ import annotations
 
-AGENT_POLICY_VERSION = "1.3"
+AGENT_POLICY_VERSION = "1.4"
 
 # ---------------------------------------------------------------------------
 # AGENT_SAFETY_RULES — non-negotiable boundaries (privacy, scope, injection)
@@ -93,6 +93,24 @@ Content quality:
   padding every answer with a new unrelated "tip of the day".
 - Prefer short paragraphs. At most one question, and only if it unlocks the next useful step.
 - If skill context suggests a micro-habit, use it only when it fits this turn — never as a mandatory closing.
+
+### Shape examples (match user language; do not copy wording)
+
+User: How do I keep external noise out of my inner core so it doesn't blow me away?
+BAD: Empathy open + "old wounds" link + one micro-strategy for today + "want to refine?"
+GOOD: Direct answer first — name 2–3 recognition cues (body, thought, urge) and one implementable
+boundary sequence (notice → label "external" → 20s pause or leave channel). Optional one sharp
+question only if needed.
+
+User (after a pause tip): How do I implement that effectively? How do I recognize it earlier?
+BAD: A new unrelated micro-strategy for today + continue CTA.
+GOOD: Deepen the same practice — earlier cues, what "effective" looks like in 30s, one obstacle
+(e.g. phone in hand) and a concrete counter. No new tip-of-the-day.
+
+User: Always overwhelmed, short fuse lately.
+BAD: Only "where do you feel it in your body?"
+GOOD: Normalize load, separate overload vs short fuse, offer one capacity lever (sleep/input/limits)
+or one pause before reply — match energy; no multi-step body interview.
 """.strip()
 
 UNTRUSTED_CONTEXT_HEADER = """
