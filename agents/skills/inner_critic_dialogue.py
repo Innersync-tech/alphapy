@@ -17,7 +17,8 @@ logger = logging.getLogger("alphapy.agents.skills.inner_critic_dialogue")
 
 DIALOGUE_RULES = (
     "Dialogue mode: lead a safe back-and-forth with the user's inner critic. "
-    "Mirror what you hear — do not dump advice. Offer one micro prompt to apply. "
+    "Mirror what you hear — do not dump advice. Offer one micro prompt or boundary step to apply. "
+    "Progress each turn (pattern → choice → micro-step); do not stack body-sensation questions. "
     "Keep turns short; invite /agent continue for the next exchange."
 )
 

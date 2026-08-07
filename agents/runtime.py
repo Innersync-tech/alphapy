@@ -411,6 +411,8 @@ async def continue_agent_session(
         metadata=session_metadata or dict(metadata or {}),
     )
 
+    # Re-inject skill/profile context on continue (same as start). Without this, multi-turn
+    # chats collapse into history-only somatic loops and lose inner_voice / pattern guidance.
     summary, skill_blocks, stored_user = await _run_agent_turn(
         ctx=ctx,
         prefs=prefs,
@@ -418,7 +420,7 @@ async def continue_agent_session(
         derived_profile=derived_profile,
         user_message=user_message,
         prior_turns=prior_turns,
-        include_context=False,
+        include_context=True,
     )
 
     await append_session_messages(
