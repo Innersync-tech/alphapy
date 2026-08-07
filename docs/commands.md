@@ -781,7 +781,7 @@ Show your active reflection agent session, if any.
 
 ### Pattern learning (`learn_from_patterns`)
 
-When enabled in App agent settings (`agent_prefs.learn_from_patterns`, or legacy `learn_from_shared`), the runtime loads up to five Tier-2-safe summaries from Supabase `agent_graph_nodes` via `agents/pattern_loader.py` and injects them into the Grok prompt as `[learned_patterns]`. No encrypted journal text is read — only validated pattern nodes the user opted into.
+When enabled in App agent settings (`agent_prefs.learn_from_patterns`, or legacy fallback to `learn_from_shared`), the runtime loads Tier-2 insights from Supabase `agent_memory.memory.derived_profile` for `agent_name=reflection` via `agents/pattern_loader.py` (up to eight labels) and injects them into the Grok prompt as `[learned_patterns]`. No encrypted journal text and no `agent_graph_nodes` read on this path — graph nodes are for Core Catalog cadence, not Discord prompt injection.
 
 ---
 

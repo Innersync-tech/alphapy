@@ -42,6 +42,36 @@ async def test_memory_patch_local_backend(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_memory_cas_retries_on_stale_write(monkeypatch) -> None:
+    """Simulated concurrent writer: first CAS fails, second succeeds after re-read."""
+    import config
+    from agents import memory as memory_mod
+    from agents.memory import clear_local_store, get_user_memory, patch_user_memory
+
+    monkeypatch.setattr(config, "ALPHAPY_AGENTS_MEMORY_BACKEND", "memory")
+    clear_local_store()
+
+    user_id = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
+    await patch_user_memory(user_id, "reflection", {"session_count": 1})
+
+    calls = {"n": 0}
+    real_try = memory_mod._try_cas_write_user_memory
+
+    async def flaky_cas(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return False
+        return await real_try(*args, **kwargs)
+
+    monkeypatch.setattr(memory_mod, "_try_cas_write_user_memory", flaky_cas)
+
+    updated = await patch_user_memory(user_id, "reflection", {"session_count": 2})
+    assert updated["session_count"] == 2
+    assert (await get_user_memory(user_id, "reflection"))["session_count"] == 2
+    assert calls["n"] >= 2
+
+
+@pytest.mark.asyncio
 async def test_create_and_complete_session_local(monkeypatch) -> None:
     import config
     from agents.memory import clear_local_store, complete_session, create_session, get_active_session
