@@ -268,6 +268,14 @@ async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
             agent_name="reflection",
         )
 
+    captured_continue: list[list[dict]] = []
+
+    async def _fake_ask_gpt_continue(messages, user_id=None, **kwargs):
+        captured_continue.append(messages)
+        return next(responses)
+
+    monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt_continue)
+
     second = await continue_agent_session(
         innersync_user_id=user_id,
         discord_user_id=42,
@@ -277,6 +285,11 @@ async def test_multi_turn_session_start_continue_end(monkeypatch) -> None:
     )
     assert second.summary == "Second reply."
     assert second.turn_count == 2
+    # Continue must re-inject UNTRUSTED skill context (not history-only).
+    assert captured_continue, "continue should call ask_gpt"
+    cont_user = captured_continue[0][-1]["content"]
+    assert "UNTRUSTED" in cont_user
+    assert "User request: Follow up" in cont_user
 
     ended = await end_agent_session(
         innersync_user_id=user_id,

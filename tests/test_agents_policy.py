@@ -25,6 +25,13 @@ def test_system_prompt_contains_required_markers() -> None:
         assert marker in prompt, f"Missing policy marker: {marker!r}"
 
 
+def test_system_prompt_includes_conversation_fitness_rules() -> None:
+    prompt = build_agent_system_prompt()
+    assert "Conversation fitness" in prompt
+    assert "somatic loops" in prompt or "body/sensation" in prompt
+    assert "same question pattern" in prompt
+
+
 def test_system_prompt_includes_locale_instruction() -> None:
     en = build_agent_system_prompt(locale="en")
     assert "Platform locale: en" in en
