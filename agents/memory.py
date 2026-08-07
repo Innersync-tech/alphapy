@@ -32,7 +32,11 @@ _MESSAGES_TABLE = "agent_session_messages"
 # In-memory fallback for tests and when Supabase is not configured.
 _local_sessions: dict[str, dict[str, Any]] = {}
 _local_memory: dict[str, dict[str, Any]] = {}
+_local_memory_updated_at: dict[str, str] = {}
 _local_session_messages: dict[str, list[dict[str, Any]]] = {}
+
+# Concurrent writers (App Patterns opt-in, /agent end, revoke purges) use CAS on updated_at.
+_MEMORY_CAS_MAX_ATTEMPTS = 3
 
 _ROLE_SORT_ORDER = {"user": 0, "assistant": 1}
 
@@ -79,6 +83,7 @@ async def clear_all_user_memory(innersync_user_id: str) -> None:
         for key in list(_local_memory.keys()):
             if key.startswith(prefix):
                 _local_memory.pop(key, None)
+                _local_memory_updated_at.pop(key, None)
         return
 
     url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_MEMORY_TABLE}"
@@ -141,6 +146,7 @@ def _purge_agent_user_data_local(
         for key in list(_local_memory.keys()):
             if key.startswith(prefix):
                 _local_memory.pop(key, None)
+                _local_memory_updated_at.pop(key, None)
 
 
 async def _collect_innersync_user_ids_for_purge(
@@ -192,9 +198,12 @@ async def _delete_agent_sessions(
 
 async def clear_derived_memory(innersync_user_id: str, agent_name: str) -> dict[str, Any]:
     """Remove Tier 2 derived profile; keep Tier 3 operational metadata."""
-    current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
-    current.pop(TIER2_ROOT_KEY, None)
-    return await _write_user_memory(innersync_user_id, agent_name, current)
+
+    def _transform(current: dict[str, Any]) -> dict[str, Any]:
+        current.pop(TIER2_ROOT_KEY, None)
+        return current
+
+    return await _mutate_user_memory(innersync_user_id, agent_name, _transform)
 
 
 async def purge_tier2_for_reflection(
@@ -203,14 +212,17 @@ async def purge_tier2_for_reflection(
     reflection_id: str,
 ) -> dict[str, Any]:
     """Drop insights linked to a revoked reflection."""
-    current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
-    derived = extract_derived_profile(current)
-    updated = purge_insights_for_reflection(derived, reflection_id)
-    if updated.get("insights"):
-        current[TIER2_ROOT_KEY] = updated
-    else:
-        current.pop(TIER2_ROOT_KEY, None)
-    return await _write_user_memory(innersync_user_id, agent_name, current)
+
+    def _transform(current: dict[str, Any]) -> dict[str, Any]:
+        derived = extract_derived_profile(current)
+        updated = purge_insights_for_reflection(derived, reflection_id)
+        if updated.get("insights"):
+            current[TIER2_ROOT_KEY] = updated
+        else:
+            current.pop(TIER2_ROOT_KEY, None)
+        return current
+
+    return await _mutate_user_memory(innersync_user_id, agent_name, _transform)
 
 
 def _now_iso() -> str:
@@ -228,30 +240,55 @@ def _use_supabase() -> bool:
         return False
 
 
-async def get_user_memory(innersync_user_id: str, agent_name: str) -> dict[str, Any]:
-    """Load durable memory blob for user+agent."""
+async def get_user_memory_row(
+    innersync_user_id: str, agent_name: str
+) -> dict[str, Any]:
+    """Load durable memory blob + updated_at for CAS writes.
+
+    Returns ``{"memory": dict, "updated_at": str | None}``. ``updated_at`` is
+    None when no row exists yet.
+    """
     if not _use_supabase():
-        return dict(_local_memory.get(_memory_key(innersync_user_id, agent_name), {}))
+        key = _memory_key(innersync_user_id, agent_name)
+        memory = dict(_local_memory.get(key, {}))
+        return {
+            "memory": memory,
+            "updated_at": _local_memory_updated_at.get(key),
+            "exists": key in _local_memory,
+        }
 
     rows = await _supabase_get(
         _MEMORY_TABLE,
         {
-            "select": "memory",
+            "select": "memory,updated_at",
             "innersync_user_id": f"eq.{innersync_user_id}",
             "agent_name": f"eq.{agent_name}",
             "limit": 1,
         },
     )
     if not rows:
-        return {}
+        return {"memory": {}, "updated_at": None, "exists": False}
     memory = rows[0].get("memory")
-    return dict(memory) if isinstance(memory, dict) else {}
+    updated_at = rows[0].get("updated_at")
+    return {
+        "memory": dict(memory) if isinstance(memory, dict) else {},
+        "updated_at": str(updated_at) if updated_at else None,
+        "exists": True,
+    }
+
+
+async def get_user_memory(innersync_user_id: str, agent_name: str) -> dict[str, Any]:
+    """Load durable memory blob for user+agent."""
+    row = await get_user_memory_row(innersync_user_id, agent_name)
+    return dict(row.get("memory") or {})
 
 
 async def clear_user_memory(innersync_user_id: str, agent_name: str) -> None:
     """Delete durable memory for user+agent (e.g. after revoking all shares)."""
     if not _use_supabase():
-        _local_memory.pop(_memory_key(innersync_user_id, agent_name), None)
+        key = _memory_key(innersync_user_id, agent_name)
+        _local_memory.pop(key, None)
+        _local_memory_updated_at.pop(key, None)
         return
 
     url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_MEMORY_TABLE}"
@@ -268,13 +305,105 @@ async def clear_user_memory(innersync_user_id: str, agent_name: str) -> None:
         response.raise_for_status()
 
 
+async def _try_cas_write_user_memory(
+    innersync_user_id: str,
+    agent_name: str,
+    memory: dict[str, Any],
+    *,
+    expected_updated_at: str | None,
+    row_exists: bool,
+) -> bool:
+    """Attempt a compare-and-swap write. Returns True if this writer won."""
+    new_updated_at = _now_iso()
+
+    if not _use_supabase():
+        key = _memory_key(innersync_user_id, agent_name)
+        current_at = _local_memory_updated_at.get(key)
+        exists = key in _local_memory
+        if not row_exists:
+            if exists:
+                return False
+            _local_memory[key] = memory
+            _local_memory_updated_at[key] = new_updated_at
+            return True
+        if current_at != expected_updated_at:
+            return False
+        _local_memory[key] = memory
+        _local_memory_updated_at[key] = new_updated_at
+        return True
+
+    if not row_exists:
+        # Insert-only; concurrent create surfaces as HTTP conflict.
+        try:
+            await _supabase_post(
+                _MEMORY_TABLE,
+                {
+                    "innersync_user_id": innersync_user_id,
+                    "agent_name": agent_name,
+                    "memory": memory,
+                    "updated_at": new_updated_at,
+                },
+                upsert=False,
+            )
+            return True
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code if exc.response is not None else 0
+            if status in (409, 23505):
+                return False
+            # PostgREST unique_violation is often 409; some gateways return 400.
+            body = (exc.response.text if exc.response is not None else "") or ""
+            if status == 400 and "duplicate" in body.lower():
+                return False
+            raise
+
+    url = f"{config.SUPABASE_URL.rstrip('/')}/rest/v1/{_MEMORY_TABLE}"
+    params: dict[str, Any] = {
+        "innersync_user_id": f"eq.{innersync_user_id}",
+        "agent_name": f"eq.{agent_name}",
+    }
+    if expected_updated_at is not None:
+        params["updated_at"] = f"eq.{expected_updated_at}"
+    else:
+        # Row existed but missing timestamp — require null updated_at (rare).
+        params["updated_at"] = "is.null"
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.patch(
+            url,
+            json={"memory": memory, "updated_at": new_updated_at},
+            headers=_headers(prefer=["return=representation"], method="PATCH"),
+            params=params,
+        )
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError:
+            logger.error(
+                "Supabase CAS PATCH failed: status=%s body=%s",
+                response.status_code,
+                response.text[:300],
+            )
+            raise
+
+    if not response.content:
+        return False
+    data = response.json()
+    if isinstance(data, list):
+        return len(data) > 0
+    if isinstance(data, dict):
+        return bool(data.get("data") or data)
+    return False
+
+
 async def _write_user_memory(
     innersync_user_id: str,
     agent_name: str,
     memory: dict[str, Any],
 ) -> dict[str, Any]:
+    """Unconditional write (last-write-wins). Prefer patch_user_memory / CAS paths."""
     if not _use_supabase():
-        _local_memory[_memory_key(innersync_user_id, agent_name)] = memory
+        key = _memory_key(innersync_user_id, agent_name)
+        _local_memory[key] = memory
+        _local_memory_updated_at[key] = _now_iso()
         return memory
 
     await _supabase_post(
@@ -290,20 +419,58 @@ async def _write_user_memory(
     return memory
 
 
+async def _mutate_user_memory(
+    innersync_user_id: str,
+    agent_name: str,
+    transform,
+) -> dict[str, Any]:
+    """Read-modify-write with optimistic concurrency on updated_at."""
+    last_memory: dict[str, Any] = {}
+    for attempt in range(_MEMORY_CAS_MAX_ATTEMPTS):
+        row = await get_user_memory_row(innersync_user_id, agent_name)
+        current = strip_sensitive_memory_keys(dict(row.get("memory") or {}))
+        last_memory = transform(dict(current))
+        ok = await _try_cas_write_user_memory(
+            innersync_user_id,
+            agent_name,
+            last_memory,
+            expected_updated_at=row.get("updated_at"),
+            row_exists=bool(row.get("exists")),
+        )
+        if ok:
+            return last_memory
+        logger.info(
+            "agent_memory CAS conflict attempt=%s user=%s agent=%s",
+            attempt + 1,
+            innersync_user_id,
+            agent_name,
+        )
+    # Exhausted retries: force merge of last transform (availability over silent drop of this write).
+    logger.warning(
+        "agent_memory CAS retries exhausted; force write user=%s agent=%s",
+        innersync_user_id,
+        agent_name,
+    )
+    return await _write_user_memory(innersync_user_id, agent_name, last_memory)
+
+
 async def patch_user_memory(
     innersync_user_id: str,
     agent_name: str,
     patch: dict[str, Any],
 ) -> dict[str, Any]:
-    """Merge patch into durable memory and return the updated blob."""
-    current = strip_sensitive_memory_keys(await get_user_memory(innersync_user_id, agent_name))
+    """Merge patch into durable memory and return the updated blob (CAS-safe)."""
     safe_patch = strip_sensitive_memory_keys(patch)
-    for key, value in safe_patch.items():
-        if key in TIER3_FIELDS:
-            current[key] = value
-        elif key == TIER2_ROOT_KEY and isinstance(value, dict):
-            current[TIER2_ROOT_KEY] = value
-    return await _write_user_memory(innersync_user_id, agent_name, current)
+
+    def _transform(current: dict[str, Any]) -> dict[str, Any]:
+        for key, value in safe_patch.items():
+            if key in TIER3_FIELDS:
+                current[key] = value
+            elif key == TIER2_ROOT_KEY and isinstance(value, dict):
+                current[TIER2_ROOT_KEY] = value
+        return current
+
+    return await _mutate_user_memory(innersync_user_id, agent_name, _transform)
 
 
 async def create_session(
@@ -537,4 +704,5 @@ def clear_local_store() -> None:
     """Test helper."""
     _local_sessions.clear()
     _local_memory.clear()
+    _local_memory_updated_at.clear()
     _local_session_messages.clear()
