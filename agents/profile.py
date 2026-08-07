@@ -177,8 +177,12 @@ def build_agent_profile_block(
     if derived_profile:
         insights = derived_profile.get("insights") or []
         if insights:
-            lines.append("Remembered patterns (generalized, not journal quotes):")
-            for ins in insights[:8]:
+            lines.append(
+                "Remembered patterns (generalized, not journal quotes). "
+                "Optional color only — do not make these the full thesis of every reply; "
+                "prefer the user's latest message:"
+            )
+            for ins in insights[:4]:
                 if not isinstance(ins, dict):
                     continue
                 label = ins.get("label")
@@ -187,10 +191,10 @@ def build_agent_profile_block(
                     lines.append(f"- {label}" + (f" ({itype})" if itype else ""))
         themes = derived_profile.get("active_themes") or []
         if themes:
-            lines.append("Active themes: " + ", ".join(str(t) for t in themes[:6]))
+            lines.append("Active themes: " + ", ".join(str(t) for t in themes[:4]))
         loops = derived_profile.get("open_loops") or []
         if loops:
-            lines.append("Open loops: " + "; ".join(str(loop) for loop in loops[:3]))
+            lines.append("Open loops: " + "; ".join(str(loop) for loop in loops[:2]))
 
     session_count = tier3.get("session_count")
     if session_count is not None:

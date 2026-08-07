@@ -40,6 +40,8 @@ def test_system_prompt_includes_shape_examples() -> None:
     assert "BAD:" in prompt
     assert "GOOD:" in prompt
     assert "Deepen the same practice" in prompt
+    assert "Anti-theory-loop" in prompt
+    assert "flip detector" in prompt
 
 
 def test_system_prompt_includes_locale_instruction() -> None:
