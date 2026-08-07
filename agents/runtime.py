@@ -303,13 +303,11 @@ async def start_agent_session(
         innersync_user_id,
         agent_name,
     )
-    # Empty start: open a dialogue — do not dump a full context summary (that caused echo loops).
+    # Empty start (App / Discord with no message): intentional default user prompt.
+    # Continuations must not re-echo that first reflection (policy anti-repetition).
     prompt = (user_message or "").strip() or (
-        "The user started a reflection session without a specific question. "
-        "Respond in their language if clear from context, otherwise English. "
-        "Open briefly: at most one short greeting and either one open question OR one single "
-        "light hook from context — never list or summarize multiple context items. "
-        "Do not invent a full reflection essay; invite them to set the focus."
+        "Give a short reflection based on the context. "
+        "Prefer depth on one or two themes over listing everything you see."
     )
 
     session_metadata = dict(metadata or {})
