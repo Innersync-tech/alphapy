@@ -5,15 +5,24 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- (No changes yet)
+
+### Fixed
+- (No changes yet)
+
+## [3.14.0] - 2026-08-08
+
+### Added
 - **Locale Output (#356)** — `utils/platform_locale.py` resolves Innersync ID locale from Core `bot-profile` (`nl-BE` \| `en`, default `en`; unlinked → `en`). Agent system prompt and Tier-2 distill use ID locale (soft override when the user clearly writes in another language).
 
 ### Changed
-- **Agent conversation fitness (#358–#362)** — multi-turn quality + session end latency:
+- **Agent conversation fitness (#358–#363)** — multi-turn quality + session end latency:
   - **#358** — re-inject skill/profile context on `/agent continue` (`include_context=True`); policy **v1.2** anti-somatic-loop / progress rules.
   - **#359** — policy **v1.3** anti-template (no fixed micro-strategy skeleton); softer dialogue skill gather strings.
   - **#360** — policy **v1.4** BAD/GOOD shape examples; Core graph push after end via background task.
   - **#361** — policy **v1.5** anti-theory-loop; lighter pattern injection in profile block (optional color, max 4 insights).
   - **#362** — true fast `/agent end`: durable complete + message delete + Tier-3 on critical path; Tier-2 distill, skill execute, snapshot, and graph finalize in background (`drain_end_background_jobs` for tests).
+  - **#363** — policy **v1.6** anti-echo / anti-recap; empty-start invites focus without multi-item context dump.
 - **Agent memory CAS (#357)** — optimistic concurrency on `agent_memory` writes (`updated_at` compare-and-swap + retries) to reduce last-write-wins between App Patterns distill and `/agent end`.
 - **Pattern Pipeline Clean (#355)** — `agents/pattern_loader.py` loads Tier-2 `derived_profile.insights` only (never graph progress / heuristic labels); `theme_key` parity with Core `_theme_key` on Memory Vault graph push (`source=agent_chat`, `theme_source=tier2`).
 - **Docs audit catch-up (#327–#351)** — Aligned `docs/api.md` (Sprint 3b `/api` paths, string snowflakes, reminder CRUD/quota/channel validation, `discord-meta`, observability `hermit_context`), auth docs (JWT-only user identity; no `X-User-Id`), webhook fallbacks (removed dead `WEBHOOK_SECRET`), commands/configuration/AGENTS for module gates, reminder quota, and fatigue prefs merge.
