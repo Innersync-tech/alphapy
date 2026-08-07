@@ -56,8 +56,9 @@ class ChainBreakerMicroSkill(BaseAgentSkill):
 
         lines: list[str] = [
             "Chain-break framing: raw and honest — no hype, no toxic positivity.",
-            "Confront avoidance/suppression with doing better than the previous generation.",
-            "Propose exactly ONE concrete micro-habit for today (small enough to do once).",
+            "Confront avoidance/suppression with doing better than the previous generation when relevant.",
+            "If a habit fits this turn, at most one concrete micro-habit (small enough to do once) — "
+            "not required every reply; never repeat the same habit as the previous assistant turn.",
         ]
         labels = insight_labels(insights)
         if labels:
