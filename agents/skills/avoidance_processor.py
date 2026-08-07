@@ -87,18 +87,18 @@ class AvoidanceProcessorSkill(BaseAgentSkill):
 
         if energy is not None and energy <= 2:
             lines.append(
-                "Soft entry: offer a gentle seal-off vs process choice. "
-                "Permission to pause — no pressure to go deep today."
+                "Energy looks low: permission to pause is OK. Soft seal-off vs process only if it fits; "
+                "do not force an exercise template every turn."
             )
         else:
             lines.append(
-                "Higher energy window: guide a structured seal-off vs process reflection. "
-                "One step at a time; still no advice dump."
+                "Energy allows depth if useful: seal-off vs process can help when avoidance is live — "
+                "still no advice dump and no mandatory micro-habit closing."
             )
 
         lines.append(
-            "When the user completes the exercise, mark progress in your reply "
-            "(they may end the session with /agent end to store a distilled pattern)."
+            "If the user finishes a real exercise this session, you may note progress lightly "
+            "(they can /agent end to store a distilled pattern)."
         )
         ctx.metadata["avoidance_processor_active"] = True
         return format_pattern_block("Avoidance processor", lines)

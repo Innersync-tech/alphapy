@@ -28,8 +28,10 @@ def test_system_prompt_contains_required_markers() -> None:
 def test_system_prompt_includes_conversation_fitness_rules() -> None:
     prompt = build_agent_system_prompt()
     assert "Conversation fitness" in prompt
-    assert "somatic loops" in prompt or "body/sensation" in prompt
-    assert "same question pattern" in prompt
+    assert "Anti-template" in prompt
+    assert "somatic loops" in prompt or "body check" in prompt
+    assert "micro-strategy for today" in prompt or "micro-habit" in prompt
+    assert "canned structure" in prompt or "fixed reply skeleton" in prompt
 
 
 def test_system_prompt_includes_locale_instruction() -> None:
