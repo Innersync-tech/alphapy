@@ -8,7 +8,10 @@ All notable changes to this project will be documented in this file.
 - (No changes yet)
 
 ### Fixed
-- (No changes yet)
+- **Webhook secret fallbacks** — removed dead `WEBHOOK_SECRET` getattr chain (never loaded in `config.py`); chains are per-route secrets → `APP_REFLECTIONS_WEBHOOK_SECRET` → `SUPABASE_WEBHOOK_SECRET` only.
+
+### Changed
+- **ROADMAP** header bumped to v3.14.0 to match `version.py`.
 
 ## [3.14.0] - 2026-08-08
 
