@@ -46,7 +46,7 @@ SUPABASE_ISSUER = os.getenv(
     f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else None,
 )
 SUPABASE_WEBHOOK_SECRET = os.getenv("SUPABASE_WEBHOOK_SECRET")
-# App reflections webhook (Core-API → Alphapy). Optional; falls back to WEBHOOK_SECRET / SUPABASE_WEBHOOK_SECRET
+# App reflections webhook (Core-API → Alphapy). Optional; falls back to SUPABASE_WEBHOOK_SECRET only.
 APP_REFLECTIONS_WEBHOOK_SECRET = os.getenv("APP_REFLECTIONS_WEBHOOK_SECRET")
 
 # Google Drive service account JSON (full key file as one-line/minified JSON string)
@@ -102,7 +102,8 @@ PRICE_YEARLY_EARLY_BIRD = os.getenv("PRICE_YEARLY_EARLY_BIRD", "€29")
 PRICE_YEARLY_REGULAR = os.getenv("PRICE_YEARLY_REGULAR", "€59.99")
 PRICE_LIFETIME_EARLY_BIRD = os.getenv("PRICE_LIFETIME_EARLY_BIRD", "€49")
 PRICE_LIFETIME_REGULAR = os.getenv("PRICE_LIFETIME_REGULAR", "€99.99")
-# Webhook secrets for Core → Alphapy callbacks (optional; fall back to APP_REFLECTIONS_WEBHOOK_SECRET / WEBHOOK_SECRET)
+# Webhook secrets for Core → Alphapy callbacks (optional; fall back to APP_REFLECTIONS / SUPABASE secrets).
+# There is no global WEBHOOK_SECRET env — do not document or rely on one.
 PREMIUM_INVALIDATE_WEBHOOK_SECRET = os.getenv("PREMIUM_INVALIDATE_WEBHOOK_SECRET")
 FOUNDER_WEBHOOK_SECRET = os.getenv("FOUNDER_WEBHOOK_SECRET")
 # Legal update webhook (GitHub Action → Alphapy). Notifies main guild when PP/ToS changes.
