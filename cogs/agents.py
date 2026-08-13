@@ -85,9 +85,16 @@ def _agent_response_embed(
     if bot_user is not None:
         try:
             icon = bot_user.display_avatar.url
+            if not isinstance(icon, str) or not icon.startswith(("http://", "https://")):
+                icon = None
         except Exception:
             icon = None
-        author_name = safe_embed_text(getattr(bot_user, "display_name", None) or "Alphapy", 256)
+        raw_name = getattr(bot_user, "display_name", None)
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            raw_name = getattr(bot_user, "name", None)
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            raw_name = "Alphapy"
+        author_name = safe_embed_text(raw_name, 256)
         if icon:
             embed.set_author(name=author_name, icon_url=icon)
         else:

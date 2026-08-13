@@ -60,6 +60,21 @@ def test_agent_response_embed_sets_bot_author_when_provided() -> None:
     assert embed.author.icon_url == "https://cdn.discordapp.com/avatars/1/abc.png"
 
 
+def test_agent_response_embed_tolerates_mock_bot_user_without_str_name() -> None:
+    """Interaction mocks often leave display_name as MagicMock — must not crash."""
+    result = AgentResult(
+        agent_name="reflection",
+        session_id="a64fdd42-1234-5678-9abc-def012345678",
+        summary="Hello.",
+        skill_blocks={},
+    )
+    bot_user = MagicMock()  # display_name / avatar.url are MagicMocks
+    embed = _agent_response_embed(result, bot_user=bot_user)
+    assert embed.author is not None
+    assert embed.author.name == "Alphapy"
+    assert embed.author.icon_url is None
+
+
 def test_agent_app_link_view_points_to_dashboard_agent() -> None:
     view = _agent_app_link_view()
     assert len(view.children) == 1
