@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Webhook secret fallbacks** — removed dead `WEBHOOK_SECRET` getattr chain (never loaded in `config.py`); chains are per-route secrets → `APP_REFLECTIONS_WEBHOOK_SECRET` → `SUPABASE_WEBHOOK_SECRET` only.
 
+### Added
+- **Agent embed polish** — emoji prefix per agent (🪞 reflection) and bot avatar as embed author when available.
+
 ### Changed
 - **ROADMAP** header bumped to v3.14.0 to match `version.py`.
 

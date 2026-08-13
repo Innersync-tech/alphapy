@@ -39,6 +39,11 @@ logger = logging.getLogger(__name__)
 _AGENT_COLOR = 0x5865F2
 _DEFAULT_APP_BASE = "https://app.innersync.tech"
 
+# Optional polish: emoji prefix per agent (Discord mobile-safe Unicode).
+_AGENT_EMOJIS: dict[str, str] = {
+    "reflection": "🪞",
+}
+
 
 def _app_agent_home_url() -> str:
     """Public App agent chat surface (Phase 4 cross-platform)."""
@@ -47,13 +52,23 @@ def _app_agent_home_url() -> str:
     return f"{base.rstrip('/')}/dashboard/agent"
 
 
-def _agent_response_embed(result: AgentResult) -> discord.Embed:
-    """Build the /agent reply: user display name as title, agent metadata in footer."""
+def _agent_emoji(agent_name: str) -> str:
+    return _AGENT_EMOJIS.get(agent_name, "✨")
+
+
+def _agent_response_embed(
+    result: AgentResult,
+    *,
+    bot_user: discord.ClientUser | discord.User | None = None,
+) -> discord.Embed:
+    """Build the /agent reply: emoji + display name as title; optional bot avatar as author."""
     agent_name = result.agent_name
+    emoji = _agent_emoji(agent_name)
     if result.display_name:
-        title = safe_embed_text(result.display_name, 256)
+        label = safe_embed_text(result.display_name, 250)
     else:
-        title = safe_embed_text(agent_name.replace("_", " ").title(), 256)
+        label = safe_embed_text(agent_name.replace("_", " ").title(), 250)
+    title = safe_embed_text(f"{emoji} {label}", 256)
 
     footer_parts = [f"Agent: {agent_name}", f"Session {result.session_id[:8]}…"]
     if result.turn_count > 1:
@@ -67,6 +82,16 @@ def _agent_response_embed(result: AgentResult) -> discord.Embed:
         description=safe_embed_text(result.summary[:4000]),
         color=_AGENT_COLOR,
     )
+    if bot_user is not None:
+        try:
+            icon = bot_user.display_avatar.url
+        except Exception:
+            icon = None
+        author_name = safe_embed_text(getattr(bot_user, "display_name", None) or "Alphapy", 256)
+        if icon:
+            embed.set_author(name=author_name, icon_url=icon)
+        else:
+            embed.set_author(name=author_name)
     embed.set_footer(text=" · ".join(footer_parts))
     return embed
 
@@ -206,7 +231,7 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result),
+            embed=_agent_response_embed(result, bot_user=interaction.client.user),
             view=_agent_app_link_view(),
             ephemeral=True,
         )
@@ -272,7 +297,7 @@ class AgentGroup(app_commands.Group):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result),
+            embed=_agent_response_embed(result, bot_user=interaction.client.user),
             view=_agent_app_link_view(),
             ephemeral=True,
         )
@@ -330,7 +355,7 @@ class AgentGroup(app_commands.Group):
             payload={"agent": agent_name, "session_id": result.session_id},
         )
 
-        embed = _agent_response_embed(result)
+        embed = _agent_response_embed(result, bot_user=interaction.client.user)
         embed.set_footer(text=embed.footer.text + " · ended")
         await interaction.followup.send(embed=embed, ephemeral=True)
 

@@ -173,7 +173,7 @@ class FatigueQuickCheckView(discord.ui.View):
             return
 
         await interaction.followup.send(
-            embed=_agent_response_embed(result),
+            embed=_agent_response_embed(result, bot_user=interaction.client.user),
             view=_agent_app_link_view(),
             ephemeral=True,
         )
