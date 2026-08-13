@@ -380,53 +380,97 @@ async def guild_has_premium(guild_id: int) -> bool:
         return False
 
 
+async def _transfer_core_api(user_id: int, new_guild_id: int) -> bool | None:
+    """
+    Call Core POST /api/premium/transfer when configured.
+    Returns True on success, False on explicit failure, None if Core not configured / unreachable.
+    """
+    url = getattr(config, "CORE_API_URL", None) or ""
+    key = getattr(config, "ALPHAPY_SERVICE_KEY", None)
+    if not url or not key:
+        return None
+    endpoint = f"{url.rstrip('/')}/api/premium/transfer"
+    headers = {"X-API-Key": key, "Content-Type": "application/json"}
+    payload = {"user_id": user_id, "guild_id": new_guild_id}
+    try:
+        client = _get_http_client()
+        response = await client.post(endpoint, json=payload, headers=headers)
+        if response.is_success:
+            return True
+        logger.warning(
+            "Premium transfer Core non-2xx: status=%s body=%s",
+            response.status_code,
+            response.text[:200],
+        )
+        return False
+    except Exception as e:
+        logger.warning("Premium transfer Core error: %s", e)
+        return None
+
+
 async def transfer_premium_to_guild(user_id: int, new_guild_id: int) -> tuple[bool, str]:
     """
-    Move the user's active premium subscription to the given guild (local DB only).
+    Move the user's active premium subscription to the given guild.
 
-    Enforces one active subscription per user: the single active row's guild_id is updated.
+    Updates local premium_subs when present, and Core premium_subscriptions when
+    CORE_API_URL + ALPHAPY_SERVICE_KEY are configured (source of truth for is_premium).
     Cache for this user is cleared so is_premium reflects the new guild immediately.
     Returns (True, "transferred") or (False, reason).
     """
     pool = await _ensure_pool()
-    if pool is None:
-        return False, "database unavailable"
-    try:
-        async with acquire_safe(pool) as conn:
-            old_row = await conn.fetchrow(
-                """
-                SELECT guild_id FROM premium_subs
-                WHERE user_id = $1 AND status = 'active'
-                  AND (expires_at IS NULL OR expires_at > NOW())
-                LIMIT 1
-                """,
-                user_id,
-            )
-            row = await conn.fetchrow(
-                """
-                UPDATE premium_subs
-                SET guild_id = $2
-                WHERE user_id = $1 AND status = 'active'
-                  AND (expires_at IS NULL OR expires_at > NOW())
-                RETURNING id
-                """,
-                user_id,
-                new_guild_id,
-            )
-        if not row:
+    local_ok = False
+    from_guild: int | None = None
+
+    if pool is not None:
+        try:
+            async with acquire_safe(pool) as conn:
+                old_row = await conn.fetchrow(
+                    """
+                    SELECT guild_id FROM premium_subs
+                    WHERE user_id = $1 AND status = 'active'
+                      AND (expires_at IS NULL OR expires_at > NOW())
+                    LIMIT 1
+                    """,
+                    user_id,
+                )
+                row = await conn.fetchrow(
+                    """
+                    UPDATE premium_subs
+                    SET guild_id = $2
+                    WHERE user_id = $1 AND status = 'active'
+                      AND (expires_at IS NULL OR expires_at > NOW())
+                    RETURNING id
+                    """,
+                    user_id,
+                    new_guild_id,
+                )
+            if row:
+                local_ok = True
+                from_guild = int(old_row["guild_id"]) if old_row else None
+        except Exception as e:
+            logger.warning("Premium guard: local transfer_premium_to_guild failed: %s", e)
+
+    core_result = await _transfer_core_api(user_id, new_guild_id)
+
+    if not local_ok and core_result is not True:
+        if core_result is False:
             return False, "no active subscription"
-        _clear_cache_for_user(user_id)
-        global _stats_transfers
-        _stats_transfers += 1
-        from_guild = int(old_row["guild_id"]) if old_row else None
-        logger.info(
-            "Premium transfer: user_id=%s from_guild=%s to_guild=%s",
-            user_id, from_guild, new_guild_id,
-        )
-        return True, "transferred"
-    except Exception as e:
-        logger.warning("Premium guard: transfer_premium_to_guild failed: %s", e)
-        return False, "transfer failed"
+        if pool is None:
+            return False, "database unavailable"
+        return False, "no active subscription"
+
+    _clear_cache_for_user(user_id)
+    global _stats_transfers
+    _stats_transfers += 1
+    logger.info(
+        "Premium transfer: user_id=%s from_guild=%s to_guild=%s local=%s core=%s",
+        user_id,
+        from_guild,
+        new_guild_id,
+        local_ok,
+        core_result,
+    )
+    return True, "transferred"
 
 
 # ---------------------------------------------------------------------------
