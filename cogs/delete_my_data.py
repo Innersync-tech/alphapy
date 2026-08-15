@@ -105,6 +105,7 @@ async def _purge_user_data(pool: asyncpg.Pool, user_id: int) -> None:
         ("automod_user_history", "user_id"),
         ("app_reflections", "user_id"),
         ("growth_checkins", "user_id"),
+        ("agent_nudge_state", "discord_user_id"),
     ]
     tables_to_anonymize = [
         ("reminders", "created_by"),

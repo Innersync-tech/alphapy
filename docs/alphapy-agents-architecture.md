@@ -99,7 +99,8 @@ alphapy/agents/
   skills/
     journal_sync.py
     trade_insight.py   # dormant — not registered until product decision
-cogs/agents.py     /agent list|start|continue|end|status
+cogs/agents.py     /agent list|start|continue|end|status|nudges
+agents/nudges.py   Opt-in Discord DM check-ins (Phase 5A)
 ```
 
 ---
@@ -113,6 +114,7 @@ cogs/agents.py     /agent list|start|continue|end|status
 | `/agent continue <message>` | Append a turn using session message history |
 | `/agent end` | Distill Tier 2, patch Tier 3, complete session, delete ephemeral messages |
 | `/agent status` | Active session start time + turn count |
+| `/agent nudges enable\|disable` | Opt in/out of Discord check-in DMs (`agent_prefs.agent_nudges_enabled`) |
 
 **Discord energy check-in (`agents/fatigue_ui.py`):**
 
@@ -121,6 +123,15 @@ cogs/agents.py     /agent list|start|continue|end|status
 - Persistent View (`timeout=None`) registered in `utils/lifecycle.py` Phase 6 via `bot.add_view`
 - Pending `/agent start` context kept in-process for 120s; after restart, clicks ACK with “expired… run `/agent start` again”
 - Persist path: `save_fatigue_self_report` → `merge_agent_prefs_fields` into existing `app_user_settings.agent_prefs` (preserves App Tier 1 fields). Fails closed if prefs cannot be loaded — never writes energy-only overwrites.
+
+**Check-in nudges (Phase 5A, `agents/nudges.py`):**
+
+- Opt-in only (`agent_nudges_enabled`, default off); App Settings + `/agent nudges`
+- Hourly loop on Agents cog; at most one fixed English DM per user per 24h
+- Ledger: Railway `agent_nudge_state` (Alembic `027`)
+- Eligibility: `/link` + `ALPHAPY_AGENTS_ENABLED` + mutual guild with `agents.enabled`
+- No Grok / no journal text; does not consume `/agent start` quota
+- Closed DMs are logged and skipped (fail-open for the loop)
 
 **Gates:**
 
