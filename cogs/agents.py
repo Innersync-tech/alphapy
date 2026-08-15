@@ -5,7 +5,7 @@ import logging
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 try:
     import config_local as config  # type: ignore
@@ -16,6 +16,7 @@ from agents.base import AgentResult
 from agents.fatigue import should_prompt_fatigue_check
 from agents.fatigue_ui import FatigueQuickCheckView, register_pending_fatigue_start
 from agents.memory import get_active_session, get_session_messages
+from agents.nudges import run_nudge_tick, set_agent_nudges_enabled
 from agents.registry import list_agents, resolve_agent
 from agents.runtime import (
     ActiveAgentSessionError,
@@ -126,7 +127,7 @@ def _agents_globally_enabled() -> bool:
 
 
 class AgentGroup(app_commands.Group):
-    """Slash command group: /agent list|start|continue|end|status"""
+    """Slash command group: /agent list|start|continue|end|status|nudges"""
 
     def __init__(self, cog: AgentsCog) -> None:
         super().__init__(name="agent", description="Run personal Alphapy agents")
@@ -417,6 +418,58 @@ class AgentGroup(app_commands.Group):
             ephemeral=True,
         )
 
+    @app_commands.command(
+        name="nudges",
+        description="Opt in or out of Discord DM check-in reminders",
+    )
+    @app_commands.describe(action="enable or disable daily check-in DMs")
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="enable", value="enable"),
+            app_commands.Choice(name="disable", value="disable"),
+        ]
+    )
+    async def nudges_cmd(
+        self,
+        interaction: discord.Interaction,
+        action: app_commands.Choice[str],
+    ) -> None:
+        if not _agents_globally_enabled():
+            await interaction.response.send_message(_AGENTS_UNAVAILABLE_MSG, ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        resolved = await self.cog._resolve_user(interaction)
+        if resolved is None:
+            return
+        innersync_id, _ = resolved
+        enabled = action.value == "enable"
+
+        try:
+            await set_agent_nudges_enabled(innersync_id, enabled)
+        except Exception as exc:
+            logger.warning("Failed to update agent nudges for %s: %s", innersync_id, exc)
+            await interaction.followup.send(
+                "Could not update nudge settings. Try again from the App "
+                "(Settings → Alphapy), or retry later.",
+                ephemeral=True,
+            )
+            return
+
+        if enabled:
+            await interaction.followup.send(
+                "Check-in DMs **enabled**. You'll get at most one reminder per day "
+                "when agents are on in a shared server. Disable anytime with "
+                "`/agent nudges disable`.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                "Check-in DMs **disabled**. You won't receive Alphapy nudge DMs.",
+                ephemeral=True,
+            )
+
 
 class AgentsCog(AlphaCog):
     """User-facing Alphapy agent commands (/agent)."""
@@ -426,8 +479,30 @@ class AgentsCog(AlphaCog):
         self.agent_group = AgentGroup(self)
         bot.tree.add_command(self.agent_group)
 
+    async def cog_load(self) -> None:
+        if not self.agent_nudge_loop.is_running():
+            self.agent_nudge_loop.start()
+
     async def cog_unload(self) -> None:
+        if self.agent_nudge_loop.is_running():
+            self.agent_nudge_loop.cancel()
         self.bot.tree.remove_command("agent")
+    @tasks.loop(hours=1)
+    async def agent_nudge_loop(self) -> None:
+        """Send opt-in Discord check-in DMs (Phase 5A). Fail-open on errors."""
+        if not _agents_globally_enabled():
+            return
+        pool = get_bot_db_pool(self.bot)
+        if pool is None:
+            return
+        try:
+            await run_nudge_tick(self.bot, pool)
+        except Exception as exc:
+            logger.error("Agent nudge loop failed: %s", exc)
+
+    @agent_nudge_loop.before_loop
+    async def before_agent_nudge_loop(self) -> None:
+        await self.bot.wait_until_ready()
 
     def _guild_agents_enabled(self, guild_id: int | None) -> bool:
         if guild_id is None:

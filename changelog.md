@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- (No changes yet)
+- **Agent check-in DMs (Phase 5A)** — opt-in Discord nudges (`/agent nudges`, `agent_prefs.agent_nudges_enabled`); hourly loop + Railway `agent_nudge_state` (Alembic `027`); fixed English invite only (no Grok / journal).
 
 ### Fixed
 - **Webhook secret fallbacks** — removed dead `WEBHOOK_SECRET` getattr chain (never loaded in `config.py`); chains are per-route secrets → `APP_REFLECTIONS_WEBHOOK_SECRET` → `SUPABASE_WEBHOOK_SECRET` only.

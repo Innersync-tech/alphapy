@@ -19,7 +19,11 @@ TIER1_FIELDS = frozenset({
     "fatigue_note",
     "fatigue_reported_at",
 })
-TIER1_BOOL_FIELDS = frozenset({"learn_from_shared", "learn_from_patterns"})
+TIER1_BOOL_FIELDS = frozenset({
+    "learn_from_shared",
+    "learn_from_patterns",
+    "agent_nudges_enabled",
+})
 TIER3_FIELDS = frozenset({"session_count", "last_session_at", "last_session_id", "last_agent"})
 
 
