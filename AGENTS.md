@@ -27,6 +27,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **API**: Reminder and dashboard flows resolve JWT `sub` → Discord via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int` / `get_innersync_id_for_discord`; both default `allow_profile_fallback=False`). Legacy `profiles.discord_id` is opt-in only (e.g. `/unlink` hint). One-off backfill: `scripts/backfill_discord_links_from_profiles.py` — run before flipping prod to links-only.
 - **Locale**: `utils/platform_locale.py` reads Core `bot-profile.locale` (`nl-BE` \| `en`, default `en`). Unlinked Discord → `en`. Used by agent system prompt + Tier-2 distill (not Discord guild language).
 - **Webhooks**: `POST /webhooks/discord-link` (HMAC `DISCORD_LINK_WEBHOOK_SECRET`) — Core sends `event: link` or `event: unlink`; upserts or deletes `alphapy_discord_links`; may DM the user
+- **Logging**: `/link` (session started) and successful `/unlink` post only to the home guild (`MAIN_GUILD_ID`) log channel via `send_home_guild_log` — never to third-party guilds
 - **GDPR**: `alphapy_discord_links` rows purged with other Railway PII in `webhooks/supabase.py` user delete handler; Supabase `agent_sessions` / `agent_memory` purged via `agents/memory.purge_agent_user_data()`
 
 ---
@@ -126,6 +127,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Commands**: `/gdpr post`, `/gdpr toggle`, `/gdpr set_channel`, `/gdpr show`
 - **Shared helpers**: `utils/gdpr_helpers.py` — `GDPRView`, `GDPRButton`, `store_gdpr_acceptance`, `build_gdpr_text`
 - **Flow**: Admin runs `/gdpr post` → embed posted and pinned in configured channel → members click "I Agree" → acceptance stored in `gdpr_acceptance` (scoped by `guild_id`)
+- **Logging**: Accept button posts to that guild's `system.log_channel_id`. Confirmed `/delete_my_data` posts only to the home guild (`MAIN_GUILD_ID`) log channel (user mention + id; no payload of deleted data)
 - **Dashboard**: `GET /api/dashboard/{guild_id}/gdpr` returns `{ acceptance_count }` (Railway DB)
 - **Self-service erasure**: `/delete_my_data` in `cogs/delete_my_data.py` — two-step confirmation; purges Railway PII + Supabase agent memory via `purge_agent_user_data()`
 

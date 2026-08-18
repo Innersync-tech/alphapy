@@ -199,6 +199,7 @@ Guild GDPR agreement acceptance (the "I Agree" button in the GDPR channel).
 
 **Notes:**
 - Written by `cogs/gdpr.py` / `utils/gdpr_helpers.py` when a user clicks the "I Agree" button on the GDPR embed
+- Acceptance is also posted to the guild `system.log_channel_id` when that channel is configured
 - Formalised in Alembic migration 016; `guild_id` column added in migration 018
 - Deleted as part of GDPR erasure when a user's Supabase account is deleted (`webhooks/supabase.py:_purge_railway_data`) or when the user runs `/delete_my_data`
 

@@ -20,6 +20,7 @@ from utils.core_discord_integration import (
 )
 from utils.db_helpers import get_bot_db_pool
 from utils.embed_builder import EmbedBuilder
+from utils.guild_logs import format_user_log_line, send_home_guild_log
 from utils.innersync_identity import (
     delete_discord_link_for_discord_user,
     get_innersync_id_for_discord,
@@ -111,6 +112,13 @@ async def link_slash(interaction: discord.Interaction) -> None:
         view=view,
         ephemeral=True,
     )
+    await send_home_guild_log(
+        interaction.client,
+        "Innersync link started",
+        f"{format_user_log_line(interaction.user)}\nStarted an Innersync account link session.",
+        level="info",
+        source="identity",
+    )
 
 
 @app_commands.command(name="unlink", description="Remove the Innersync link for this Discord account")
@@ -149,6 +157,13 @@ async def unlink_slash(interaction: discord.Interaction) -> None:
                 ),
             ),
             ephemeral=True,
+        )
+        await send_home_guild_log(
+            interaction.client,
+            "Innersync unlinked",
+            f"{format_user_log_line(interaction.user)}\nRemoved the Innersync account link.",
+            level="info",
+            source="identity",
         )
     else:
         legacy_profile = await get_innersync_id_for_discord(
