@@ -14,6 +14,7 @@ from discord.ext import commands
 
 from utils.database_helpers import DatabaseManager
 from utils.db_helpers import acquire_safe, is_pool_healthy
+from utils.guild_logs import format_user_log_line, send_home_guild_log
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.logger import logger
 
@@ -72,6 +73,16 @@ class ConfirmDeleteView(discord.ui.View):
                 "If you have questions, contact support@innersync.tech."
             ),
             view=None,
+        )
+        await send_home_guild_log(
+            interaction.client,
+            "User data deleted",
+            (
+                f"{format_user_log_line(interaction.user)}\n"
+                "Confirmed `/delete_my_data`. Personal data was purged from Alphapy."
+            ),
+            level="warning",
+            source="gdpr",
         )
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)

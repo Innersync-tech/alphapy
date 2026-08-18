@@ -6,7 +6,7 @@ permalink: /privacy-policy/
 
 # Innersync • Alphapy Bot Privacy Policy
 
-_Last updated: 2026-04-13_
+_Last updated: 2026-08-18_
 
 This Privacy Policy explains how the Innersync • Alphapy Discord Bot (“**Innersync • Alphapy**”, “**Bot**”, “**we**”, “**us**”) collects, uses, and protects information when it operates on your Discord server and when you use our pricing and information website. By installing or interacting with the Bot, or by visiting our websites, you consent to the practices described here. If you do not agree with this Policy, do not use the Bot or our websites.
 
@@ -30,7 +30,7 @@ Depending on the features you enable, the Bot may process the following categori
   - Learning requests (`/learn_topic`) and ticket conversation summaries;
   - AI caption inputs and generated outputs (for context and troubleshooting).
 - **Ticketing data**: Ticket channel IDs, message excerpts, AI summaries, user and staff actions, and status updates.
-- **Logging and audit events**: Internal logs for errors, status updates, and admin actions posted to designated log channels.
+- **Logging and audit events**: Internal logs for errors, status updates, and admin actions posted to designated log channels. Guild log channels may record that guild's GDPR agreement acceptance. Innersync `/link`, `/unlink`, and `/delete_my_data` confirmations are posted only to the Innersync home guild log channel (Discord user mention and id only).
 - **Support communications**: Emails or GitHub issues you send us about the Bot.
 - **Premium subscription data**: For paying users, we store subscription tier, status, activation date, and guild assignment. Payment information (credit card details, billing addresses) is processed exclusively by our payment provider (Lemon Squeezy) and never stored on our systems.
 - **Email address**: Optionally collected during the onboarding flow when your guild administrator has enabled the email question step. Used solely for communication related to your onboarding or support. Not shared with third parties beyond hosting infrastructure. You may leave this field blank if it is marked optional.

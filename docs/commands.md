@@ -80,7 +80,7 @@ Link your Discord account to your central Innersync (Supabase Auth) user id so M
 
 ### `/link`
 
-Starts a link session via Core API. You receive an ephemeral message with a browser URL; after you complete the flow in the App, Core calls Alphapy and you get a confirmation DM.
+Starts a link session via Core API. You receive an ephemeral message with a browser URL; after you complete the flow in the App, Core calls Alphapy and you get a confirmation DM. Starting a session is posted only to the home guild (`MAIN_GUILD_ID`) log channel.
 
 **Rate limit:** Up to 3 uses per minute per user.
 
@@ -88,7 +88,7 @@ Starts a link session via Core API. You receive an ephemeral message with a brow
 
 ### `/unlink`
 
-Removes the stored mapping in Alphapy for your Discord account. You can run `/link` again later.
+Removes the stored mapping in Alphapy for your Discord account. You can run `/link` again later. A successful unlink is posted only to the home guild (`MAIN_GUILD_ID`) log channel.
 
 **Permissions:** Everyone (ephemeral)
 
@@ -432,6 +432,7 @@ When enabled, linked members can use [`/agent`](#alphapy-agents). See [Configura
 - `/gdpr set_channel [#channel]` — GDPR document channel
 - `/gdpr set_acceptance_role [@role]` — Role assigned when member clicks "I Agree"
 - `/gdpr post` — Post and pin the GDPR agreement embed
+- Accepting the posted agreement is recorded in `gdpr_acceptance` and posted to the guild log channel when `system.log_channel_id` is set
 
 ---
 
@@ -971,7 +972,7 @@ Export FAQ entries as CSV (admins only).
 ### `/delete_my_data`
 Permanently delete your personal data stored in Alphapy's Railway database.
 
-**Behavior:** Shows a confirmation flow before deleting user-scoped records (GDPR self-service). This action cannot be undone.
+**Behavior:** Shows a confirmation flow before deleting user-scoped records (GDPR self-service). This action cannot be undone. A confirmation notice (user mention and id only) is posted only to the home guild (`MAIN_GUILD_ID`) log channel.
 
 **Permissions:** Public (self-service)
 

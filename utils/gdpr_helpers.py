@@ -10,6 +10,7 @@ import discord
 from discord.ext import commands
 
 from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
+from utils.guild_logs import format_user_log_line, guild_id_from_interaction, send_guild_log
 from utils.logger import logger
 
 # ---------------------------------------------------------------------------
@@ -119,6 +120,22 @@ class GDPRButton(discord.ui.Button):
 
         await interaction.response.send_message(
             "Thank you for accepting the GDPR terms.", ephemeral=True
+        )
+
+        role_note = ""
+        if role_id:
+            role_note = "\nAcceptance role assignment was attempted."
+        await send_guild_log(
+            self.bot,
+            guild_id_from_interaction(interaction),
+            "GDPR agreement accepted",
+            (
+                f"{format_user_log_line(interaction.user)}\n"
+                "Accepted the server data processing agreement."
+                f"{role_note}"
+            ),
+            level="success",
+            source="gdpr",
         )
 
     def _is_enabled(self, guild_id: int) -> bool:
