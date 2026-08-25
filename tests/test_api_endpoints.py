@@ -704,6 +704,55 @@ class TestCreateAutomodRule:
 
 
 # ---------------------------------------------------------------------------
+# PUT /api/dashboard/{guild_id}/automod/rules/{rule_id}
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateAutomodRule:
+    """PUT must coerce asyncpg datetimes — same bug as prod 500 on rule edit."""
+
+    def test_serializes_datetime_fields_as_strings(self):
+        pool, conn = _mock_pool()
+        created = datetime(2026, 4, 15, 12, 0, 0)
+        updated = datetime(2026, 8, 25, 16, 0, 0)
+        conn.fetchrow = AsyncMock(
+            side_effect=[
+                {"id": 2, "action_id": 9},
+                {
+                    "id": 2,
+                    "guild_id": GUILD_ID,
+                    "rule_type": "spam",
+                    "name": "Spam updated",
+                    "enabled": True,
+                    "config": {"max": 5},
+                    "created_by": DISCORD_USER_ID,
+                    "created_at": created,
+                    "updated_at": updated,
+                    "is_premium": False,
+                    "action_type": "delete",
+                    "action_config": {},
+                    "severity": 1,
+                },
+            ]
+        )
+        app = make_app()
+        with (
+            patch.object(api_module, "db_pool", pool),
+            patch.object(api_module, "_invalidate_automod_rules_cache"),
+        ):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/automod/rules/2",
+                json={"name": "Spam updated"},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "Spam updated"
+        assert data["created_at"] == created.isoformat()
+        assert data["updated_at"] == updated.isoformat()
+
+
+# ---------------------------------------------------------------------------
 # Dashboard verification queue / resolve
 # ---------------------------------------------------------------------------
 
