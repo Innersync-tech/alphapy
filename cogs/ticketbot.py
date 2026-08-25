@@ -79,7 +79,10 @@ class TicketBot(AlphaCog):
             logger.debug(f"Ticket cooldowns: Evicted {excess} oldest entries, size now: {len(self._suggest_reply_cooldowns)}")
     
     async def setup_db(self) -> None:
-        """Initialize database connection using the shared bot pool and ensure schema is current."""
+        """Initialize database connection using the shared bot pool.
+
+        Schema is Alembic-owned — fail loud if core ticket tables are missing.
+        """
         pool = get_bot_db_pool(self.bot)
         if pool is None:
             logger.error("TicketBot: shared DB pool not available")
@@ -91,121 +94,15 @@ class TicketBot(AlphaCog):
 
         try:
             async with acquire_safe(self.db) as conn:
-                await conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS support_tickets (
-                        id SERIAL PRIMARY KEY,
-                        guild_id BIGINT NOT NULL,
-                        user_id BIGINT NOT NULL,
-                        username TEXT,
-                        description TEXT NOT NULL,
-                        status TEXT DEFAULT 'open',
-                        created_at TIMESTAMPTZ DEFAULT NOW()
-                    );
-                    """
-                )
-                # Backwards-compatible column additions
-                try:
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS channel_id BIGINT;"
-                    )
-                except Exception as e:
-                    logger.warning(f"⚠️ TicketBot: could not add column channel_id: {e}")
-                try:
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS claimed_by BIGINT;"
-                    )
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;"
-                    )
-                except Exception as e:
-                    logger.warning(f"⚠️ TicketBot: could not upgrade schema: {e}")
-                # Indexes for faster queries
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);"
-                )
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);"
-                )
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_support_tickets_channel_id ON support_tickets(channel_id);"
-                )
-                # Status workflow columns
-                try:
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();"
-                    )
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS escalated_to BIGINT;"
-                    )
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;"
-                    )
-                    await conn.execute(
-                        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS archived_by BIGINT;"
-                    )
-                except Exception:
-                    pass
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_support_tickets_updated_at ON support_tickets(updated_at);"
-                )
-                # Index for claims
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_support_tickets_claimed_by ON support_tickets(claimed_by);"
-                )
-                # Summaries table for FAQ detection
-                await conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS ticket_summaries (
-                      id SERIAL PRIMARY KEY,
-                      ticket_id INT NOT NULL,
-                      summary TEXT NOT NULL,
-                      similarity_key TEXT,
-                      created_at TIMESTAMPTZ DEFAULT NOW()
-                    );
-                    """
-                )
-                await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_ticket_summaries_key ON ticket_summaries(similarity_key);"
-                )
-                # FAQ entries table
-                await conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS faq_entries (
-                      id SERIAL PRIMARY KEY,
-                      similarity_key TEXT,
-                      summary TEXT NOT NULL,
-                      created_by BIGINT,
-                      created_at TIMESTAMPTZ DEFAULT NOW()
-                    );
-                    """
-                )
-                # Metrics snapshots
-                await conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS ticket_metrics (
-                      id BIGSERIAL PRIMARY KEY,
-                      snapshot JSONB NOT NULL,
-                      created_at TIMESTAMPTZ DEFAULT NOW()
-                    );
-                    """
-                )
-                # Evolve metrics to structured columns
-                try:
-                    await conn.execute("ALTER TABLE ticket_metrics ADD COLUMN IF NOT EXISTS scope TEXT;")
-                    await conn.execute("ALTER TABLE ticket_metrics ADD COLUMN IF NOT EXISTS counts JSONB;")
-                    await conn.execute("ALTER TABLE ticket_metrics ADD COLUMN IF NOT EXISTS average_cycle_time BIGINT;")
-                    await conn.execute("ALTER TABLE ticket_metrics ADD COLUMN IF NOT EXISTS triggered_by BIGINT;")
-                    await conn.execute("ALTER TABLE ticket_metrics ADD COLUMN IF NOT EXISTS topics JSONB;")
-                except Exception:
-                    pass
-
+                await conn.fetchval("SELECT 1 FROM support_tickets LIMIT 1")
+                await conn.fetchval("SELECT 1 FROM faq_entries LIMIT 1")
             logger.info("TicketBot: DB ready (support_tickets)")
             log_database_event("DB_READY", details="TicketBot database fully initialized")
         except Exception as e:
-            log_database_event("DB_INIT_ERROR", details=f"TicketBot setup failed: {e}")
-            logger.error(f"TicketBot: DB init error: {e}")
+            logger.error(f"TicketBot: required tables missing or unavailable: {e}")
+            log_database_event("DB_SETUP_ERROR", details=f"TicketBot schema check failed: {e}")
             self.db = None
+            raise
 
     async def send_log_embed(self, title: str, description: str, level: str = "info", guild_id: int = 0) -> None:
         """Send log embed to the correct guild's log channel"""

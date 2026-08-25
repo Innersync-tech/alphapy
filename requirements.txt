@@ -2,8 +2,6 @@ discord.py
 python-dotenv
 asyncpg
 openai>=1.0.0
-pydrive2
-PyMuPDF>=1.26.7
 fastapi
 uvicorn
 pytz
@@ -21,4 +19,3 @@ mypy>=1.11.0
 # Security: pin transitive deps that had known CVEs
 cryptography>=46.0.6
 pyopenssl>=26.0.0
-requests>=2.33.0

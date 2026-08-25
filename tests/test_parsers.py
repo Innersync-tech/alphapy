@@ -6,7 +6,7 @@ Test fixtures for centralized parsing functions with graceful failure handling.
 
 import pytest
 
-from utils.parsers import format_days_for_display, parse_days_string, parse_relative_date, parse_time_string
+from utils.parsers import format_days_for_display, parse_days_string, parse_time_string
 
 
 class TestParseDaysString:
@@ -102,13 +102,3 @@ class TestFormatDaysForDisplay:
         assert "Monday" in result
         assert "Thursday" in result
         assert "Sunday" in result
-
-
-class TestParseRelativeDate:
-    """Tests for parse_relative_date function."""
-    
-    def test_parse_relative_date_not_implemented(self):
-        """Test that relative date parsing returns None (not yet implemented)."""
-        # This function is a placeholder for future implementation
-        result = parse_relative_date("This Wednesday")
-        assert result is None  # Currently not implemented

@@ -128,12 +128,9 @@ class StartupManager:
             "cogs.gdpr",
             "cogs.inviteboard",
             "cogs.clean",
-            "cogs.lotquiz",
-            "cogs.leadership",
             "cogs.status",
             "cogs.growth",
             "cogs.learn",
-            "cogs.contentgen",
             "cogs.configuration",
             "cogs.premium",
             "cogs.reminders",
@@ -143,11 +140,11 @@ class StartupManager:
             "cogs.exports",
             "cogs.delete_my_data",
             "cogs.innersync_identity",
-            "cogs.migrations",
             "cogs.verification",
             "cogs.automod",
             "cogs.custom_commands",
             "cogs.retention_cleanup",
+            # Engagement stays loaded (optional product module — ballast audit P1 KEEP).
             "cogs.engagement",
             "cogs.agents",
         ]
@@ -193,9 +190,6 @@ class StartupManager:
     async def _phase_background_tasks(self) -> None:
         """Phase 5: Start background tasks."""
         logger.info("🔄 Phase 5: Background Tasks...")
-        
-        # Optional: Verify Google Drive configuration
-        await self._verify_drive_config()
         
         # Initialize command tracker with database pool in bot's event loop
         try:
@@ -256,24 +250,6 @@ class StartupManager:
             logger.warning(f"  ⚠️ Failed to start sync cooldowns cleanup task: {e}")
         
         logger.info("✅ Phase 5 complete: Background tasks started")
-    
-    async def _verify_drive_config(self) -> None:
-        """Optional: Verify Google Drive configuration during startup."""
-        try:
-            import config
-            from utils.drive_sync import _ensure_drive
-
-            if config.GOOGLE_CREDENTIALS_JSON:
-                logger.info("🔍 Verifying Google Drive configuration...")
-                drive_client = await asyncio.to_thread(_ensure_drive)
-                if drive_client:
-                    logger.info("✅ Google Drive configuration verified and ready")
-                else:
-                    logger.warning("⚠️ Google Drive configuration found but initialization failed (check logs above)")
-            else:
-                logger.debug("ℹ️ Google Drive not configured (GOOGLE_CREDENTIALS_JSON not set)")
-        except Exception as e:
-            logger.debug(f"ℹ️ Google Drive verification skipped: {e}")
     
     async def _phase_ready(self) -> None:
         """Phase 6: Mark bot as ready."""

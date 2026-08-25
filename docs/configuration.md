@@ -251,7 +251,7 @@ Dashboard **Disable** and Discord gates share one flag per module (default **tru
 | `ticketbot` | Member ticket create/claim/close + idle loop (Dashboard **Support** uses the same flag) |
 | `embedwatcher` | Auto-reminder create from announcements |
 | `custom_commands` | Message trigger replies |
-| `gpt` | `/create_caption`, `/learn_topic` |
+| `gpt` | `/learn_topic` |
 | `faq` | `/faq *` |
 | `rules` | RuleAcceptanceView body (questions-only path still works) |
 | `fyi` | Contextual FYI tip posts |
@@ -341,7 +341,6 @@ The following environment variables are required/optional for bot operation:
 - `USE_TEST_BOT`: Set to `1` (or any non-empty value) to run the bot with `BOT_TOKEN_TEST` instead of `BOT_TOKEN`. Use this for local testing without touching the production bot.
 
 ### Optional - Google Cloud (for Drive integration)
-- `GOOGLE_CREDENTIALS_JSON`: Google service account key as a JSON string (Railway env var or `.env`). Required for Drive PDF features (`/learn_topic`, etc.). See [Google credentials setup](../google_credentials_setup/).
 
 ### Optional - API & Authentication
 - `API_KEY`: Internal API key for API endpoints

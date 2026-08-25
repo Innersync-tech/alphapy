@@ -98,7 +98,6 @@ alphapy/agents/
   runtime.py       Closed-loop orchestration
   skills/
     journal_sync.py
-    trade_insight.py   # dormant — not registered until product decision
 cogs/agents.py     /agent list|start|continue|end|status|nudges
 agents/nudges.py   Opt-in Discord DM check-ins (Phase 5A)
 ```
@@ -160,7 +159,6 @@ See starter implementation:
 - `agents/skills/avoidance_processor.py` — energy-aware avoidance/seal-off vs process; optional Tier 2 write on end
 - `agents/skills/chain_breaker_micro.py` — generational chain-break framing + one daily micro-habit
 - `agents/skills/journal_sync.py` — reflections via `load_user_reflections`, engagement streak
-- `agents/skills/trade_insight.py` — dormant (not exposed in `/agent`)
 - `agents/runtime.py` — gather → prompt → `ask_gpt` → memory patch → `complete_session`
 
 Enable locally:

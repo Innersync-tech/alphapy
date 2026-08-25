@@ -117,45 +117,12 @@ class ReminderCog(AlphaCog):
             raise RuntimeError("Bot database pool not available")
         self.db = pool
         log_database_event("DB_CONNECTED", details="Reminders using shared bot database pool")
-
+        # Schema: Alembic migrations (fail loud if table missing — no runtime CREATE TABLE).
         try:
             async with acquire_safe(self.db) as conn:
-                # Create table
-                await conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS reminders (
-                        id SERIAL PRIMARY KEY,
-                        guild_id BIGINT NOT NULL,
-                        name TEXT NOT NULL,
-                        channel_id BIGINT NOT NULL,
-                        time TIME,
-                        call_time TIME,
-                        days TEXT[],
-                        message TEXT,
-                        created_by BIGINT,
-                        origin_channel_id BIGINT,
-                        origin_message_id BIGINT,
-                        event_time TIMESTAMPTZ,
-                        location TEXT,
-                        last_sent_at TIMESTAMPTZ
-                    );
-                    """
-                )
-                # Add columns if they don't exist
-                await conn.execute(
-                    "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS call_time TIME;"
-                )
-                await conn.execute(
-                    "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS last_sent_at TIMESTAMPTZ;"
-                )
-                await conn.execute(
-                    "ALTER TABLE reminders ADD COLUMN IF NOT EXISTS image_url TEXT;"
-                )
-                # Create indexes
-                await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_time ON reminders(time);")
-                await conn.execute("CREATE INDEX IF NOT EXISTS idx_reminders_event_time ON reminders(event_time);")
+                await conn.fetchval("SELECT 1 FROM reminders LIMIT 1")
         except Exception as setup_e:
-            log_database_event("DB_SETUP_ERROR", details=f"Failed to setup reminders table: {setup_e}")
+            log_database_event("DB_SETUP_ERROR", details=f"Reminders table missing or unavailable: {setup_e}")
             raise
 
         logger.info("✅ Connected to database pool!")

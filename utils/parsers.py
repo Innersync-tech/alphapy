@@ -122,25 +122,6 @@ def parse_time_string(time_str: str | None) -> time | None:
         return None
 
 
-def parse_relative_date(text: str) -> str | None:
-    """
-    Parse relative dates like 'This Wednesday', 'Next Friday'.
-    
-    This is a placeholder for future implementation. Currently returns None.
-    Future enhancement: Implement relative date parsing with dateutil or similar.
-    
-    Args:
-        text: Text containing relative date expressions
-        
-    Returns:
-        Optional[str]: Parsed date string or None if not found/not implemented
-    """
-    # TODO: Implement relative date parsing
-    # This would require dateutil or similar library
-    # For now, return None to indicate not implemented
-    return None
-
-
 def format_days_for_display(days_list: list[str]) -> str:
     """
     Convert day numbers to readable day names for display.

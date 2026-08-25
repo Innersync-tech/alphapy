@@ -49,9 +49,6 @@ SUPABASE_WEBHOOK_SECRET = os.getenv("SUPABASE_WEBHOOK_SECRET")
 # App reflections webhook (Core-API → Alphapy). Optional; falls back to SUPABASE_WEBHOOK_SECRET only.
 APP_REFLECTIONS_WEBHOOK_SECRET = os.getenv("APP_REFLECTIONS_WEBHOOK_SECRET")
 
-# Google Drive service account JSON (full key file as one-line/minified JSON string)
-GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
-
 # Telemetry ingest configuration
 TELEMETRY_INGEST_INTERVAL = int(os.getenv("TELEMETRY_INGEST_INTERVAL", "45"))  # seconds
 
