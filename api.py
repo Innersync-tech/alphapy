@@ -2690,6 +2690,66 @@ async def save_guild_onboarding_rule(
         raise HTTPException(status_code=500, detail="Failed to save rule") from exc
 
 
+@router.put("/dashboard/{guild_id}/onboarding/rules/{rule_id}")
+async def update_guild_onboarding_rule(
+    guild_id: int,
+    rule_id: int,
+    rule: OnboardingRule,
+    auth_user_id: str = Depends(require_dashboard_guild_actor),
+):
+    """Update an existing onboarding/guild rule by primary key id."""
+    global db_pool
+    if db_pool is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE guild_rules
+                SET title = $3,
+                    description = $4,
+                    thumbnail_url = $5,
+                    image_url = $6,
+                    enabled = $7,
+                    rule_order = $8,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE guild_id = $1 AND id = $2
+                """,
+                guild_id,
+                rule_id,
+                rule.title,
+                rule.description,
+                rule.thumbnail_url or None,
+                rule.image_url or None,
+                rule.enabled,
+                rule.rule_order,
+            )
+
+            if result == "UPDATE 0":
+                raise HTTPException(status_code=404, detail="Rule not found")
+
+            return {
+                "success": True,
+                "message": "Rule updated successfully",
+                "rule": {
+                    "id": rule_id,
+                    "title": rule.title,
+                    "description": rule.description,
+                    "thumbnail_url": rule.thumbnail_url,
+                    "image_url": rule.image_url,
+                    "enabled": rule.enabled,
+                    "rule_order": rule.rule_order,
+                },
+            }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ERROR] Failed to update onboarding rule: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to update rule") from exc
+
+
 @router.delete("/dashboard/{guild_id}/onboarding/rules/{rule_id}")
 async def delete_guild_onboarding_rule(
     guild_id: int,

@@ -231,7 +231,7 @@ settings_service.register(
     SettingDefinition(
         scope="gpt",
         key="enabled",
-        description="Enable member Grok slash commands (/create_caption, /learn_topic).",
+        description="Enable member Grok slash commands (/learn_topic).",
         value_type="bool",
         default=True,
     )

@@ -139,8 +139,6 @@ Alphapy uses a **Google service account** for read-only Drive access (`/learn_to
 ### Credential storage
 
 - **Never** commit keys to git (`.env` and `credentials/` are gitignored).
-- **Runtime**: `GOOGLE_CREDENTIALS_JSON` — full service account JSON as one env var (local `.env` or Railway).
-- **Code**: `utils/drive_sync.py` parses `GOOGLE_CREDENTIALS_JSON` at startup; no GCP Secret Manager integration.
 
 See [Google credentials setup](../google_credentials_setup/) for creating the service account and setting Railway variables.
 
@@ -304,7 +302,6 @@ For **service account keys**:
 ### Code-level (implemented) ✅
 
 - [x] Credentials not committed in source code
-- [x] Drive credentials loaded from `GOOGLE_CREDENTIALS_JSON` only
 - [x] Clear logging when Drive is configured or missing
 - [x] Minimum scopes (`drive.readonly`)
 - [x] Webhook endpoints fail-closed (HTTP 503) when secrets are missing in production

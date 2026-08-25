@@ -314,7 +314,7 @@ curl -H "X-Api-Key: <api-key>" \
 
 **Authentication:** Required (Supabase JWT)
 
-**Methods:** `GET`, `POST`, `DELETE`
+**Methods:** `GET`, `POST`, `PUT`, `DELETE`
 
 #### `/api/dashboard/{guild_id}/settings/history`
 

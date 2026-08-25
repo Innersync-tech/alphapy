@@ -309,54 +309,6 @@ class AutoModLogger:
             log.error(f"Error getting moderation statistics: {e}")
             return {}
             
-    async def create_appeal(self, guild_id: int, user_id: int, log_id: int, reason: str) -> bool:
-        """Create an appeal for a moderation action."""
-        try:
-            pool = self._get_pool()
-            if not pool:
-                log.warning("No pool available for appeal creation")
-                return False
-
-            async with acquire_safe(pool) as conn:
-                await conn.execute(
-                    """
-                    UPDATE automod_logs
-                    SET appeal_status = 'pending'
-                    WHERE id = $1 AND guild_id = $2 AND user_id = $3
-                    """,
-                    log_id,
-                    guild_id,
-                    user_id,
-                )
-            log.info(f"Appeal created: Guild {guild_id}, User {user_id}, Log {log_id}")
-            return True
-        except Exception as e:
-            log.error(f"Error creating appeal: {e}")
-            return False
-    
-    async def get_pending_appeals(self, guild_id: int) -> list[dict[str, Any]]:
-        """Get all pending appeals for a guild (placeholder for future implementation)."""
-        try:
-            pool = self._get_pool()
-            if not pool:
-                return []
-
-            async with acquire_safe(pool) as conn:
-                rows = await conn.fetch(
-                    """
-                    SELECT id, user_id, rule_id, action_taken, timestamp, appeal_status
-                    FROM automod_logs
-                    WHERE guild_id = $1 AND appeal_status = 'pending'
-                    ORDER BY timestamp DESC
-                    LIMIT 25
-                    """,
-                    guild_id,
-                )
-            return [dict(row) for row in rows]
-        except Exception as e:
-            log.error(f"Error getting pending appeals: {e}")
-            return []
-            
     def format_log_entry(self, entry: dict) -> str:
         """Format a log entry for display."""
         timestamp = entry.get('timestamp', datetime.utcnow()).strftime('%Y-%m-%d %H:%M:%S')
@@ -365,37 +317,3 @@ class AutoModLogger:
         rule_id = entry.get('rule_id', 'Unknown')
         
         return f"[{timestamp}] User {user_id} - {action} (Rule {rule_id})"
-        
-    async def export_logs(self, guild_id: int, days: int = 30, format: str = 'csv') -> str:
-        """Export violation logs for a guild as CSV."""
-        try:
-            pool = self._get_pool()
-            if not pool:
-                return ""
-            async with acquire_safe(pool) as conn:
-                rows = await conn.fetch(
-                    """
-                    SELECT id, guild_id, user_id, channel_id, rule_id,
-                           action_taken, appeal_status, timestamp
-                    FROM automod_logs
-                    WHERE guild_id = $1
-                      AND timestamp > NOW() - ($2::text || ' days')::interval
-                    ORDER BY timestamp DESC
-                    """,
-                    guild_id,
-                    days,
-                )
-            if not rows:
-                return ""
-            import csv
-            import io
-            fieldnames = ["id", "guild_id", "user_id", "channel_id", "rule_id",
-                          "action_taken", "appeal_status", "timestamp"]
-            buf = io.StringIO()
-            writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows([dict(r) for r in rows])
-            return buf.getvalue()
-        except Exception as e:
-            log.error(f"Error exporting logs for guild {guild_id}: {e}")
-            return ""

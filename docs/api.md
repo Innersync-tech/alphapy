@@ -588,7 +588,13 @@ Get all onboarding rules for a guild.
 
 #### `POST /api/dashboard/{guild_id}/onboarding/rules`
 
-Save or update an onboarding rule.
+Save or upsert an onboarding rule (by `guild_id` + `rule_order`).
+
+**Authentication:** Required (Supabase JWT token + guild admin access)
+
+#### `PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}`
+
+Update an existing onboarding/guild rule by primary key `id`.
 
 **Authentication:** Required (Supabase JWT token + guild admin access)
 

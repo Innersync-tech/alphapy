@@ -1,6 +1,6 @@
 """Tests for Tier-2 copy polish and user_messages rollout."""
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import discord
 import pytest
@@ -65,23 +65,6 @@ async def test_verification_start_button_guild_only():
 
 
 @pytest.mark.asyncio
-async def test_contentgen_uses_generic_error_on_failure():
-    from cogs.contentgen import ContentGen
-
-    cog = ContentGen(MagicMock())
-    interaction = AsyncMock()
-    interaction.guild = MagicMock(id=1)
-    interaction.response.defer = AsyncMock()
-    interaction.followup.send = AsyncMock()
-    style = MagicMock(value="punchy")
-
-    with patch("cogs.contentgen.ask_gpt", side_effect=RuntimeError("boom")):
-        await cog.create_caption.callback(cog, interaction, topic="discipline", style=style)
-
-    interaction.followup.send.assert_awaited_once_with(ERR_GENERIC, ephemeral=True)
-
-
-@pytest.mark.asyncio
 async def test_learn_topic_defer_failure_uses_generic_error():
     from cogs.learn import LearnTopic
 
@@ -128,24 +111,4 @@ async def test_reminder_edit_db_unavailable():
     await cog.reminder_edit.callback(cog, interaction, reminder_id=1)
 
     interaction.response.send_message.assert_awaited_once_with(ERR_DB, ephemeral=True)
-
-
-@pytest.mark.asyncio
-async def test_leadership_challenge_select_generic_error():
-    from cogs.leadership import ChallengeSelect
-
-    select = ChallengeSelect(MagicMock())
-    interaction = AsyncMock()
-    interaction.user.id = 1
-    interaction.guild = MagicMock(id=2)
-    interaction.response.defer = AsyncMock()
-    interaction.followup.send = AsyncMock()
-
-    with (
-        patch.object(ChallengeSelect, "values", new_callable=PropertyMock) as mock_values,
-        patch("cogs.leadership.ask_gpt", side_effect=RuntimeError("fail")),
-    ):
-        mock_values.return_value = ["burnout"]
-        await select.callback(interaction)
-
-    interaction.followup.send.assert_awaited_once_with(ERR_GENERIC, ephemeral=True)
+    interaction.followup.send.assert_not_awaited()

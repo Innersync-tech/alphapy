@@ -61,8 +61,8 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 
 ## 🚀 Agent: GrokInteraction
 - **Purpose**: AI functionality with Grok
-- **Commands**: `/create_caption`, `/learn_topic`, `/gptstatus`
-- **Enable gate**: `gpt.enabled` (default true). When false, `/create_caption` and `/learn_topic` refuse with `MODULE_DISABLED_MSG`. `/gptstatus` remains available for ops.
+- **Commands**: `/learn_topic`, `/gptstatus`
+- **Enable gate**: `gpt.enabled` (default true). When false, `/learn_topic` refuses with `MODULE_DISABLED_MSG`. `/gptstatus` remains available for ops.
 - **Outages**: `gpt/errors.py` classifies credits / bad key / 5xx as `offline` (`ERR_GROK_OFFLINE`); rate limits as `rate_limited`. `ask_gpt` raises `GrokUnavailableError` (never returns fallback text as a model reply). Operators see last `kind` on `/gptstatus`.
 
 ---
@@ -92,7 +92,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Energy check-in**: When energy prefs are missing or older than 24h, `/agent start` shows an ephemeral 1–5 + Skip prompt (`FatigueQuickCheckView`). Persistent View (`timeout=None`, `alphapy:fatigue:*` custom_ids) registered in `utils/lifecycle.py` Phase 6; pending start state is in-process (120s TTL). After redeploy, expired prompts ask the user to run `/agent start` again. Saves merge into existing `app_user_settings.agent_prefs` via `merge_agent_prefs_fields` (fail-closed if prefs cannot be loaded — never overwrites App Tier 1 fields with energy-only data).
 - **Safety policy**: `agents/policy.py` (`AGENT_SAFETY_RULES` + `build_agent_system_prompt()`); see `docs/agents-safety-guidelines.md` and [Innersync-meta AGENT-SAFETY-POLICY](https://github.com/Innersync-tech/Innersync-meta/blob/main/AGENT-SAFETY-POLICY.md)
 - **Agents**: `reflection` (journal sync; trade agents deferred)
-- **Skills**: `inner_voice`, `inner_critic_dialogue`, `avoidance_processor`, `fatigue_check`, `chain_breaker_micro`, `journal_sync` (`trade_insight` skill file kept dormant for later)
+- **Skills**: `inner_voice`, `inner_critic_dialogue`, `avoidance_processor`, `fatigue_check`, `chain_breaker_micro`, `journal_sync`
 - **Tier 2 dialogue skills**: mirror inner-conflict patterns + one micro-step; avoidance/chain-break skills may append validated insights on `/agent end` when learning is enabled
 - **Session timeline**: `agent_sessions.memory_patch.session_insight_snapshot` (max 5 insight chips per session for App BFF)
 - **Memory Vault graph push**: on `/agent end`, Tier-2 insight labels (+ `active_themes`) → Core `POST /integrations/platform/agent-graph/write` (`source=agent_chat`, `theme_source=tier2`, metadata only). Gate: `ALPHAPY_MEMORY_GRAPH_PUSH` (default on when `CORE_API_URL` + `ALPHAPY_SERVICE_KEY` set). Fail-open — never blocks session end. Client: `utils/core_agent_graph.py` (`theme_key` parity with Core `_theme_key`).
@@ -244,7 +244,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
   - `set_severity` (rule priority management, 1-10)
   - `logs` (with filters: user_id, rule_id, action_type, days)
 - **Status Command**: `/automod status`
-- **Logging**: Violations logged to `automod_logs` and to the guild log channel (`automod.log_channel_id`). Discord embed **Rule** field shows the human-readable rule name (fallback `Rule #{id}`); footer includes `db #{rule_id}` for support. Message content sanitized via `safe_embed_text` (200 chars). Appeal system (scaffolding).
+- **Logging**: Violations logged to `automod_logs` and to the guild log channel (`automod.log_channel_id`). Discord embed **Rule** field shows the human-readable rule name (fallback `Rule #{id}`); footer includes `db #{rule_id}` for support. Message content sanitized via `safe_embed_text` (200 chars).
 - **Integration**: Works with existing premium guard system, settings service, and operational logs
 - **UX improvements**: Auto-mod action params now use fixed slash-command choices (Delete/Warn/Mute/Timeout/Ban), and `rule_id` fields support autocomplete for `delete_rule`, `set_rule_enabled`, `edit_rule`, `set_severity`, and `logs`
 - **Caching**: `RuleProcessor.list_rules()` now has TTL-backed per-guild cache (separate from active-rules cache), and create/update/delete paths invalidate both caches immediately
@@ -252,6 +252,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## ⚡ Agent: Engagement
+- **Decision (ballast P1):** Kept loaded — optional product module (challenges / weekly / badges / streaks / OG). Not cut with niche Grok cogs.
 - **Path**: `cogs/engagement.py`, `utils/engagement_service.py`
 - **Purpose**: Community engagement gamification module. Every feature is independently enabled per guild via `/engagement toggle`. All data is multi-guild scoped.
 - **Features** (all off by default):

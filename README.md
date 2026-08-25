@@ -8,7 +8,7 @@ Modular Discord bot for conscious communities: server tools, AI coaching, knowle
 
 Alphapy powers the **Innersync • Alphapips** community with:
 
-- **AI:** growth coaching (`/growthcheckin`), topic learning (`/learn_topic`), captions (`/create_caption`), **personal agents** (`/agent`)
+- **AI:** growth coaching (`/growthcheckin`), topic learning (`/learn_topic`), **personal agents** (`/agent`)
 - **Tickets:** support channels with claim/close, Grok summaries, FAQ suggestions
 - **Reminders:** one-off and recurring, including auto-detection from announcement embeds
 - **Infra:** PostgreSQL (Supabase), Alembic migrations, FastAPI metrics, pytest
@@ -42,7 +42,7 @@ alphapy/
 ├── config.py
 ├── cogs/               # Slash commands & features (growth, learn, ticketbot, reminders, agents, …)
 ├── agents/             # Multi-user agent runtime (reflection, skills, policy, memory)
-├── utils/              # DB, metrics, timezone, drive_sync, …
+├── utils/              # DB, metrics, timezone, …
 ├── gpt/                # Grok/LLM helpers, dataset_loader (learn_topic)
 ├── tests/
 ├── alembic/            # Migrations
@@ -57,12 +57,11 @@ alphapy/
 | Required | Optional |
 |----------|----------|
 | `BOT_TOKEN` | `GROK_API_KEY` / `OPENAI_API_KEY` |
-| `DATABASE_URL` | `GOOGLE_CREDENTIALS_JSON` (Drive, optional) |
+| `DATABASE_URL` | |
 | | `ALPHAPY_AGENTS_ENABLED`, `ALPHAPY_AGENTS_MEMORY_BACKEND` (agents) |
 | | `API_KEY` (API auth), Supabase vars, ticket/reminder config |
 
 Full list and multi-guild setup: [docs/configuration.md](docs/configuration.md).  
-Google Drive credentials: [docs/GOOGLE_CREDENTIALS_SETUP.md](docs/GOOGLE_CREDENTIALS_SETUP.md), [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
