@@ -6,9 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Agent check-in DMs (Phase 5A)** — opt-in Discord nudges (`/agent nudges`, `agent_prefs.agent_nudges_enabled`); hourly loop + Railway `agent_nudge_state` (Alembic `027`); fixed English invite only (no Grok / journal).
+- **Onboarding rules PUT (#375)** — `PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}` for control-panel rule edit.
 
 ### Fixed
+- **Automod rule timestamps (#377)** — PUT/POST coerce asyncpg `datetime` → ISO strings for `created_at`/`updated_at` (was 500 on dashboard rule edit).
 - **Webhook secret fallbacks** — removed dead `WEBHOOK_SECRET` getattr chain (never loaded in `config.py`); chains are per-route secrets → `APP_REFLECTIONS_WEBHOOK_SECRET` → `SUPABASE_WEBHOOK_SECRET` only.
+
+### Removed
+- **Platform ballast (#375)** — unused skills/cogs (`trade_insight`, lotquiz, leadership, contentgen, import/migrate helpers), Google Drive sync / PyMuPDF / `pydrive2`, appeal stubs, `performance_test`; fail-loud schema checks instead of runtime DDL in reminders/ticketbot. Engagement kept loaded.
 
 ### Added
 - **Agent embed polish** — emoji prefix per agent (🪞 reflection) and bot avatar as embed author when available.
