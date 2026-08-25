@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-import api as api_module
 from cogs.engagement import (
     EngagementCog,
     _get_food_channel_ids,
@@ -159,6 +158,8 @@ async def test_automod_list_rules_cache_and_create_rule_invalidation(monkeypatch
 
 
 def test_collect_cache_metrics_and_premium_metrics(monkeypatch) -> None:
+    import api_metrics as metrics_module
+
     fake_rule_processor = SimpleNamespace(
         get_cache_stats=lambda: {
             "automod_rules_cache_size": 1,
@@ -195,10 +196,10 @@ def test_collect_cache_metrics_and_premium_metrics(monkeypatch) -> None:
         },
     )
 
-    cache_metrics = api_module._collect_cache_metrics()
+    cache_metrics = metrics_module._collect_cache_metrics()
     assert cache_metrics.automod_rules_cache_hits == 3
     assert cache_metrics.engagement_food_channels_cache_misses == 10
 
-    premium_metrics = api_module._collect_premium_metrics()
+    premium_metrics = metrics_module._collect_premium_metrics()
     assert premium_metrics is not None
     assert premium_metrics.premium_guild_cache_hits == 18
