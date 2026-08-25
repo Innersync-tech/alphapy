@@ -25,6 +25,7 @@ metrics_router = APIRouter()
 db_pool = None  # live pool via _get_pool()
 _telemetry_queue: list[dict[str, Any]] = []
 _command_stats_cache: dict[tuple[int | None, int, int], tuple[Any, datetime]] = {}
+_ip_rate_limits: dict[str, list[float]] = {}
 MAX_TELEMETRY_QUEUE_SIZE = 100
 MAX_TELEMETRY_RETRIES = 5
 MAX_COMMAND_STATS_CACHE_SIZE = 64
@@ -36,17 +37,19 @@ def bind_shared_state(
     get_pool,
     telemetry_queue: list[dict[str, Any]],
     command_stats_cache: dict,
+    ip_rate_limits: dict[str, list[float]],
     max_telemetry_queue_size: int,
     max_telemetry_retries: int,
     max_command_stats_cache_size: int,
     command_stats_cache_ttl: int | float,
 ) -> None:
     """Bind live api.py state. get_pool is a callable returning the current pool."""
-    global _telemetry_queue, _command_stats_cache
+    global _telemetry_queue, _command_stats_cache, _ip_rate_limits
     global MAX_TELEMETRY_QUEUE_SIZE, MAX_TELEMETRY_RETRIES, MAX_COMMAND_STATS_CACHE_SIZE
     global COMMAND_STATS_CACHE_TTL, _get_pool
     _telemetry_queue = telemetry_queue
     _command_stats_cache = command_stats_cache
+    _ip_rate_limits = ip_rate_limits
     MAX_TELEMETRY_QUEUE_SIZE = max_telemetry_queue_size
     MAX_TELEMETRY_RETRIES = max_telemetry_retries
     MAX_COMMAND_STATS_CACHE_SIZE = max_command_stats_cache_size

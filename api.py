@@ -7,7 +7,7 @@ import uuid
 from collections import defaultdict, deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 import asyncpg
@@ -28,15 +28,12 @@ from cogs.reminders import (
     update_reminder,
 )
 from dashboard_guild_crud import register_dashboard_guild_crud
-from utils import core_ingress as core_ingress_module
 from utils.hermit_context import get_hermit_context_stats
 from utils.logger import get_gpt_status_logs, logger
 from utils.operational_logs import EventType, get_operational_events, log_operational_event
-from utils.runtime_metrics import get_bot_snapshot, serialize_snapshot
+from utils.runtime_metrics import get_bot_snapshot
 from utils.supabase_auth import verify_supabase_token
-from utils.supabase_client import SupabaseConfigurationError, _supabase_post
-from utils.timezone import BRUSSELS_TZ
-from version import CODENAME, __version__
+from version import __version__
 from webhooks.app_reflections import router as app_reflections_webhook_router
 from webhooks.discord_link import router as discord_link_webhook_router
 from webhooks.founder import router as founder_webhook_router
@@ -778,6 +775,7 @@ bind_shared_state(
     get_pool=lambda: db_pool,
     telemetry_queue=_telemetry_queue,
     command_stats_cache=_command_stats_cache,
+    ip_rate_limits=_ip_rate_limits,
     max_telemetry_queue_size=MAX_TELEMETRY_QUEUE_SIZE,
     max_telemetry_retries=MAX_TELEMETRY_RETRIES,
     max_command_stats_cache_size=MAX_COMMAND_STATS_CACHE_SIZE,
