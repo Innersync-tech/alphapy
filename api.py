@@ -3000,6 +3000,28 @@ def _invalidate_automod_rules_cache(guild_id: int) -> None:
         logger.debug(f"AutoMod cache invalidation skipped for guild {guild_id}: {exc}")
 
 
+def _normalize_automod_rule_dict(rule_dict: dict[str, Any]) -> dict[str, Any]:
+    """Coerce asyncpg row values so AutoModRule (string timestamps) validates."""
+    import json
+
+    for key in ("config", "action_config"):
+        val = rule_dict.get(key)
+        if isinstance(val, str):
+            try:
+                rule_dict[key] = json.loads(val)
+            except (ValueError, TypeError):
+                pass
+        elif val is None:
+            rule_dict[key] = {}
+
+    for ts_key in ("created_at", "updated_at"):
+        ts_val = rule_dict.get(ts_key)
+        if ts_val is not None and hasattr(ts_val, "isoformat"):
+            rule_dict[ts_key] = ts_val.isoformat()
+
+    return rule_dict
+
+
 class AutoModRule(BaseModel):
     id: int | None = None
     guild_id: int
@@ -3118,29 +3140,8 @@ async def get_automod_rules(
             
             rules = []
             for row in rows:
-                rule_dict = dict(row)
-                # Parse JSON config if needed
-                if rule_dict.get('config') and isinstance(rule_dict['config'], str):
-                    try:
-                        import json
-                        rule_dict['config'] = json.loads(rule_dict['config'])
-                    except (ValueError, TypeError):
-                        pass
-                
-                if rule_dict.get('action_config') and isinstance(rule_dict['action_config'], str):
-                    try:
-                        import json
-                        rule_dict['action_config'] = json.loads(rule_dict['action_config'])
-                    except (ValueError, TypeError):
-                        pass
+                rules.append(AutoModRule(**_normalize_automod_rule_dict(dict(row))))
 
-                for ts_key in ("created_at", "updated_at"):
-                    ts_val = rule_dict.get(ts_key)
-                    if ts_val is not None and hasattr(ts_val, "isoformat"):
-                        rule_dict[ts_key] = ts_val.isoformat()
-                
-                rules.append(AutoModRule(**rule_dict))
-            
             return rules
             
     except HTTPException:
@@ -3198,11 +3199,8 @@ async def create_automod_rule(
             """, rule_id)
             
             if row:
-                rule_dict = dict(row)
-                rule_dict['config'] = json.loads(rule_dict['config'])
-                rule_dict['action_config'] = json.loads(rule_dict['action_config'])
                 _invalidate_automod_rules_cache(guild_id)
-                return AutoModRule(**rule_dict)
+                return AutoModRule(**_normalize_automod_rule_dict(dict(row)))
             else:
                 raise HTTPException(status_code=500, detail="Failed to create rule")
                 
@@ -3306,12 +3304,8 @@ async def update_automod_rule(
             """, guild_id, rule_id)
             
             if row:
-                rule_dict = dict(row)
-                import json
-                rule_dict['config'] = json.loads(rule_dict['config'])
-                rule_dict['action_config'] = json.loads(rule_dict['action_config'])
                 _invalidate_automod_rules_cache(guild_id)
-                return AutoModRule(**rule_dict)
+                return AutoModRule(**_normalize_automod_rule_dict(dict(row)))
             else:
                 raise HTTPException(status_code=404, detail="Rule not found")
                 
