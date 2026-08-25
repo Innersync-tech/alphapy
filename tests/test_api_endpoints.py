@@ -891,3 +891,60 @@ class TestDiscordMeta:
             response = client.get(f"/api/dashboard/{GUILD_ID}/discord-meta")
         assert response.status_code == 400
         assert response.json()["detail"] == "Guild not found"
+
+
+# ---------------------------------------------------------------------------
+# PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateOnboardingRule:
+    """Tests for PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}."""
+
+    _RULE_BODY = {
+        "title": "Be kind",
+        "description": "Treat others with respect",
+        "thumbnail_url": None,
+        "image_url": None,
+        "enabled": True,
+        "rule_order": 1,
+    }
+
+    def test_returns_503_when_db_unavailable(self):
+        app = make_app()
+        with patch.object(api_module, "db_pool", None):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/onboarding/rules/7",
+                json=self._RULE_BODY,
+            )
+        assert response.status_code == 503
+
+    def test_returns_404_when_rule_missing(self):
+        pool, conn = _mock_pool()
+        conn.execute = AsyncMock(return_value="UPDATE 0")
+        app = make_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/onboarding/rules/7",
+                json=self._RULE_BODY,
+            )
+        assert response.status_code == 404
+
+    def test_updates_rule_successfully(self):
+        pool, conn = _mock_pool()
+        conn.execute = AsyncMock(return_value="UPDATE 1")
+        app = make_app()
+        with patch.object(api_module, "db_pool", pool):
+            client = TestClient(app)
+            response = client.put(
+                f"/api/dashboard/{GUILD_ID}/onboarding/rules/7",
+                json=self._RULE_BODY,
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["rule"]["id"] == 7
+        assert data["rule"]["title"] == "Be kind"
+        conn.execute.assert_awaited()
