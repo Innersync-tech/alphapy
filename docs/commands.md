@@ -680,12 +680,12 @@ View your recent Growth Check-ins.
 ---
 
 ### `/learn_topic`
-Hybrid topic search using the local knowledge base.
+Topic search using the local knowledge base.
 
 **Parameters:**
 - `topic` (required): Topic to learn about
 
-**Behavior:** Searches local `.md` files and Google Drive content, then generates a comprehensive explanation using Grok.
+**Behavior:** Loads matching files under `data/prompts/` (`.md` and `.txt` only), then generates an explanation using Grok. There is no Google Drive search.
 
 ---
 
@@ -748,6 +748,18 @@ End your active reflection session.
 Show your active reflection agent session, if any.
 
 **Behavior:** Returns start time and turn count. Empty when no session is active.
+
+**Permissions:** Linked Innersync users only (ephemeral)
+
+---
+
+### `/agent nudges enable|disable`
+Opt in or out of Discord check-in DMs.
+
+**Parameters:**
+- `enable` or `disable` (required): Set `agent_prefs.agent_nudges_enabled`
+
+**Behavior:** Default is **off**. When enabled, the hourly bot loop may send at most one fixed English invite DM per 24 hours (`agents/nudges.py`). The DM never includes Grok output or journal text. Requires `/link` and a mutual guild with `agents.enabled`. Does not consume `/agent start` quota. Same pref as Innersync App → Settings → Alphapy → Check-ins.
 
 **Permissions:** Linked Innersync users only (ephemeral)
 

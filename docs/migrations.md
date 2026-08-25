@@ -132,11 +132,14 @@ Each migration file contains:
 
 ## Integration with Bot
 
-The bot can check migration status on startup. To enable automatic migration checks:
+There are **no Discord `/migrate` commands**. Operators apply schema changes with the Alembic CLI against Railway `DATABASE_URL`:
 
-1. Add migration check to `bot.py` startup hook
-2. Use `/migrate status` command to check status manually
-3. Use `/migrate` command (admin only) to apply migrations
+```bash
+alembic current
+alembic upgrade head
+```
+
+Do not run runtime `CREATE TABLE` from cogs for new schema. Reminders and ticketbot fail loud if expected tables are missing.
 
 ## Troubleshooting
 
@@ -192,7 +195,7 @@ If a migration fails partway through:
 
 ## Current Schema
 
-**Current migration head:** `026_reminders_completed_flag`
+**Current migration head:** `027_agent_nudge_state`
 
 Tables added across all migrations:
 
@@ -224,6 +227,7 @@ Tables added across all migrations:
 | `024_agent_session_usage` | Adds `agent_session_usage` for per-user daily `/agent start` quota (tier-based limits in `utils/premium_tiers.py`). |
 | `025_growth_checkins_content` | Adds `goal` / `obstacle` / `feeling` / `grok_response` on `growth_checkins` for plaintext `/growthhistory` (must not use encrypted Supabase vault `reflections`). |
 | `026_reminders_completed_flag` | Adds `reminders.completed` for Dashboard mark-done; backfills `event_time` from legacy `scheduled_time` when present. |
+| `027_agent_nudge_state` | Adds Railway `agent_nudge_state` ledger for opt-in Discord check-in DMs (`innersync_user_id`, `discord_user_id`, `last_sent_at`). |
 
 ## References
 

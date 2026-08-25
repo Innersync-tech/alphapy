@@ -238,7 +238,9 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment (Railway env). Per-guil
 /config agents toggle <true|false>
 ```
 
-When enabled, linked members can use `/agent list`, `/agent start`, `/agent continue`, `/agent end`, and `/agent status`.
+When enabled, linked members can use `/agent list`, `/agent start`, `/agent continue`, `/agent end`, `/agent status`, and `/agent nudges enable|disable`.
+
+Check-in DMs are **opt-in** (`agent_prefs.agent_nudges_enabled`, default off). Members toggle them with `/agent nudges` or in Innersync App → Settings → Alphapy → Check-ins. The hourly loop sends at most one fixed English invite per 24 hours; it does not include journal text.
 
 ### Module enable contract (`{scope}.enabled`)
 
@@ -324,10 +326,6 @@ Example:
 - Verify `/embedwatcher set_announcements` is set to the correct channel
 - Ensure bot has read permissions in that channel
 
-### Import commands failing
-- Set appropriate channels first (log channel for imports)
-- Owner permissions required for import commands
-
 ## Environment Variables
 
 The following environment variables are required/optional for bot operation:
@@ -339,8 +337,6 @@ The following environment variables are required/optional for bot operation:
 ### Optional - Local testing (separate dev bot)
 - `BOT_TOKEN_TEST`: Discord token for a separate test/dev bot. Used only when `USE_TEST_BOT=1`.
 - `USE_TEST_BOT`: Set to `1` (or any non-empty value) to run the bot with `BOT_TOKEN_TEST` instead of `BOT_TOKEN`. Use this for local testing without touching the production bot.
-
-### Optional - Google Cloud (for Drive integration)
 
 ### Optional - API & Authentication
 - `API_KEY`: Internal API key for API endpoints
