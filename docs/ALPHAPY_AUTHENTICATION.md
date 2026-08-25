@@ -165,7 +165,6 @@ const alphapyBaseUrl = process.env.ALPHAPY_BASE_URL || "https://alphapy.innersyn
 const response = await fetch(`${alphapyBaseUrl}/api/dashboard/metrics`, {
   headers: {
     "X-API-Key": process.env.ALPHAPY_API_KEY!, // Must match Alphapy's API_KEY
-    "X-User-Id": userId, // Required for API key auth
   }
 });
 ```

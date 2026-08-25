@@ -9,7 +9,7 @@ Complete reference for all database tables used by the Alphapy Discord Bot.
 
 ## Overview
 
-The bot uses PostgreSQL for persistent storage. Schema is primarily managed via [Alembic migrations](../migrations/), with some legacy cogs still running idempotent `CREATE TABLE IF NOT EXISTS` safeguards at startup for backward compatibility. All tables support multi-guild architecture via `guild_id` columns where applicable.
+The bot uses PostgreSQL for persistent storage. Schema is managed via [Alembic migrations](../migrations/). Reminders and ticketbot **fail loud** if expected tables are missing (no runtime DDL). A few legacy cogs still run idempotent `CREATE TABLE IF NOT EXISTS` safeguards at startup: onboarding, inviteboard, verification, and faq. All tables support multi-guild architecture via `guild_id` columns where applicable.
 
 ## Tables
 
@@ -163,6 +163,26 @@ Per-user daily `/agent start` tracking for tier-based session caps. Added in mig
 
 ---
 
+### `agent_nudge_state`
+
+Delivery ledger for opt-in Discord check-in DMs (Phase 5A). Added in migration `027_agent_nudge_state`.
+
+**Columns:**
+- `innersync_user_id` (UUID, NOT NULL, PRIMARY KEY): Innersync Auth user id
+- `discord_user_id` (BIGINT, NOT NULL): Discord snowflake used to DM
+- `last_sent_at` (TIMESTAMPTZ, NULL): Last successful DM send (24h cooldown)
+
+**Indexes:**
+- `idx_agent_nudge_state_discord` on `discord_user_id`
+- `idx_agent_nudge_state_last_sent` on `last_sent_at`
+
+**Notes:**
+- Written by `agents/nudges.py` after a successful DM; not a Supabase prefs table
+- Opt-in flag lives in App `agent_prefs.agent_nudges_enabled` (default off)
+- Purged with other Railway PII (`webhooks/supabase.py`, `/delete_my_data`)
+
+---
+
 ### `terms_acceptance`
 
 Tracks user acceptance of the Terms of Service and Privacy Policy for GDPR compliance.
@@ -225,10 +245,12 @@ Plaintext reflections received from the App via Core-API webhook. Used for Grok 
 - Populated by `POST /webhooks/app-reflections`; deleted by `POST /webhooks/revoke-reflection`.
 - Context loader (`gpt/context_loader.py`) reads from this table for user-self flows (e.g. `/growthcheckin`). Ticket "Suggest reply" does not use reflection context.
 
-**Grok context sources for `/growthcheckin` (all three are merged, max 5 total):**
-1. Supabase `reflections_shared` — App reflections the user opted to share (requires `bot_sharing_enabled = true`)
-2. Supabase `reflections` — Discord check-ins written by `/growthcheckin` itself (no opt-in required)
-3. Railway `app_reflections` — plaintext from Core-API webhook (last 30 days, no opt-in required)
+**Grok context sources for `/growthcheckin` (merged, max 5 total):**
+1. Railway `app_reflections` — plaintext from Core-API webhook, **only** when `reflection_alphapy_consent` has an active row for that `reflection_id`
+2. Supabase `reflections_shared` — legacy plaintext copies, **same per-reflection consent gate** (not a bulk `bot_sharing_enabled` flag)
+3. Supabase `reflections` — Discord `/growthcheckin` rows for the linked user (no extra opt-in)
+
+App journal plaintext never loads without matching `reflection_alphapy_consent`. See `gpt/context_loader.py`.
 
 **Also used by Alphapy Agents** (`journal_sync` skill): opt-in shared reflections via `load_user_reflections` — never encrypted App ciphertext. See [Agent safety guidelines](../agents-safety-guidelines/).
 
@@ -399,7 +421,7 @@ AI-generated summaries of closed tickets (Grok).
 
 **Notes:**
 - Used for FAQ proposal generation when 3+ similar summaries appear
-- Legacy startup guards in `cogs/ticketbot.py` still ensure table/index presence on boot.
+- Schema is Alembic-owned. `cogs/ticketbot.py` does **not** run startup `CREATE TABLE` guards; missing tables fail loud.
 
 ---
 
@@ -416,7 +438,7 @@ Ticket statistics snapshots.
 - `triggered_by` (BIGINT): User ID who triggered the snapshot
 - `created_at` (TIMESTAMPTZ): Snapshot timestamp
 
-**Runtime note:** Historically created/extended by idempotent startup DDL in `cogs/ticketbot.py`; Alembic migration coverage should remain the source of truth for new changes.
+**Runtime note:** Historically created/extended by idempotent startup DDL in `cogs/ticketbot.py`. Ticketbot no longer runs that DDL; Alembic is the source of truth and missing tables fail loud.
 
 ---
 

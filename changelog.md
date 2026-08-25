@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - **Agent embed polish** — emoji prefix per agent (🪞 reflection) and bot avatar as embed author when available.
 
 ### Changed
+- **Docs catch-up (#371, #376, #378, #380)** — Phase 5A nudges in commands/configuration/schema/migrations/playbook; metrics auth sample is API key only (no `X-User-Id`); ballast leftovers (Drive, `/migrate`, `/create_caption`, import commands, ticketbot runtime DDL, `reflection_alphapy_consent` for `/growthcheckin`). Legal `docs/terms-of-service.md` left unchanged (legal-update webhook).
 - **ROADMAP** header bumped to v3.14.0 to match `version.py`.
 
 ## [3.14.0] - 2026-08-08

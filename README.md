@@ -99,7 +99,7 @@ Full reference: [docs/api.md](docs/api.md).
 
 ### Migrations & analytics
 
-- **Migrations:** Alembic; Discord commands `/migrate`, `/migrate_status`. [docs/migrations.md](docs/migrations.md).
+- **Migrations:** Alembic CLI only (`alembic upgrade head`). There are no Discord `/migrate` commands. [docs/migrations.md](docs/migrations.md).
 - **Analytics:** Commands in `audit_logs`; telemetry to Supabase for dashboard.
 
 ---

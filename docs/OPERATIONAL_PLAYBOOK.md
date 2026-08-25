@@ -46,10 +46,9 @@ After starting the bot, confirm in the logs:
 - Verify the reminder appears in the list and triggers at the correct time.
 - Test `/reminder_edit` to modify it.
 
-### 3. Import (owner only)
+### 3. Import (removed)
 
-- Use `/import_onboarding` and `/import_invites` after configuring the required channels.
-- Check `WATCHER_LOG_CHANNEL` for "created", "sent", and "deleted" log embeds.
+Owner import slash commands (`/import_onboarding`, `/import_invites`) were removed in the ballast cut. Do not use them.
 
 ### 4. Recurring reminder
 
@@ -72,6 +71,17 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment and `/config agents tog
 - [ ] `/agent end` completes session; row in `agent_sessions` has status `completed`
 - [ ] Core `0023` applied: `agent_session_messages` empty after end (ephemeral purge)
 - [ ] Optional: run Matrix A probes from [Agent safety guidelines](../agents-safety-guidelines/)
+
+### 7. Phase 5A check-in DMs (if agents enabled)
+
+Requires `/link`, `ALPHAPY_AGENTS_ENABLED=true`, guild `agents.enabled`, and Alembic head `027_agent_nudge_state`.
+
+- [ ] Default is off: user without the pref does not receive DMs
+- [ ] `/agent nudges enable` (or App Settings → Alphapy → Check-ins) persists `agent_prefs.agent_nudges_enabled: true`
+- [ ] Linked user receives the **fixed English** invite DM within ~1h (or after a staging force tick) — **no journal / Grok text**
+- [ ] `/agent nudges disable` → no further DMs
+- [ ] Closed DMs are skipped; the hourly loop does not crash
+- [ ] GDPR / `/delete_my_data` clears Railway `agent_nudge_state` for that user
 
 ## Troubleshooting reminders
 
