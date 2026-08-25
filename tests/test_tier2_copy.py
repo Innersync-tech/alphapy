@@ -111,5 +111,4 @@ async def test_reminder_edit_db_unavailable():
     await cog.reminder_edit.callback(cog, interaction, reminder_id=1)
 
     interaction.response.send_message.assert_awaited_once_with(ERR_DB, ephemeral=True)
-
-    interaction.followup.send.assert_awaited_once_with(ERR_GENERIC, ephemeral=True)
+    interaction.followup.send.assert_not_awaited()
