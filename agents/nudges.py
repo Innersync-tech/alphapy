@@ -14,6 +14,7 @@ import discord
 from agents.fatigue import load_raw_agent_prefs
 from agents.profile import load_agent_prefs, merge_agent_prefs_fields
 from utils.db_helpers import acquire_safe
+from utils.settings_helpers import is_module_enabled
 from utils.supabase_client import _supabase_get
 
 logger = logging.getLogger("alphapy.agents.nudges")
@@ -173,21 +174,8 @@ async def mark_nudge_sent(
 
 
 def guild_has_agents_enabled(bot: discord.Client, guild_id: int) -> bool:
-    helper = getattr(bot, "settings_helper", None)
-    if helper is not None and hasattr(helper, "get_bool"):
-        return bool(helper.get_bool("agents", "enabled", guild_id, fallback=False))
-    settings = getattr(bot, "settings", None)
-    if settings is not None and hasattr(settings, "get"):
-        try:
-            raw = settings.get(guild_id, "agents", "enabled")
-            if isinstance(raw, bool):
-                return raw
-            if raw is None:
-                return False
-            return str(raw).strip().lower() in {"1", "true", "yes", "on"}
-        except Exception:
-            return False
-    return False
+    """True when guild `agents.enabled` is on (default False)."""
+    return is_module_enabled(bot, guild_id, "agents")
 
 
 async def user_in_guild(guild: discord.Guild, discord_user_id: int) -> bool:

@@ -11,6 +11,7 @@ from agents.nudges import (
     NUDGE_COOLDOWN,
     agent_nudges_enabled,
     build_nudge_dm_text,
+    guild_has_agents_enabled,
     is_due_for_nudge,
     list_due_nudge_candidates,
     user_has_agents_enabled_guild,
@@ -53,6 +54,22 @@ def test_build_nudge_dm_text_has_no_journal_hooks() -> None:
     assert "plaintext" not in text.lower()
     assert "vault" not in text.lower()
     assert "shared reflection" not in text.lower()
+
+
+def test_guild_has_agents_enabled_via_bot_settings() -> None:
+    """Production bot has settings on bot, not settings_helper — get(scope, key, guild_id)."""
+    settings = MagicMock()
+
+    def _get(scope: str, key: str, guild_id: int = 0, fallback=None):
+        if scope == "agents" and key == "enabled" and guild_id == 1160511689263947796:
+            return True
+        return fallback
+
+    settings.get.side_effect = _get
+    bot = SimpleNamespace(settings=settings)
+
+    assert guild_has_agents_enabled(bot, 1160511689263947796) is True
+    assert guild_has_agents_enabled(bot, 1143899864158191676) is False
 
 
 @pytest.mark.asyncio
