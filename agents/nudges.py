@@ -83,13 +83,18 @@ async def set_agent_nudges_enabled(innersync_user_id: str, enabled: bool) -> dic
 
 
 async def fetch_opted_in_user_ids(*, limit: int = 200) -> list[str]:
-    """Supabase users with agent_nudges_enabled=true."""
+    """Supabase users with agent_nudges_enabled=true.
+
+    Uses jsonb **contains** (`cs.{"agent_nudges_enabled":true}`) instead of
+    `->>…=eq.true`. The text extractor path often returns zero rows for JSON
+    booleans under PostgREST while still HTTP 200 — silent empty ticks.
+    """
     try:
         rows = await _supabase_get(
             "app_user_settings",
             {
                 "select": "user_id,agent_prefs",
-                "agent_prefs->>agent_nudges_enabled": "eq.true",
+                "agent_prefs": 'cs.{"agent_nudges_enabled":true}',
                 "limit": str(limit),
             },
         )
@@ -185,13 +190,31 @@ def guild_has_agents_enabled(bot: discord.Client, guild_id: int) -> bool:
     return False
 
 
-def user_has_agents_enabled_guild(bot: discord.Client, discord_user_id: int) -> bool:
+async def user_in_guild(guild: discord.Guild, discord_user_id: int) -> bool:
+    """True if discord_user_id is a member (cache first, then API fetch)."""
+    if guild.get_member(discord_user_id) is not None:
+        return True
+    try:
+        await guild.fetch_member(discord_user_id)
+        return True
+    except discord.NotFound:
+        return False
+    except discord.HTTPException as exc:
+        logger.debug(
+            "fetch_member failed guild=%s user=%s: %s",
+            guild.id,
+            discord_user_id,
+            exc,
+        )
+        return False
+
+
+async def user_has_agents_enabled_guild(bot: discord.Client, discord_user_id: int) -> bool:
     """True if the user is in at least one mutual guild with agents.enabled."""
     for guild in getattr(bot, "guilds", []) or []:
-        member = guild.get_member(discord_user_id)
-        if member is None:
+        if not guild_has_agents_enabled(bot, guild.id):
             continue
-        if guild_has_agents_enabled(bot, guild.id):
+        if await user_in_guild(guild, discord_user_id):
             return True
     return False
 
@@ -206,29 +229,50 @@ async def list_due_nudge_candidates(
     """Opted-in + linked + cooldown elapsed + agents-enabled guild."""
     opted_in = await fetch_opted_in_user_ids(limit=max(batch_limit * 4, 100))
     if not opted_in:
+        logger.info("Nudge tick: opted_in=0 (no candidates)")
         return []
 
     links = await load_discord_links_for_users(pool, opted_in)
     if not links:
+        logger.info(
+            "Nudge tick: opted_in=%s linked=0 (missing alphapy_discord_links)",
+            len(opted_in),
+        )
         return []
 
     last_sent = await load_last_sent_map(pool, list(links.keys()))
     current = now or datetime.now(UTC)
     due: list[NudgeCandidate] = []
+    skipped_cooldown = 0
+    skipped_prefs = 0
+    skipped_guild = 0
 
     for uid, discord_id in links.items():
         if not is_due_for_nudge(last_sent.get(uid), now=current):
+            skipped_cooldown += 1
             continue
         # Double-check prefs in case PostgREST JSON filter is unavailable.
         prefs = await load_agent_prefs(uid)
         if not agent_nudges_enabled(prefs):
+            skipped_prefs += 1
             continue
-        if not user_has_agents_enabled_guild(bot, discord_id):
+        if not await user_has_agents_enabled_guild(bot, discord_id):
+            skipped_guild += 1
             continue
         due.append(NudgeCandidate(innersync_user_id=uid, discord_user_id=discord_id))
         if len(due) >= batch_limit:
             break
 
+    logger.info(
+        "Nudge tick: opted_in=%s linked=%s due=%s "
+        "skipped_cooldown=%s skipped_prefs=%s skipped_guild=%s",
+        len(opted_in),
+        len(links),
+        len(due),
+        skipped_cooldown,
+        skipped_prefs,
+        skipped_guild,
+    )
     return due
 
 
@@ -259,9 +303,11 @@ async def run_nudge_tick(bot: discord.Client, pool: Any) -> int:
 
     candidates = await list_due_nudge_candidates(bot, pool)
     sent = 0
+    failed = 0
     for candidate in candidates:
         ok = await send_nudge_dm(bot, candidate.discord_user_id)
         if not ok:
+            failed += 1
             continue
         try:
             await mark_nudge_sent(
@@ -276,8 +322,13 @@ async def run_nudge_tick(bot: discord.Client, pool: Any) -> int:
                 candidate.innersync_user_id,
                 exc,
             )
-    if sent:
-        logger.info("Agent nudge tick sent %s DM(s)", sent)
+    if candidates:
+        logger.info(
+            "Agent nudge tick done: due=%s sent=%s failed_dm=%s",
+            len(candidates),
+            sent,
+            failed,
+        )
     return sent
 
 
@@ -294,4 +345,6 @@ __all__ = [
     "run_nudge_tick",
     "send_nudge_dm",
     "set_agent_nudges_enabled",
+    "user_has_agents_enabled_guild",
+    "user_in_guild",
 ]

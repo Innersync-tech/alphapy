@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -55,7 +55,8 @@ def test_build_nudge_dm_text_has_no_journal_hooks() -> None:
     assert "shared reflection" not in text.lower()
 
 
-def test_user_has_agents_enabled_guild() -> None:
+@pytest.mark.asyncio
+async def test_user_has_agents_enabled_guild_cache_hit() -> None:
     helper = MagicMock()
     helper.get_bool.side_effect = lambda scope, key, guild_id, fallback=False: guild_id == 2
 
@@ -64,10 +65,26 @@ def test_user_has_agents_enabled_guild() -> None:
     guild_on = SimpleNamespace(id=2, get_member=lambda _uid: member_ok)
     bot = SimpleNamespace(guilds=[guild_off, guild_on], settings_helper=helper)
 
-    assert user_has_agents_enabled_guild(bot, 99) is True
+    assert await user_has_agents_enabled_guild(bot, 99) is True
 
     bot_none = SimpleNamespace(guilds=[guild_off], settings_helper=helper)
-    assert user_has_agents_enabled_guild(bot_none, 99) is False
+    assert await user_has_agents_enabled_guild(bot_none, 99) is False
+
+
+@pytest.mark.asyncio
+async def test_user_has_agents_enabled_guild_fetch_member_fallback() -> None:
+    """Cache miss should still pass when fetch_member succeeds."""
+    helper = MagicMock()
+    helper.get_bool.return_value = True
+
+    guild = MagicMock()
+    guild.id = 2
+    guild.get_member.return_value = None
+    guild.fetch_member = AsyncMock(return_value=MagicMock())
+    bot = SimpleNamespace(guilds=[guild], settings_helper=helper)
+
+    assert await user_has_agents_enabled_guild(bot, 99) is True
+    guild.fetch_member.assert_awaited_once_with(99)
 
 
 @pytest.mark.asyncio
@@ -87,14 +104,36 @@ async def test_list_due_skips_unlinked_and_cooldown(monkeypatch: pytest.MonkeyPa
     async def fake_prefs(uid: str):
         return {"agent_nudges_enabled": True}
 
+    async def fake_guild(*_a, **_k):
+        return True
+
     monkeypatch.setattr("agents.nudges.fetch_opted_in_user_ids", fake_opted_in)
     monkeypatch.setattr("agents.nudges.load_discord_links_for_users", fake_links)
     monkeypatch.setattr("agents.nudges.load_last_sent_map", fake_last)
     monkeypatch.setattr("agents.nudges.load_agent_prefs", fake_prefs)
-    monkeypatch.setattr("agents.nudges.user_has_agents_enabled_guild", lambda *_a, **_k: True)
+    monkeypatch.setattr("agents.nudges.user_has_agents_enabled_guild", fake_guild)
 
     bot = SimpleNamespace(guilds=[])
     due = await list_due_nudge_candidates(bot, pool=MagicMock())
     assert len(due) == 1
     assert due[0].innersync_user_id == "user-a"
     assert due[0].discord_user_id == 111
+
+
+@pytest.mark.asyncio
+async def test_fetch_opted_in_uses_jsonb_contains(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict = {}
+
+    async def fake_get(table: str, params: dict | None = None):
+        captured["table"] = table
+        captured["params"] = params
+        return [{"user_id": "u1", "agent_prefs": {"agent_nudges_enabled": True}}]
+
+    monkeypatch.setattr("agents.nudges._supabase_get", fake_get)
+    from agents.nudges import fetch_opted_in_user_ids
+
+    ids = await fetch_opted_in_user_ids(limit=10)
+    assert ids == ["u1"]
+    assert captured["table"] == "app_user_settings"
+    assert captured["params"]["agent_prefs"] == 'cs.{"agent_nudges_enabled":true}'
+    assert "->>" not in str(captured["params"])
