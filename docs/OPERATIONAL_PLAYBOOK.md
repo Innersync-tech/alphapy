@@ -79,9 +79,12 @@ Requires `/link`, `ALPHAPY_AGENTS_ENABLED=true`, guild `agents.enabled`, and Ale
 - [ ] Default is off: user without the pref does not receive DMs
 - [ ] `/agent nudges enable` (or App Settings → Alphapy → Check-ins) persists `agent_prefs.agent_nudges_enabled: true`
 - [ ] Linked user receives the **fixed English** invite DM within ~1h (or after a staging force tick) — **no journal / Grok text**
+- [ ] Deploy logs show `Nudge tick: opted_in=… due=…` (not silent empty ticks); after send: `Agent nudge tick done: due=… sent=…`
 - [ ] `/agent nudges disable` → no further DMs
 - [ ] Closed DMs are skipped; the hourly loop does not crash
 - [ ] GDPR / `/delete_my_data` clears Railway `agent_nudge_state` for that user
+
+**Ops note (delivery):** opt-in listing uses jsonb contains `cs.{"agent_nudges_enabled":true}` (not `->>eq.true`). Membership uses cache then `fetch_member`. If `opted_in>0` but `skipped_guild` high, check `/config agents toggle` on a mutual guild.
 
 ## Troubleshooting reminders
 
