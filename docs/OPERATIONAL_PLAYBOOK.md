@@ -84,7 +84,7 @@ Requires `/link`, `ALPHAPY_AGENTS_ENABLED=true`, guild `agents.enabled`, and Ale
 - [ ] Closed DMs are skipped; the hourly loop does not crash
 - [ ] GDPR / `/delete_my_data` clears Railway `agent_nudge_state` for that user
 
-**Ops note (delivery):** opt-in listing uses jsonb contains `cs.{"agent_nudges_enabled":true}` (not `->>eq.true`). Membership uses cache then `fetch_member`. If `opted_in>0` but `skipped_guild` high, check `/config agents toggle` on a mutual guild.
+**Ops note (delivery):** opt-in listing uses jsonb contains `cs.{"agent_nudges_enabled":true}` (not `->>eq.true`). Membership uses cache then `fetch_member`. Guild gate uses `is_module_enabled(bot, guild_id, "agents")` on `bot.settings` (not reversed `get(guild_id, …)`). If `opted_in>0` but `skipped_guild` high, confirm `agents.enabled` on a mutual guild via `/config agents show`.
 
 ## Troubleshooting reminders
 
