@@ -25,12 +25,13 @@ Quick checklist and verification steps after adding the bot to a new server.
 
 After starting the bot, confirm in the logs:
 
-- [ ] "DB pool created"
-- [ ] "audit_logs table created" or "audit_logs table verified"
-- [ ] "health_check_history table created" or "health_check_history table verified"
-- [ ] "Command tracker: Database pool set"
-- [ ] "Bot has successfully started and connected to X server(s)!"
+- [ ] Database pool created / settings loaded (`SETTINGS_LOADED` / `POOL_CREATED`)
+- [ ] Phase 3 cogs loaded (e.g. `Loaded N/N cogs`)
+- [ ] Command sync completed (global and/or guild)
+- [ ] `Bot initialization complete` / online ready
 - [ ] Guild enumeration with server names and IDs
+
+Schema tables (`audit_logs`, `health_check_history`, etc.) are **Alembic-owned** — do not expect startup “table created” log lines. Apply migrations with `alembic upgrade head` before relying on those tables.
 
 ## Testing functionality
 
@@ -90,7 +91,7 @@ Requires `/link`, `ALPHAPY_AGENTS_ENABLED=true`, guild `agents.enabled`, and Ale
 
 - **No sends?** Verify timezone is Brussels and system clock is correct.
 - Check that `time` in the DB equals the intended trigger minute (HH:MM).
-- Inspect `WATCHER_LOG_CHANNEL` for parsing or SQL errors.
+- Inspect the guild `system.log_channel_id` (via `/config system show`) for embed-watcher parsing or SQL errors.
 - **Optional indexes** for performance:
   ```sql
   CREATE INDEX IF NOT EXISTS idx_reminders_time ON reminders (time);

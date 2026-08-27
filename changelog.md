@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - **Onboarding rules PUT (#375)** — `PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}` for control-panel rule edit.
 
 ### Fixed
+- **Docs honesty (#382)** — migration head `027` in `database-schema.md`; metrics auth is JWT-only in `ALPHAPY_AUTHENTICATION.md` (no bare API-key metrics example); `/growthcheckin` consent note in `commands.md`; playbook startup/log-channel cleanup; README drops Google Drive env hint. Legal ToS left unchanged (legal-update webhook).
 - **Agent nudge delivery** — opt-in listing uses jsonb `cs.{"agent_nudges_enabled":true}` (PostgREST `->>eq.true` returned empty 200s); guild membership falls back to `fetch_member`; tick logs `opted_in`/`due`/`skipped_*` for ops.
 - **Agent nudge guild gate** — `guild_has_agents_enabled` called `SettingsService.get(guild_id, …)` with reversed args so every guild read as disabled (`skipped_guild=1` forever); now uses `is_module_enabled(bot, guild_id, "agents")`.
 - **Automod rule timestamps (#377)** — PUT/POST coerce asyncpg `datetime` → ISO strings for `created_at`/`updated_at` (was 500 on dashboard rule edit).

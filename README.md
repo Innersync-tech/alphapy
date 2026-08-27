@@ -22,7 +22,7 @@ See [docs/commands.md](docs/commands.md) for the full command list.
 ```bash
 git clone https://github.com/bryntje/alphapy.git && cd alphapy
 pip install -r requirements.txt
-cp .env.example .env   # edit: BOT_TOKEN, DATABASE_URL, optional GROK_API_KEY / Google vars
+cp .env.example .env   # edit: BOT_TOKEN, DATABASE_URL, optional GROK_API_KEY
 alembic upgrade head   # or: alembic stamp head (existing DB)
 python bot.py
 ```
