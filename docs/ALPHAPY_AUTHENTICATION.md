@@ -5,11 +5,13 @@ description: How Alphapy API authentication works for Mind and service integrati
 
 ## Overview
 
-All Alphapy API endpoints require authentication. This document explains how authentication works and how to configure it correctly for the Mind dashboard.
+Dashboard and user-scoped Alphapy API routes require authentication (Supabase JWT and/or service `X-API-Key`, depending on the endpoint). This document explains how that works and how to configure it correctly for the Mind dashboard.
+
+**Public probes (no auth):** `GET /api/health` and `GET /status` — safe for load balancers and uptime checks. Do not treat them as authenticated dashboard APIs.
 
 **Endpoints that Mind uses:**
-- `/api/dashboard/metrics` (or `/api/metrics` alias) - Live metrics
-- `/api/health` - Health checks
+- `/api/dashboard/metrics` (or `/api/metrics` alias) - Live metrics (JWT)
+- `/api/health` - Health checks (no auth)
 - `/api/dashboard/settings/{guild_id}` - Get/update guild settings
 - `/api/dashboard/{guild_id}/onboarding/questions` - Manage onboarding questions
 - `/api/dashboard/{guild_id}/onboarding/rules` - Manage onboarding rules

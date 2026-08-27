@@ -125,10 +125,12 @@ agents/nudges.py   Opt-in Discord DM check-ins (Phase 5A)
 
 **Check-in nudges (Phase 5A, `agents/nudges.py`):**
 
-- Opt-in only (`agent_nudges_enabled`, default off); App Settings + `/agent nudges`
+- Opt-in only (`agent_nudges_enabled`, default off); App Settings → Alphapy → Check-ins + `/agent nudges`
 - Hourly loop on Agents cog; at most one fixed English DM per user per 24h
 - Ledger: Railway `agent_nudge_state` (Alembic `027`)
 - Eligibility: `/link` + `ALPHAPY_AGENTS_ENABLED` + mutual guild with `agents.enabled`
+- Opt-in listing uses PostgREST jsonb contains `cs.{"agent_nudges_enabled":true}` (not `->>eq.true`); membership cache then `fetch_member` — see [OPERATIONAL_PLAYBOOK](./OPERATIONAL_PLAYBOOK.md) § Phase 5A
+- Deep-link base: `INNERSYNC_APP_URL` (falls back to `APP_BASE_URL`) → `/dashboard/agent`
 - No Grok / no journal text; does not consume `/agent start` quota
 - Closed DMs are logged and skipped (fail-open for the loop)
 
