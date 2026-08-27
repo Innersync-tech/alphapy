@@ -10,6 +10,7 @@ import pytest
 from agents.nudges import (
     NUDGE_COOLDOWN,
     agent_nudges_enabled,
+    build_nudge_dm_embed,
     build_nudge_dm_text,
     guild_has_agents_enabled,
     is_due_for_nudge,
@@ -55,6 +56,21 @@ def test_build_nudge_dm_text_has_no_journal_hooks() -> None:
     assert "plaintext" not in text.lower()
     assert "vault" not in text.lower()
     assert "shared reflection" not in text.lower()
+
+
+def test_build_nudge_dm_embed_has_no_journal_hooks() -> None:
+    embed = build_nudge_dm_embed(app_url="https://app.innersync.tech/dashboard/agent")
+    assert embed.title == "🪞 Alphapy check-in"
+    assert embed.description is not None
+    assert "/agent start" in embed.description
+    assert "dashboard/agent" in embed.description
+    assert embed.footer.text is not None
+    assert "nudges disable" in embed.footer.text
+    assert "Check-ins" in embed.footer.text
+    body = f"{embed.title}\n{embed.description}\n{embed.footer.text}".lower()
+    assert "plaintext" not in body
+    assert "vault" not in body
+    assert "shared reflection" not in body
 
 
 def test_guild_has_agents_enabled_via_bot_settings() -> None:
