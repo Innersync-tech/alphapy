@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Agent check-in DMs** — send the fixed invite as a Discord embed (`build_nudge_dm_embed`) instead of a plain message.
+
 ### Added
 - **Agent check-in DMs (Phase 5A)** — opt-in Discord nudges (`/agent nudges`, `agent_prefs.agent_nudges_enabled`); hourly loop + Railway `agent_nudge_state` (Alembic `027`); fixed English invite only (no Grok / journal).
 - **Onboarding rules PUT (#375)** — `PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}` for control-panel rule edit.

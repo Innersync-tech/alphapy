@@ -16,6 +16,7 @@ from agents.profile import load_agent_prefs, merge_agent_prefs_fields
 from utils.db_helpers import acquire_safe
 from utils.settings_helpers import is_module_enabled
 from utils.supabase_client import _supabase_get
+from utils.timezone import BRUSSELS_TZ
 
 logger = logging.getLogger("alphapy.agents.nudges")
 
@@ -46,7 +47,7 @@ def app_agent_home_url() -> str:
 
 
 def build_nudge_dm_text(*, app_url: str | None = None) -> str:
-    """Fixed English DM body (no journal / LLM content)."""
+    """Plain-text fallback of the fixed invite (no journal / LLM content)."""
     url = app_url or app_agent_home_url()
     return (
         "🪞 **Alphapy check-in**\n\n"
@@ -55,6 +56,27 @@ def build_nudge_dm_text(*, app_url: str | None = None) -> str:
         "Disable these reminders anytime with `/agent nudges disable` "
         "or in Innersync App → Settings → Alphapy → Check-ins."
     )
+
+
+def build_nudge_dm_embed(*, app_url: str | None = None) -> discord.Embed:
+    """Fixed English check-in invite as an informative embed (no journal / LLM)."""
+    url = app_url or app_agent_home_url()
+    embed = discord.Embed(
+        title="🪞 Alphapy check-in",
+        description=(
+            "When you're ready, run `/agent start` in a server where agents are enabled, "
+            f"or open your agent in the App:\n{url}"
+        ),
+        color=discord.Color.blue(),
+        timestamp=datetime.now(BRUSSELS_TZ),
+    )
+    embed.set_footer(
+        text=(
+            "Disable anytime with /agent nudges disable "
+            "or App → Settings → Alphapy → Check-ins"
+        )
+    )
+    return embed
 
 
 def agent_nudges_enabled(prefs: dict[str, str | bool]) -> bool:
@@ -265,12 +287,12 @@ async def list_due_nudge_candidates(
 
 
 async def send_nudge_dm(bot: discord.Client, discord_user_id: int) -> bool:
-    """Send the fixed nudge DM. Returns True on success."""
+    """Send the fixed nudge DM embed. Returns True on success."""
     try:
         user = await bot.fetch_user(discord_user_id)
         if user is None:
             return False
-        await user.send(build_nudge_dm_text())
+        await user.send(embed=build_nudge_dm_embed())
         return True
     except discord.Forbidden:
         logger.info("Nudge DM blocked (closed DMs) for discord_user_id=%s", discord_user_id)
@@ -327,6 +349,7 @@ __all__ = [
     "NUDGE_COOLDOWN",
     "agent_nudges_enabled",
     "app_agent_home_url",
+    "build_nudge_dm_embed",
     "build_nudge_dm_text",
     "is_due_for_nudge",
     "list_due_nudge_candidates",
