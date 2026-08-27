@@ -49,7 +49,8 @@ X-API-Key: <api-key>
 
 **How it works:**
 - `verify_api_key` accepts a valid Supabase JWT **or** a bare `X-Api-Key` matching `API_KEY`
-- A bare API key does **not** bind a user id — it is for service/ops routes (e.g. `/api/observability`, `/api/hermit/growth-checkins`, metrics when configured)
+- A bare API key does **not** bind a user id — it is for service/ops routes (e.g. `/api/observability`, `/api/hermit/growth-checkins`)
+- Routes that also depend on `get_authenticated_user_id` (notably **`GET /api/dashboard/metrics`**) still need a Supabase JWT `sub` — API key alone returns `401 Missing authentication context`
 - There is **no** `X-User-Id` header. Do not send it; it is ignored and not trusted (see also [API Reference](../api/))
 
 **Configuration in Alphapy:**
@@ -156,15 +157,16 @@ if (!response.ok) {
 const metrics = await response.json();
 ```
 
-### Option 2: Using API Key (Fallback)
+### Option 2: Service API key (ops routes — not metrics)
+
+Bare `X-Api-Key` works for **`/api/observability`** and Hermit broker routes. It does **not** satisfy `get_authenticated_user_id` on **`/api/dashboard/metrics`** — use Option 1 (JWT) for metrics.
 
 ```typescript
-// In Mind's API route or component
 const alphapyBaseUrl = process.env.ALPHAPY_BASE_URL || "https://alphapy.innersync.tech";
 
-const response = await fetch(`${alphapyBaseUrl}/api/dashboard/metrics`, {
+const response = await fetch(`${alphapyBaseUrl}/api/observability`, {
   headers: {
-    "X-API-Key": process.env.ALPHAPY_API_KEY!, // Must match Alphapy's API_KEY
+    "X-Api-Key": process.env.ALPHAPY_API_KEY!, // Must match Alphapy's API_KEY
   }
 });
 ```
@@ -279,15 +281,15 @@ curl -H "X-Api-Key: <api-key>" \
 
 ### Auth patterns by route family
 
-- **JWT settings / history / onboarding (linked Discord admin):** `Authorization: Bearer <supabase_jwt>`
-- **Service metrics / observability / Hermit broker:** `X-Api-Key` (or JWT where the shared dependency allows both)
+- **JWT metrics / settings / history / onboarding (linked Discord admin):** `Authorization: Bearer <supabase_jwt>`
+- **Service observability / Hermit broker:** `X-Api-Key` (no user binding)
 - **Sprint 3b guild CRUD / invalidate-cache / discord-meta:** `X-Api-Key` + `X-Discord-User-Id`
 
 ### Main Endpoints for Mind
 
 #### `/api/dashboard/metrics` and `/api/metrics`
 
-**Authentication:** Required (Supabase JWT or service `X-Api-Key`)
+**Authentication:** Required — **Supabase JWT only** (`get_authenticated_user_id`). Bare `X-Api-Key` is not enough.
 
 **Query Parameters:**
 - `guild_id` (optional): Filter metrics by guild ID

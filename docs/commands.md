@@ -657,6 +657,8 @@ Grok-powered check-in for goals, obstacles, and emotions.
 
 **Behavior:** Opens a modal with three fields (goal, obstacle, feeling). Grok responds with coaching feedback. If the user has past reflections, Grok actively references patterns and progress. Premium users receive Mockingbird mode (direct, sharper tone).
 
+**App reflection context:** Plaintext App journals are injected only when the user has an **active** `reflection_alphapy_consent` row for that content (same gate as `/agent` journal sync). Encrypted App vault fields are never decryptable by the bot; without consent, App-sourced rows are skipped. Railway `growth_checkins` from Discord itself do not need that consent.
+
 After the response, an optional share prompt appears (ephemeral):
 - **Share anonymously** — posts the check-in + Grok response as an embed in the growth channel, without name or avatar.
 - **Share with my name** — same embed with display name and avatar.
