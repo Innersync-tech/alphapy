@@ -61,6 +61,8 @@ curl -H "Authorization: Bearer supabase_token" \
 
 Enhanced health check endpoint with detailed metrics.
 
+**Authentication:** None (public probe — same trust model as `/status`).
+
 **Response:**
 ```json
 {
@@ -75,6 +77,17 @@ Enhanced health check endpoint with detailed metrics.
   "database_pool_size": 5
 }
 ```
+
+**Fields:**
+- `service`: Service name
+- `version`: Bot version
+- `uptime_seconds`: Uptime in seconds
+- `db_status`: Database status (`ok`, `not_initialized`, or `error:...`)
+- `timestamp`: ISO timestamp of check
+- `guild_count`: Number of guilds bot is connected to (optional)
+- `active_commands_24h`: Number of commands executed in last 24 hours (optional)
+- `gpt_status`: Grok/LLM service status (`operational`, `degraded`, `error`) (optional)
+- `database_pool_size`: Current size of the database connection pool (managed automatically by `asyncpg`)
 
 #### `GET /status`
 
@@ -132,15 +145,9 @@ The `hermit_context` block comes from `get_hermit_context_stats()` (in-memory He
 All responses now include an `X-Request-ID` header for request correlation.
 
 **Fields:**
-- `service`: Service name
-- `version`: Bot version
-- `uptime_seconds`: Uptime in seconds
-- `db_status`: Database status (`ok`, `not_initialized`, or `error:...`)
-- `timestamp`: ISO timestamp of check
-- `guild_count`: Number of guilds bot is connected to (optional)
-- `active_commands_24h`: Number of commands executed in last 24 hours (optional)
-- `gpt_status`: Grok/LLM service status (`operational`, `degraded`, `error`) (optional)
-- `database_pool_size`: Current size of the database connection pool (managed automatically by `asyncpg`)
+- `api`: In-memory API request counters — `requests`, `success_rate`, `latency_ms` (`p50` / `p95` / `p99`)
+- `webhooks`: Same shape for webhook traffic
+- `hermit_context`: Counters from `get_hermit_context_stats()` (attempts, success/failure, cache hits/misses, prompt applied/omitted)
 
 #### `GET /api/hermit/growth-checkins`
 
@@ -341,6 +348,8 @@ Alias for `/api/dashboard/metrics` - provided for compatibility with Mind monito
 #### `GET /top-commands`
 
 Command usage analytics endpoint.
+
+**Authentication:** None today (legacy public analytics). Prefer JWT-gated `/api/dashboard/metrics` for Mind; do not expose aggregate command names via this route if the deployment is internet-facing without a network boundary.
 
 **Query Parameters:**
 - `guild_id` (optional): Filter by guild ID

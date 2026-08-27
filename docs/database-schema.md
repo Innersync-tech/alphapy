@@ -183,6 +183,24 @@ Delivery ledger for opt-in Discord check-in DMs (Phase 5A). Added in migration `
 
 ---
 
+### `invite_tracker`
+
+Per-guild invite leaderboard counts for InviteTracker (`cogs/inviteboard.py`). Not managed by Alembic — the cog creates the table with `CREATE TABLE IF NOT EXISTS` at startup (legacy safeguard, same class as onboarding/verification).
+
+**Columns:**
+- `guild_id` (BIGINT, NOT NULL): Discord guild snowflake
+- `user_id` (BIGINT, NOT NULL): Inviter Discord snowflake
+- `invite_count` (INTEGER, DEFAULT 0): Tracked invite total for that member in the guild
+
+**Primary key:** `(guild_id, user_id)`
+
+**Notes:**
+- Updated on invite use (`update_invite_count`) and via admin `/setinvites`
+- Read by `/inviteleaderboard`
+- Railway bot DB only; purged with other Railway PII on GDPR erasure where applicable
+
+---
+
 ### `terms_acceptance`
 
 Tracks user acceptance of the Terms of Service and Privacy Policy for GDPR compliance.

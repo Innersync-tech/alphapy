@@ -31,6 +31,8 @@ ALLOWED_ORIGINS = [
     if o.strip()
 ] or DEFAULT_ALLOWED_ORIGINS
 APP_BASE_URL = os.getenv("APP_BASE_URL", DEFAULT_ALLOWED_ORIGINS[0])
+# Public App origin for agent DM deep-links (`/dashboard/agent`). Alias of APP_BASE_URL when unset.
+INNERSYNC_APP_URL = (os.getenv("INNERSYNC_APP_URL") or APP_BASE_URL).rstrip("/")
 MIND_BASE_URL = os.getenv("MIND_BASE_URL", DEFAULT_ALLOWED_ORIGINS[1])
 ALPHAPY_BASE_URL = os.getenv("ALPHAPY_BASE_URL", DEFAULT_ALLOWED_ORIGINS[2])
 SERVICE_NAME = os.getenv("SERVICE_NAME", "alphapy-service")

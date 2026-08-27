@@ -373,6 +373,7 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 - `ALPHAPY_AGENTS_ENABLED`: Enable multi-user `/agent` commands (`false` by default).
 - `ALPHAPY_AGENTS_MEMORY_BACKEND`: `supabase` (default, persistent sessions via Supabase) or `memory` (in-process, dev/tests).
 - `ALPHAPY_MEMORY_GRAPH_PUSH`: When `1`/`true`, push Tier-2 insight labels to Core Memory Vault graph on `/agent end`. Default: enabled whenever `CORE_API_URL` and `ALPHAPY_SERVICE_KEY` are set; set `0` to disable in local tests.
+- `INNERSYNC_APP_URL`: Public App origin for agent DM deep-links (default: `APP_BASE_URL`, usually `https://app.innersync.tech`). Used by Phase 5A nudges and agent UI helpers as `{origin}/dashboard/agent`.
 
 ### Optional - Innersync identity (Discord link webhook)
 - `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`. (`WEBHOOK_SECRET` is not loaded in `config.py` — do not rely on it.)

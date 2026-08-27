@@ -51,6 +51,7 @@ def test_build_nudge_dm_text_has_no_journal_hooks() -> None:
     text = build_nudge_dm_text(app_url="https://app.innersync.tech/dashboard/agent")
     assert "/agent start" in text
     assert "dashboard/agent" in text
+    assert "Settings → Alphapy → Check-ins" in text
     assert "plaintext" not in text.lower()
     assert "vault" not in text.lower()
     assert "shared reflection" not in text.lower()

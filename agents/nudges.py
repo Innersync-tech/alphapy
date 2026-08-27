@@ -53,7 +53,7 @@ def build_nudge_dm_text(*, app_url: str | None = None) -> str:
         "When you're ready, run `/agent start` in a server where agents are enabled, "
         f"or open your agent in the App: {url}\n\n"
         "Disable these reminders anytime with `/agent nudges disable` "
-        "or in Innersync App → Settings → Alphapy."
+        "or in Innersync App → Settings → Alphapy → Check-ins."
     )
 
 
