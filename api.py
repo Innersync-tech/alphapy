@@ -1724,16 +1724,16 @@ async def _fetch_command_stats(guild_id: int | None = None, days: int = 7, limit
                 limit
             )
             
-            # Get total count for 24h
-            total_24h_params: list[Any] = ["1"]
+            # Get total count for 24h (use $1 for guild filter — never $2 without $1)
+            total_24h_params: list[Any] = []
             total_24h_where = "WHERE created_at >= NOW() - interval '24 hours'"
             if guild_id is not None:
-                total_24h_where += " AND guild_id = $2"
+                total_24h_where += " AND guild_id = $1"
                 total_24h_params.append(guild_id)
-            
+
             total_24h = await conn.fetchval(
                 f"SELECT COUNT(*) FROM audit_logs {total_24h_where}",
-                *total_24h_params
+                *total_24h_params,
             ) or 0
             
             top_commands = [
