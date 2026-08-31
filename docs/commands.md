@@ -841,7 +841,9 @@ Show bot version and codename.
 ---
 
 ### `/release`
-Show release notes for Alphapy or the Innersync App. Posts in the channel (not ephemeral).
+Show release notes for Alphapy or the Innersync App.
+
+**Permissions:** Owner only (`requires_owner()` / `OWNER_IDS`). Success posts in the channel. Errors (missing notes, missing `GITHUB_TOKEN`, fetch failure, permission denial) are ephemeral.
 
 **Parameters:**
 - `product` (optional, default: Alphapy): `Alphapy` or `App`

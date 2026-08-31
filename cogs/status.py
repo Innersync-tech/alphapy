@@ -22,7 +22,7 @@ from utils.db_helpers import acquire_safe, get_bot_db_pool, is_pool_healthy
 from utils.embed_builder import EmbedBuilder
 from utils.logger import get_gpt_status_logs, logger
 from utils.timezone import BRUSSELS_TZ
-from utils.validators import validate_admin
+from utils.validators import requires_owner, validate_admin
 from version import CODENAME, __version__
 
 # Database for command_stats (shared bot pool via interaction.client)
@@ -104,7 +104,7 @@ async def innersync_cmd(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@app_commands.command(name="release", description="Show release notes for Alphapy or the Innersync App")
+@app_commands.command(name="release", description="Show release notes for Alphapy or the Innersync App (owner only)")
 @app_commands.describe(
     product="Product to post notes for (default: Alphapy)",
     version="Release version (default: running bot for Alphapy, latest for App)",
@@ -115,27 +115,29 @@ async def innersync_cmd(interaction: discord.Interaction):
         app_commands.Choice(name="App", value=RELEASE_PRODUCT_APP),
     ]
 )
+@requires_owner()
 async def release_cmd(
     interaction: discord.Interaction,
     product: app_commands.Choice[str] | None = None,
     version: str | None = None,
 ):
-    await interaction.response.defer()
+    # Ephemeral defer so errors stay private. Success is posted to the channel separately
+    # (Discord cannot mix a public defer with an ephemeral followup).
+    await interaction.response.defer(ephemeral=True)
     try:
         product_key = product.value if product is not None else RELEASE_PRODUCT_ALPHAPY
         result = await _get_release_notes(product_key, version)
         if result.error:
-            await interaction.followup.send(result.error)
+            await interaction.followup.send(result.error, ephemeral=True)
             return
         if not result.notes:
             if product_key == RELEASE_PRODUCT_ALPHAPY:
-                await interaction.followup.send(f"No notes found for v{result.version}.")
+                msg = f"No notes found for v{result.version}."
             elif result.version and result.version != "latest":
-                await interaction.followup.send(
-                    f"No notes found for {result.label} v{result.version}."
-                )
+                msg = f"No notes found for {result.label} v{result.version}."
             else:
-                await interaction.followup.send(f"No notes found for {result.label}.")
+                msg = f"No notes found for {result.label}."
+            await interaction.followup.send(msg, ephemeral=True)
             return
         footer_link = ""
         if result.github_url:
@@ -150,10 +152,25 @@ async def release_cmd(
             description=description,
         )
         embed.set_footer(text=result.footer)
-        await interaction.followup.send(embed=embed)
+        channel = interaction.channel
+        if channel is None:
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+        send = getattr(channel, "send", None)
+        if not callable(send):
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+        await send(embed=embed)
+        try:
+            await interaction.delete_original_response()
+        except Exception:
+            await interaction.followup.send("Posted.", ephemeral=True)
     except Exception:
         logger.exception("release_cmd failed")
-        await interaction.followup.send("Failed to read release notes. Please try again later.")
+        await interaction.followup.send(
+            "Failed to read release notes. Please try again later.",
+            ephemeral=True,
+        )
 
 @app_commands.command(name="health", description="Show configuration and system status")
 async def health_cmd(interaction: discord.Interaction):

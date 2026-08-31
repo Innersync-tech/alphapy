@@ -29,6 +29,9 @@ class TestIsAdminCommand:
     def test_explicit_admin_path(self):
         assert is_admin_command("command_stats", "command_stats", False) is True
 
+    def test_release_is_admin_listed(self):
+        assert is_admin_command("release", "release", False) is True
+
     def test_debug_parse_embed_admin(self):
         assert is_admin_command("debug_parse_embed", "debug_parse_embed", False) is True
 
@@ -114,3 +117,9 @@ class TestStatusPermissionCheckHelper:
         other = SimpleNamespace(callback=lambda: None)
         cmd = SimpleNamespace(checks=[other])
         assert _command_has_permission_checks(cmd) is True
+
+    def test_release_cmd_has_owner_check(self):
+        from cogs.status import _command_has_permission_checks, release_cmd
+
+        assert _command_has_permission_checks(release_cmd) is True
+        assert len(release_cmd.checks) >= 1
