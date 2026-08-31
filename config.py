@@ -116,9 +116,10 @@ DASHBOARD_BASE_URL = (os.getenv("DASHBOARD_BASE_URL") or "").rstrip("/")
 REFLECTION_WEBHOOK_SECRET = os.getenv("REFLECTION_WEBHOOK_SECRET")
 GDPR_WEBHOOK_SECRET = os.getenv("GDPR_WEBHOOK_SECRET")
 
-# GitHub (for /release notes and "read full" link). Optional; when unset, /release uses local changelog.
+# GitHub (for /release notes). GITHUB_REPO overrides the Alphapy repo (default Innersync-tech/alphapy).
+# GITHUB_TOKEN: optional for public Alphapy (rate limits); required for /release product:App
+# (innersync-dashboard is private — needs contents:read).
 GITHUB_REPO = (os.getenv("GITHUB_REPO") or "").strip().rstrip("/")
-# Optional: token for GitHub API (e.g. /release, repo links) to avoid rate limits
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # Admin And Owner — set OWNER_IDS / ADMIN_ROLE_ID in your deployment env vars

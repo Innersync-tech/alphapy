@@ -841,9 +841,20 @@ Show bot version and codename.
 ---
 
 ### `/release`
-Show release notes for the current version.
+Show release notes for Alphapy or the Innersync App. Posts in the channel (not ephemeral).
 
-**Response:** Release notes from GitHub Releases API, with fallback to `changelog.md` in the repo.
+**Parameters:**
+- `product` (optional, default: Alphapy): `Alphapy` or `App`
+- `version` (optional): Release tag without requiring a `v` prefix. Alphapy defaults to the running bot version; App defaults to GitHub **latest**.
+
+**Response:** Release notes from the GitHub Releases API. Alphapy falls back to `changelog.md` in this repo. App is GitHub-only (`Innersync-tech/innersync-dashboard`, private) — requires `GITHUB_TOKEN` with `contents:read`. The App embed links to the live App URL, not GitHub (private repo).
+
+**Examples:**
+```
+/release
+/release product:App
+/release product:App version:3.8.0
+```
 
 ---
 

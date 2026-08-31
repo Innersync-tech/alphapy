@@ -1,7 +1,7 @@
 import asyncio
 import os
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import aiohttp
 import asyncpg
@@ -27,6 +27,43 @@ from version import CODENAME, __version__
 
 # Database for command_stats (shared bot pool via interaction.client)
 BOOT_TIME = datetime.now(BRUSSELS_TZ)
+
+RELEASE_PRODUCT_ALPHAPY = "alphapy"
+RELEASE_PRODUCT_APP = "app"
+DEFAULT_ALPHAPY_GITHUB_REPO = "Innersync-tech/alphapy"
+APP_GITHUB_REPO = "Innersync-tech/innersync-dashboard"
+APP_RELEASE_TOKEN_MSG = (
+    "Could not load App release notes. A GitHub token with access to the App repository is required."
+)
+
+# Add a row here to support more products later (Core, Mind, ...).
+RELEASE_PRODUCTS: dict[str, dict[str, Any]] = {
+    RELEASE_PRODUCT_ALPHAPY: {
+        "label": "Alphapy",
+        "local_changelog": True,
+        "use_running_version": True,
+        "public_github": True,
+        "footer": None,  # CODENAME at send time
+    },
+    RELEASE_PRODUCT_APP: {
+        "label": "App",
+        "repo": APP_GITHUB_REPO,
+        "local_changelog": False,
+        "use_running_version": False,
+        "public_github": False,
+        "footer": "Innersync App",
+    },
+}
+
+
+class ReleaseNotesResult(NamedTuple):
+    notes: str
+    version: str
+    github_url: str | None
+    public_url: str | None
+    error: str | None
+    label: str
+    footer: str
 
 # ------------------ SLASH COMMAND ------------------ #
 
@@ -67,21 +104,52 @@ async def innersync_cmd(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@app_commands.command(name="release", description="Show release notes for the current version")
-async def release_cmd(interaction: discord.Interaction):
+@app_commands.command(name="release", description="Show release notes for Alphapy or the Innersync App")
+@app_commands.describe(
+    product="Product to post notes for (default: Alphapy)",
+    version="Release version (default: running bot for Alphapy, latest for App)",
+)
+@app_commands.choices(
+    product=[
+        app_commands.Choice(name="Alphapy", value=RELEASE_PRODUCT_ALPHAPY),
+        app_commands.Choice(name="App", value=RELEASE_PRODUCT_APP),
+    ]
+)
+async def release_cmd(
+    interaction: discord.Interaction,
+    product: app_commands.Choice[str] | None = None,
+    version: str | None = None,
+):
     await interaction.response.defer()
     try:
-        notes, releases_url = await _get_release_notes(__version__)
-        if not notes:
-            await interaction.followup.send(f"No notes found for v{__version__}.")
+        product_key = product.value if product is not None else RELEASE_PRODUCT_ALPHAPY
+        result = await _get_release_notes(product_key, version)
+        if result.error:
+            await interaction.followup.send(result.error)
+            return
+        if not result.notes:
+            if product_key == RELEASE_PRODUCT_ALPHAPY:
+                await interaction.followup.send(f"No notes found for v{result.version}.")
+            elif result.version and result.version != "latest":
+                await interaction.followup.send(
+                    f"No notes found for {result.label} v{result.version}."
+                )
+            else:
+                await interaction.followup.send(f"No notes found for {result.label}.")
             return
         footer_link = ""
-        if releases_url:
-            footer_link = f"\n\n*Read full release notes on [GitHub]({releases_url}).*"
+        if result.github_url:
+            footer_link = f"\n\n*Read full release notes on [GitHub]({result.github_url}).*"
+        elif result.public_url:
+            host = result.public_url.removeprefix("https://").removeprefix("http://").rstrip("/")
+            footer_link = f"\n\n*Live: [{host}]({result.public_url}).*"
         max_desc = 4096 - len(footer_link)
-        description = _truncate_release_notes_md(notes, max_desc) + footer_link
-        embed = EmbedBuilder.info(title=f"Release notes v{__version__}", description=description)
-        embed.set_footer(text=f"{CODENAME}")
+        description = _truncate_release_notes_md(result.notes, max_desc) + footer_link
+        embed = EmbedBuilder.info(
+            title=f"{result.label} release notes v{result.version}",
+            description=description,
+        )
+        embed.set_footer(text=result.footer)
         await interaction.followup.send(embed=embed)
     except Exception:
         logger.exception("release_cmd failed")
@@ -847,42 +915,178 @@ def _truncate_release_notes_md(text: str, max_len: int) -> str:
     return _drop_dangling_last_header(result).strip()
 
 
-async def _fetch_github_release_notes(repo: str, version: str) -> str | None:
-    """Fetch release notes body from GitHub API for tag v{version}. Returns None on failure."""
-    tag = f"v{version}" if not version.startswith("v") else version
-    url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+def _resolve_release_product(product_key: str | None) -> str:
+    if product_key in RELEASE_PRODUCTS:
+        return product_key
+    return RELEASE_PRODUCT_ALPHAPY
+
+
+def _product_github_repo(product_key: str) -> str:
+    spec = RELEASE_PRODUCTS[product_key]
+    hardcoded = spec.get("repo")
+    if hardcoded:
+        return str(hardcoded)
+    configured = (getattr(config, "GITHUB_REPO", "") or "").strip().rstrip("/")
+    return configured or DEFAULT_ALPHAPY_GITHUB_REPO
+
+
+def _normalize_release_tag(version: str | None) -> str | None:
+    if not version or not str(version).strip():
+        return None
+    raw = str(version).strip()
+    return raw if raw.lower().startswith("v") else f"v{raw}"
+
+
+def _display_version(tag: str | None, fallback: str = "") -> str:
+    raw = (tag or fallback or "").strip()
+    if len(raw) >= 2 and raw[0] in ("v", "V") and raw[1].isdigit():
+        return raw[1:]
+    return raw
+
+
+def _github_token() -> str:
+    return (getattr(config, "GITHUB_TOKEN", None) or "").strip()
+
+
+def _github_release_api_url(repo: str, tag: str | None) -> str:
+    base = f"https://api.github.com/repos/{repo}/releases"
+    if tag:
+        return f"{base}/tags/{tag}"
+    return f"{base}/latest"
+
+
+def _github_request_headers() -> dict[str, str]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "Innersync-Alphapy",
+    }
+    token = _github_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _app_public_url() -> str:
+    url = (
+        (getattr(config, "INNERSYNC_APP_URL", None) or "")
+        or (getattr(config, "APP_BASE_URL", None) or "")
+        or "https://app.innersync.tech"
+    )
+    return str(url).rstrip("/")
+
+
+async def _fetch_github_release(
+    repo: str, tag: str | None
+) -> tuple[str | None, str | None, str | None, int | None]:
+    """Fetch a GitHub release. tag=None uses /releases/latest.
+
+    Returns (body, html_url, tag_name, http_status). status is None on network error.
+    """
+    url = _github_release_api_url(repo, tag)
+    headers = _github_request_headers()
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                if resp.status != 200:
-                    return None
+            async with session.get(
+                url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                status = resp.status
+                if status != 200:
+                    logger.info(
+                        "GitHub release fetch status=%s repo=%s tag=%s",
+                        status,
+                        repo,
+                        tag or "latest",
+                    )
+                    return None, None, None, status
                 data = await resp.json()
-                return (data.get("body") or "").strip() or None
+                body = (data.get("body") or "").strip() or None
+                html_url = (data.get("html_url") or "").strip() or None
+                tag_name = (data.get("tag_name") or "").strip() or None
+                return body, html_url, tag_name, status
     except Exception as e:
         logger.debug("GitHub release fetch failed: %s", e)
-        return None
+        return None, None, None, None
 
 
-async def _get_release_notes(version: str) -> tuple[str, str | None]:
-    """Return (notes_text, releases_url). Uses GitHub if configured, else local changelog.md."""
-    repo = getattr(config, "GITHUB_REPO", "").strip() or None
-    releases_url = f"https://github.com/{repo}/releases/tag/v{version}" if repo else None
+async def _get_release_notes(
+    product_key: str | None, version: str | None = None
+) -> ReleaseNotesResult:
+    """Load notes for a product. Alphapy falls back to local changelog.md; App is GitHub-only."""
+    key = _resolve_release_product(product_key)
+    spec = RELEASE_PRODUCTS[key]
+    label = str(spec["label"])
+    footer = str(spec["footer"] or CODENAME)
+    public_url = _app_public_url() if key == RELEASE_PRODUCT_APP else None
+    repo = _product_github_repo(key)
+    tag = _normalize_release_tag(version)
+    if spec["use_running_version"] and tag is None:
+        tag = _normalize_release_tag(__version__)
+    display = _display_version(tag, "latest" if key == RELEASE_PRODUCT_APP else "")
+
+    empty = ReleaseNotesResult(
+        notes="",
+        version=display or "latest",
+        github_url=None,
+        public_url=public_url,
+        error=None,
+        label=label,
+        footer=footer,
+    )
+
+    if key == RELEASE_PRODUCT_APP and not _github_token():
+        return empty._replace(error=APP_RELEASE_TOKEN_MSG)
+
+    status: int | None = None
     if repo:
-        logger.info("Release notes: fetching from GitHub repo=%s tag=v%s", repo, version)
-        notes = await _fetch_github_release_notes(repo, version)
-        if notes:
-            logger.info("Release notes: using GitHub (v%s)", version)
-            return notes, releases_url
-        logger.info("Release notes: GitHub fetch failed or empty, falling back to local changelog")
-    else:
-        logger.info("Release notes: GITHUB_REPO not set, using local changelog")
-    # Fallback: local changelog
-    base = os.path.dirname(os.path.dirname(__file__))
-    path = os.path.join(base, "changelog.md")
-    local = await _read_release_notes(path, version)
-    if local:
-        logger.info("Release notes: using local changelog %s", path)
-    return local or "", releases_url
+        logger.info(
+            "Release notes: fetching from GitHub repo=%s tag=%s",
+            repo,
+            tag or "latest",
+        )
+        body, html_url, tag_name, status = await _fetch_github_release(repo, tag)
+        if body:
+            display = _display_version(tag_name or tag, display or "latest")
+            github_url = html_url if spec["public_github"] else None
+            logger.info("Release notes: using GitHub (%s v%s)", label, display)
+            return ReleaseNotesResult(
+                notes=body,
+                version=display,
+                github_url=github_url,
+                public_url=public_url,
+                error=None,
+                label=label,
+                footer=footer,
+            )
+        logger.info("Release notes: GitHub fetch failed or empty status=%s", status)
+
+    if spec["local_changelog"] and display:
+        base = os.path.dirname(os.path.dirname(__file__))
+        path = os.path.join(base, "changelog.md")
+        local = await _read_release_notes(path, display)
+        if local:
+            github_url = (
+                f"https://github.com/{repo}/releases/tag/v{display}"
+                if spec["public_github"] and repo
+                else None
+            )
+            logger.info("Release notes: using local changelog %s", path)
+            return ReleaseNotesResult(
+                notes=local,
+                version=display,
+                github_url=github_url,
+                public_url=None,
+                error=None,
+                label=label,
+                footer=footer,
+            )
+
+    if key == RELEASE_PRODUCT_APP and status in (401, 403):
+        return empty._replace(error=APP_RELEASE_TOKEN_MSG)
+    if key == RELEASE_PRODUCT_APP and status is None:
+        return empty._replace(
+            error="Could not load App release notes. Please try again later."
+        )
+    return empty
 
 
 async def _read_release_notes(changelog_path: str, version: str) -> str:

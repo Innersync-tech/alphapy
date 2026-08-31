@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - **Agent check-in DMs** — send the fixed invite as a Discord embed (`build_nudge_dm_embed`) instead of a plain message.
 
 ### Added
+- **`/release` multi-repo** — optional `product` (Alphapy default, App) and `version`; App uses GitHub latest (`innersync-dashboard` is private, so `GITHUB_TOKEN` with `contents:read` is required and the embed links to the live App URL instead of GitHub).
 - **Agent check-in DMs (Phase 5A)** — opt-in Discord nudges (`/agent nudges`, `agent_prefs.agent_nudges_enabled`); hourly loop + Railway `agent_nudge_state` (Alembic `027`); fixed English invite only (no Grok / journal).
 - **Onboarding rules PUT (#375)** — `PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}` for control-panel rule edit.
 
