@@ -6,7 +6,7 @@ permalink: /privacy-policy/
 
 # Innersync • Alphapy Bot Privacy Policy
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-08-31_
 
 This Privacy Policy explains how the Innersync • Alphapy Discord Bot (“**Innersync • Alphapy**”, “**Bot**”, “**we**”, “**us**”) collects, uses, and protects information when it operates on your Discord server and when you use our pricing and information website. By installing or interacting with the Bot, or by visiting our websites, you consent to the practices described here. If you do not agree with this Policy, do not use the Bot or our websites.
 
@@ -28,7 +28,9 @@ Depending on the features you enable, the Bot may process the following categori
 - **Interaction content**:
   - Growth check-in prompts and user responses;
   - Learning requests (`/learn_topic`) and ticket conversation summaries;
-  - AI caption inputs and generated outputs (for context and troubleshooting).
+  - AI caption inputs and generated outputs (for context and troubleshooting);
+  - **`/agent` session turns** while a session is open, **session metadata**, and **optional distilled insights** if you opt in to learning in the Innersync App.
+- **App Inner Barz / Grok chat** (the Innersync App journal chat) is **not** stored by the Bot. That history lives in the App account and is described in the [App Privacy Policy](https://app.innersync.tech/privacy) (same controller, different store).
 - **Ticketing data**: Ticket channel IDs, message excerpts, AI summaries, user and staff actions, and status updates.
 - **Logging and audit events**: Internal logs for errors, status updates, and admin actions posted to designated log channels. Guild log channels may record that guild's GDPR agreement acceptance. Innersync `/link`, `/unlink`, and `/delete_my_data` confirmations are posted only to the Innersync home guild log channel (Discord user mention and id only).
 - **Support communications**: Emails or GitHub issues you send us about the Bot.
@@ -89,6 +91,9 @@ Each provider processes data under their own terms and policies. We aim to choos
 - Reminder entries persist until the scheduled job completes or an admin deletes them.
 - Ticket transcripts and AI summaries remain until manually removed.
 - Growth check-in responses are stored for follow-up unless deleted.
+- **`/agent` session turns:** removed when you end the session (`/agent end`) or when that session is removed from App history. There is no 7-day chat TTL.
+- **`/agent` session metadata / opted-in insights:** kept until you delete that history row, reset learning, use `/delete_my_data`, or App GDPR purge — not the same clock as turns.
+- **Prompts sent to Grok / X.AI:** outside our retention clock; we cannot recall a copy already sent to the model provider.
 - Premium subscription records (tier, status, guild assignment) are kept for the duration of active subscriptions plus 7 years for Belgian tax compliance requirements (Belgian Income Tax Code - Wetboek van inkomstenbelastingen). After this period, premium subscription records are automatically anonymized or deleted, unless an ongoing procedure requires otherwise.
 - Audit logs in Discord channels follow Discord’s retention unless you purge them.
 - Backups (if enabled) are kept for up to 30 days before automatic deletion.
