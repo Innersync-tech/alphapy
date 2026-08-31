@@ -6,7 +6,7 @@ permalink: /terms-of-service/
 
 # Innersync • Alphapy Bot Terms of Service
 
-_Last updated: 2026-03-02_
+_Last updated: 2026-08-31_
 
 Thank you for using the Innersync • Alphapy Discord Bot (“**Innersync • Alphapy**”, “**Bot**”, “**we**”, “**us**”, “**our**”). These Terms of Service (“**Terms**”) set out the rules that govern how you access and use the Bot and its related functionality, including our pricing and information website at **pricing.alphapy.innersync.tech** (the "**Pricing Site**"). By inviting the Bot to a Discord server, configuring it, interacting with any of its commands, or visiting or using the Pricing Site, you agree to be bound by these Terms. If you do not agree, do not use the Bot or the Pricing Site.
 
@@ -103,7 +103,7 @@ Your use of the Bot and the Pricing Site is also governed by the [Innersync • 
 ## 6. Configuration Data and Member Content
 
 - Server administrators are responsible for the accuracy of configuration settings (e.g., reminder channels, log channels, access roles).
-- Growth check-in responses, ticket messages, reminder details, and similar content may be stored in a database to operate the features you enable.
+- Growth check-in responses, ticket messages, reminder details, `/agent` session turns, and similar content may be stored in a database to operate the features you enable. Session turns are removed when you end the session; session metadata and opted-in insights may persist as described in the Privacy Policy.
 - AI-generated suggestions or summaries are produced automatically. They may be inaccurate or unsuitable; always review before acting on them.
 - If you submit third-party content through the Bot, you confirm you have the right to do so and grant us a non-exclusive license to process that content for the purpose of operating the Bot.
 
