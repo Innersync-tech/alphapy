@@ -74,7 +74,7 @@ Full list and multi-guild setup: [docs/configuration.md](docs/configuration.md).
 
 ### System & Information
 
-- **Status commands:** `/innersync` (platform info), `/version`, `/health`, `/gptstatus`, `/release` (Alphapy or App)
+- **Status commands:** `/innersync` (platform info), `/version`, `/health`, `/gptstatus`, `/release` (owner only; Alphapy or App)
 - **Command listing:** `/commands` with categorized display and admin options
 
 ### Reminders

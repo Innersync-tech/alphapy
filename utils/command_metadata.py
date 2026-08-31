@@ -72,6 +72,7 @@ ADMIN_COMMANDS: set[str] = {
     "migrate_status",
     "reload",
     "command_stats",
+    "release",
     "ticket_stats",
     "ticket_status",
     "ticket_panel_post",

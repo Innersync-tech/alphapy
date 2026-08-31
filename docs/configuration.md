@@ -412,7 +412,7 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 
 ### Optional - GitHub
 - `GITHUB_REPO`: Alphapy GitHub slug for `/release` (default `Innersync-tech/alphapy` when unset). Does not affect App.
-- `GITHUB_TOKEN`: Token for the GitHub Releases API. Optional for public Alphapy (avoids rate limits; `/release` still falls back to local `changelog.md`). **Required** for `/release product:App` because `Innersync-tech/innersync-dashboard` is private — use a PAT with `contents:read` (classic: `repo`). Without it, App notes fail closed with a generic message (no GitHub error leaked).
+- `GITHUB_TOKEN`: Token for the GitHub Releases API. Optional for public Alphapy (avoids rate limits; `/release` still falls back to local `changelog.md`). **Required** for `/release product:App` because `Innersync-tech/innersync-dashboard` is private — use a PAT with `contents:read` (classic: `repo`). Owner-only `/release` distinguishes unset vs 401 (invalid/expired) vs 403 (wrong scope / no repo access); GitHub response bodies are not shown.
 
 ## Migration Notes
 
