@@ -182,7 +182,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ## Agent: Status
 - **Path**: `cogs/status.py`
 - **Purpose**: General information and status commands
-- **Commands**: `/version`, `/gptstatus`, `/innersync`, `/release`, `/health`, `/commands`, `/command_stats`, `/help`
+- **Commands**: `/version`, `/gptstatus`, `/innersync`, `/release` (optional `product` Alphapy|App, optional `version`), `/health`, `/commands`, `/command_stats`, `/help`
 
 ---
 

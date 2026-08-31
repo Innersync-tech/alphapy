@@ -411,7 +411,8 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 - Write endpoints under `/api/reminders` support `Idempotency-Key` header to prevent duplicate writes during client retries (cached for 10 minutes).
 
 ### Optional - GitHub
-- `GITHUB_TOKEN`: Optional token for GitHub API (e.g. `/release`, repo links when `GITHUB_REPO` is set) to avoid rate limits.
+- `GITHUB_REPO`: Alphapy GitHub slug for `/release` (default `Innersync-tech/alphapy` when unset). Does not affect App.
+- `GITHUB_TOKEN`: Token for the GitHub Releases API. Optional for public Alphapy (avoids rate limits; `/release` still falls back to local `changelog.md`). **Required** for `/release product:App` because `Innersync-tech/innersync-dashboard` is private — use a PAT with `contents:read` (classic: `repo`). Without it, App notes fail closed with a generic message (no GitHub error leaked).
 
 ## Migration Notes
 
