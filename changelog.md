@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
-- **`/release` errors** — missing notes, token, and fetch failures are ephemeral; a successful post still goes to the channel.
+- **`/release` errors** — missing notes, fetch failures, and GitHub token issues are ephemeral (unset vs 401 invalid vs 403 scope); a successful post still goes to the channel.
 - **`/release` owner-only** — gated with `requires_owner()` (`OWNER_IDS`); hidden from `/commands` unless `include_admin`.
 - **Agent check-in DMs** — send the fixed invite as a Discord embed (`build_nudge_dm_embed`) instead of a plain message.
 

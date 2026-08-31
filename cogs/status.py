@@ -32,8 +32,16 @@ RELEASE_PRODUCT_ALPHAPY = "alphapy"
 RELEASE_PRODUCT_APP = "app"
 DEFAULT_ALPHAPY_GITHUB_REPO = "Innersync-tech/alphapy"
 APP_GITHUB_REPO = "Innersync-tech/innersync-dashboard"
-APP_RELEASE_TOKEN_MSG = (
-    "Could not load App release notes. A GitHub token with access to the App repository is required."
+APP_RELEASE_TOKEN_MISSING_MSG = (
+    "GITHUB_TOKEN is not set. Add a PAT on Railway Alphapy with contents:read "
+    "(classic: repo) for Innersync-tech/innersync-dashboard."
+)
+APP_RELEASE_TOKEN_INVALID_MSG = (
+    "GITHUB_TOKEN is invalid or expired. Replace it on Railway Alphapy."
+)
+APP_RELEASE_TOKEN_SCOPE_MSG = (
+    "GITHUB_TOKEN cannot access the App repository. Grant contents:read "
+    "(classic: repo) on Innersync-tech/innersync-dashboard."
 )
 
 # Add a row here to support more products later (Core, Mind, ...).
@@ -1051,7 +1059,7 @@ async def _get_release_notes(
     )
 
     if key == RELEASE_PRODUCT_APP and not _github_token():
-        return empty._replace(error=APP_RELEASE_TOKEN_MSG)
+        return empty._replace(error=APP_RELEASE_TOKEN_MISSING_MSG)
 
     status: int | None = None
     if repo:
@@ -1097,8 +1105,10 @@ async def _get_release_notes(
                 footer=footer,
             )
 
-    if key == RELEASE_PRODUCT_APP and status in (401, 403):
-        return empty._replace(error=APP_RELEASE_TOKEN_MSG)
+    if key == RELEASE_PRODUCT_APP and status == 401:
+        return empty._replace(error=APP_RELEASE_TOKEN_INVALID_MSG)
+    if key == RELEASE_PRODUCT_APP and status == 403:
+        return empty._replace(error=APP_RELEASE_TOKEN_SCOPE_MSG)
     if key == RELEASE_PRODUCT_APP and status is None:
         return empty._replace(
             error="Could not load App release notes. Please try again later."

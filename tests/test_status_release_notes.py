@@ -148,7 +148,7 @@ async def test_app_without_token_does_not_fetch(monkeypatch):
 
     monkeypatch.setattr(status_cog, "_fetch_github_release", _should_not_fetch)
     result = await status_cog._get_release_notes("app", None)
-    assert result.error == status_cog.APP_RELEASE_TOKEN_MSG
+    assert result.error == status_cog.APP_RELEASE_TOKEN_MISSING_MSG
     assert result.notes == ""
     assert result.github_url is None
 
@@ -228,7 +228,7 @@ async def test_alphapy_uses_github_url_when_public(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_app_401_returns_token_message(monkeypatch):
+async def test_app_401_returns_invalid_token_message(monkeypatch):
     monkeypatch.setattr(status_cog.config, "GITHUB_TOKEN", "bad")
 
     async def _unauth(*_a, **_k):
@@ -236,5 +236,18 @@ async def test_app_401_returns_token_message(monkeypatch):
 
     monkeypatch.setattr(status_cog, "_fetch_github_release", _unauth)
     result = await status_cog._get_release_notes("app", "3.8.0")
-    assert result.error == status_cog.APP_RELEASE_TOKEN_MSG
+    assert result.error == status_cog.APP_RELEASE_TOKEN_INVALID_MSG
+    assert result.notes == ""
+
+
+@pytest.mark.asyncio
+async def test_app_403_returns_scope_message(monkeypatch):
+    monkeypatch.setattr(status_cog.config, "GITHUB_TOKEN", "limited")
+
+    async def _forbidden(*_a, **_k):
+        return None, None, None, 403
+
+    monkeypatch.setattr(status_cog, "_fetch_github_release", _forbidden)
+    result = await status_cog._get_release_notes("app", "3.8.0")
+    assert result.error == status_cog.APP_RELEASE_TOKEN_SCOPE_MSG
     assert result.notes == ""

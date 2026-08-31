@@ -843,7 +843,7 @@ Show bot version and codename.
 ### `/release`
 Show release notes for Alphapy or the Innersync App.
 
-**Permissions:** Owner only (`requires_owner()` / `OWNER_IDS`). Success posts in the channel. Errors (missing notes, missing `GITHUB_TOKEN`, fetch failure, permission denial) are ephemeral.
+**Permissions:** Owner only (`requires_owner()` / `OWNER_IDS`). Success posts in the channel. Errors are ephemeral: missing `GITHUB_TOKEN`, invalid/expired token (401), insufficient scope (403), missing notes, fetch failure, or permission denial.
 
 **Parameters:**
 - `product` (optional, default: Alphapy): `Alphapy` or `App`
