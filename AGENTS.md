@@ -96,6 +96,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Tier 2 dialogue skills**: mirror inner-conflict patterns + one micro-step; avoidance/chain-break skills may append validated insights on `/agent end` when learning is enabled
 - **Session timeline**: `agent_sessions.memory_patch.session_insight_snapshot` (max 5 insight chips per session for App BFF)
 - **Memory Vault graph push**: on `/agent end`, Tier-2 insight labels (+ `active_themes`) → Core `POST /integrations/platform/agent-graph/write` (`source=agent_chat`, `theme_source=tier2`, metadata only). Gate: `ALPHAPY_MEMORY_GRAPH_PUSH` (default on when `CORE_API_URL` + `ALPHAPY_SERVICE_KEY` set). Fail-open — never blocks session end. Client: `utils/core_agent_graph.py` (`theme_key` parity with Core `_theme_key`).
+- **Tier-2 distill catalog**: `/agent end` injects current `derived_profile.insights` (≤20) into the same Grok distill call. Same lived mechanism → exact stored label (`+0.08`); different friction or doubt → new label. No cosine merge.
 - **Pattern context**: `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` only (never graph progress / heuristic labels); prefs `learn_from_patterns` / fallback `learn_from_shared`
 - **Output locale**: agent replies + Tier-2 distill follow Innersync ID `preferences.locale` via `utils/platform_locale.py` (see InnersyncIdentity)
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests

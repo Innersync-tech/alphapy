@@ -311,6 +311,52 @@ def build_session_insight_snapshot(
     return snapshots
 
 
+CATALOG_INSIGHT_CAP = 20
+
+CATALOG_KEEP_APART_RULES = (
+    "Catalog reuse: if this text is the same lived mechanism as an existing catalog label, "
+    "return that EXACT stored label and type so it can be reinforced. "
+    "If the friction is different, invent a new label even when they share a word. "
+    "If uncertain, keep them apart — do not merge to tidy the list. "
+    "Example: waiting before acting (impulse control) is distinct from "
+    "resting to recover energy (recovery)."
+)
+
+
+def format_catalog_for_distill(existing: dict[str, Any], *, cap: int = CATALOG_INSIGHT_CAP) -> str:
+    """Compact label+type list for distill prompts (empty when catalog is empty)."""
+    profile = normalize_derived_profile(existing)
+    lines: list[str] = []
+    for ins in profile.get("insights") or []:
+        if not isinstance(ins, dict):
+            continue
+        label = str(ins.get("label") or "").strip()[:MAX_LABEL_LEN]
+        if len(label) < 8:
+            continue
+        insight_type = str(ins.get("type") or "theme").strip().lower() or "theme"
+        lines.append(f"- {label} ({insight_type})")
+        if len(lines) >= cap:
+            break
+    return "\n".join(lines)
+
+
+def catalog_user_block(catalog_lines: str) -> str:
+    body = (catalog_lines or "").strip()
+    if not body:
+        return ""
+    return (
+        "Existing catalog (reuse the exact stored label when the mechanism matches):\n"
+        + body
+    )
+
+
+def with_catalog_user_message(base_user: str, catalog_lines: str) -> str:
+    block = catalog_user_block(catalog_lines)
+    if not block:
+        return base_user
+    return f"{block}\n\n{base_user}"
+
+
 def _parse_distill_json(raw: str) -> dict[str, Any] | None:
     text = raw.strip()
     if not text:
@@ -354,6 +400,7 @@ async def distill_session_profile(
     from utils.platform_locale import locale_output_instruction, normalize_platform_locale
 
     loc = normalize_platform_locale(platform_locale)
+    catalog_lines = format_catalog_for_distill(existing)
     system = (
         "You extract generalized reflection patterns for a private coaching agent. "
         "Return ONLY valid JSON, no markdown. Schema:\n"
@@ -363,13 +410,17 @@ async def distill_session_profile(
         '"open_loops":["optional gentle follow-up without quotes"]}\n'
         "Rules: NO quotes from journals; NO dates; NO mantras; NO names; "
         "labels must be abstract patterns only; omit insights below 0.6 confidence. "
+        f"{CATALOG_KEEP_APART_RULES} "
         f"{locale_output_instruction(loc)}"
     )
-    user = (
-        f"Ephemeral journal context (do not quote):\n{tier0_context[:2000]}\n\n"
-        f"User request: {user_message[:500]}\n\n"
-        f"Agent reply (do not quote): {agent_response[:1500]}\n\n"
-        f"Linked reflection IDs (metadata only): {', '.join(sorted(source_reflection_ids)[:10])}"
+    user = with_catalog_user_message(
+        (
+            f"Ephemeral journal context (do not quote):\n{tier0_context[:2000]}\n\n"
+            f"User request: {user_message[:500]}\n\n"
+            f"Agent reply (do not quote): {agent_response[:1500]}\n\n"
+            f"Linked reflection IDs (metadata only): {', '.join(sorted(source_reflection_ids)[:10])}"
+        ),
+        catalog_lines,
     )
     messages = [
         {"role": "system", "content": system},
