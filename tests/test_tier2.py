@@ -256,3 +256,113 @@ async def test_purge_tier2_for_reflection_local(monkeypatch) -> None:
     stored = await get_user_memory(user_id, "reflection")
     assert "derived_profile" not in stored
     assert stored.get("session_count") == 2
+
+
+def test_format_catalog_for_distill_keep_apart_and_cap() -> None:
+    from agents.tier2 import (
+        CATALOG_INSIGHT_CAP,
+        CATALOG_KEEP_APART_RULES,
+        format_catalog_for_distill,
+        with_catalog_user_message,
+    )
+
+    existing = {
+        "insights": [
+            {
+                "type": "habit",
+                "label": "waiting before acting on impulse",
+                "confidence": 0.7,
+            },
+            {"type": "habit", "label": "short", "confidence": 0.9},
+            {
+                "type": "theme",
+                "label": "resting to recover energy after strain",
+                "confidence": 0.8,
+            },
+        ]
+    }
+    lines = format_catalog_for_distill(existing)
+    assert "waiting before acting on impulse (habit)" in lines
+    assert "resting to recover energy after strain (theme)" in lines
+    assert "short" not in lines
+
+    many = {
+        "insights": [
+            {
+                "type": "theme",
+                "label": f"recurring inner critic pattern number {i}",
+                "confidence": 0.7,
+            }
+            for i in range(CATALOG_INSIGHT_CAP + 5)
+        ]
+    }
+    assert len(format_catalog_for_distill(many).splitlines()) == CATALOG_INSIGHT_CAP
+    assert format_catalog_for_distill({}) == ""
+
+    assert "EXACT stored label" in CATALOG_KEEP_APART_RULES
+    assert "keep them apart" in CATALOG_KEEP_APART_RULES
+    assert "impulse control" in CATALOG_KEEP_APART_RULES
+    base = "Ephemeral journal context (do not quote):\nhi"
+    with_cat = with_catalog_user_message(base, lines)
+    assert with_cat.startswith("Existing catalog")
+    assert "waiting before acting on impulse" in with_cat
+    assert with_catalog_user_message(base, "") == base
+
+
+@pytest.mark.asyncio
+async def test_distill_session_profile_injects_catalog(monkeypatch) -> None:
+    import json
+
+    from agents.tier2 import distill_session_profile, normalize_derived_profile
+
+    captured: dict[str, list] = {}
+
+    async def _fake_ask_gpt(messages, **_kwargs):
+        captured["messages"] = messages
+        return json.dumps(
+            {
+                "insights": [
+                    {
+                        "type": "habit",
+                        "label": "waiting before acting on impulse",
+                        "confidence": 0.8,
+                    }
+                ],
+                "active_themes": [],
+            }
+        )
+
+    monkeypatch.setattr("agents.tier2.ask_gpt", _fake_ask_gpt)
+    existing = normalize_derived_profile(
+        {
+            "insights": [
+                {
+                    "type": "habit",
+                    "label": "waiting before acting on impulse",
+                    "confidence": 0.7,
+                    "source_reflection_ids": ["ref-1"],
+                }
+            ]
+        }
+    )
+    merged = await distill_session_profile(
+        tier0_context="opted-in notes about evening wind-down after meetings with colleagues",
+        user_message="I keep jumping in",
+        agent_response="Notice the pause before you act.",
+        source_reflection_ids=frozenset({"ref-1"}),
+        existing=existing,
+        discord_user_id=1,
+        guild_id=2,
+    )
+    system = captured["messages"][0]["content"]
+    user = captured["messages"][1]["content"]
+    assert "keep them apart" in system
+    assert "waiting before acting on impulse" in user
+    assert "Existing catalog" in user
+    assert merged is not None
+    assert any(
+        "waiting before acting on impulse" in str(i.get("label"))
+        for i in merged.get("insights") or []
+    )
+
+

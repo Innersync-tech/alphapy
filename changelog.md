@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- **Tier-2 distill catalog-in-prompt** — `/agent end` passes current `derived_profile.insights` (≤20 labels + types) into the existing Grok distill call. Same lived mechanism reuses the exact stored label (`+0.08`); distinct friction or doubt stays a new row. No cosine merge, no extra LLM round-trip.
 - **Legal — `/agent` retention honesty** — Privacy Policy §2/§6 and Terms §6 now name agent session turns (removed on `/agent end`) vs session metadata / opted-in insights (until delete or GDPR purge). App Inner Barz chat is pointed at the App Privacy Policy. Merging `docs/privacy-policy.md` to `main` fires the legal-update webhook.
 - **`/release` errors** — missing notes, fetch failures, and GitHub token issues are ephemeral (unset vs 401 invalid vs 403 scope); a successful post still goes to the channel.
 - **`/release` owner-only** — gated with `requires_owner()` (`OWNER_IDS`); hidden from `/commands` unless `include_admin`.
