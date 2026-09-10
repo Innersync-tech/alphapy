@@ -166,9 +166,20 @@ _ip_rate_limits: dict[str, list[float]] = defaultdict(list)
 MAX_IP_ENTRIES = 1000
 RATE_LIMIT_CLEANUP_INTERVAL = 600  # 10 minutes
 
-# API observability counters (single-process, rolling windows)
-_api_latencies_ms: deque[float] = deque(maxlen=2000)
-_webhook_latencies_ms: deque[float] = deque(maxlen=2000)
+# API observability (single-process, 60s rolling window)
+OBS_WINDOW_SECONDS = 60
+MIN_P50_SAMPLES = 5
+MIN_P95_SAMPLES = 20
+_OBS_SKIP_PATHS = {
+    "/health",
+    "/api/health",
+    "/api/observability",
+    "/api/metrics",
+    "/status",
+}
+# (timestamp, latency_ms, success)
+_api_samples: deque[tuple[float, float, bool]] = deque(maxlen=2000)
+_webhook_samples: deque[tuple[float, float, bool]] = deque(maxlen=2000)
 _api_total_requests = 0
 _api_success_requests = 0
 _webhook_total_requests = 0
@@ -191,20 +202,66 @@ def _percentile(values: list[float], pct: float) -> float:
     return float(ordered[f] * (c - k) + ordered[c] * (k - f))
 
 
+def _windowed_samples(
+    samples: deque[tuple[float, float, bool]],
+    now: float | None = None,
+) -> list[tuple[float, float, bool]]:
+    now_ts = now if now is not None else time.time()
+    cutoff = now_ts - OBS_WINDOW_SECONDS
+    while samples and samples[0][0] < cutoff:
+        samples.popleft()
+    return list(samples)
+
+
+def _observability_bucket(samples: deque[tuple[float, float, bool]]) -> dict[str, Any]:
+    windowed = _windowed_samples(samples)
+    latencies = [latency for _, latency, _ in windowed]
+    n = len(windowed)
+    successes = sum(1 for _, _, ok in windowed if ok)
+    success_rate = (successes / n) if n else 1.0
+    p50 = _percentile(latencies, 0.50) if n >= MIN_P50_SAMPLES else 0.0
+    p95 = _percentile(latencies, 0.95) if n >= MIN_P95_SAMPLES else 0.0
+    p99 = _percentile(latencies, 0.99) if n >= MIN_P95_SAMPLES else 0.0
+    return {
+        "requests": n,
+        "sample_count": n,
+        "window_seconds": OBS_WINDOW_SECONDS,
+        "success_rate": round(success_rate, 4),
+        "latency_ms": {
+            "p50": round(p50, 2),
+            "p95": round(p95, 2),
+            "p99": round(p99, 2),
+        },
+    }
+
+
+def _build_observability_payload() -> dict[str, Any]:
+    return {
+        "api": _observability_bucket(_api_samples),
+        "webhooks": _observability_bucket(_webhook_samples),
+        "hermit_context": get_hermit_context_stats(),
+    }
+
+
 def _record_observability(path: str, status_code: int, latency_ms: float) -> None:
     global _api_total_requests, _api_success_requests, _webhook_total_requests, _webhook_success_requests
+    if path in _OBS_SKIP_PATHS:
+        return
+    now_ts = time.time()
     is_webhook = path.startswith("/webhooks/")
     success = status_code < 500
     if is_webhook:
         _webhook_total_requests += 1
         if success:
             _webhook_success_requests += 1
-        _webhook_latencies_ms.append(latency_ms)
+        _webhook_samples.append((now_ts, latency_ms, success))
+        _windowed_samples(_webhook_samples, now_ts)
     else:
         _api_total_requests += 1
         if success:
             _api_success_requests += 1
-        _api_latencies_ms.append(latency_ms)
+        _api_samples.append((now_ts, latency_ms, success))
+        _windowed_samples(_api_samples, now_ts)
 
 
 def _cleanup_idempotency_cache() -> None:
@@ -558,29 +615,7 @@ def get_status():
     dependencies=[Depends(require_observability_api_key)],
 )
 def get_observability() -> dict[str, Any]:
-    api_success_rate = (_api_success_requests / _api_total_requests) if _api_total_requests else 1.0
-    webhook_success_rate = (_webhook_success_requests / _webhook_total_requests) if _webhook_total_requests else 1.0
-    return {
-        "api": {
-            "requests": _api_total_requests,
-            "success_rate": round(api_success_rate, 4),
-            "latency_ms": {
-                "p50": round(_percentile(list(_api_latencies_ms), 0.50), 2),
-                "p95": round(_percentile(list(_api_latencies_ms), 0.95), 2),
-                "p99": round(_percentile(list(_api_latencies_ms), 0.99), 2),
-            },
-        },
-        "webhooks": {
-            "requests": _webhook_total_requests,
-            "success_rate": round(webhook_success_rate, 4),
-            "latency_ms": {
-                "p50": round(_percentile(list(_webhook_latencies_ms), 0.50), 2),
-                "p95": round(_percentile(list(_webhook_latencies_ms), 0.95), 2),
-                "p99": round(_percentile(list(_webhook_latencies_ms), 0.99), 2),
-            },
-        },
-        "hermit_context": get_hermit_context_stats(),
-    }
+    return _build_observability_payload()
 
 
 @app.get("/api/health/history")
@@ -1539,27 +1574,6 @@ async def _persist_telemetry_snapshot(
             gpt_errors_24h / float(gpt_successes_24h + gpt_errors_24h), 2
         )
 
-    # Safely handle latency_ms - check for NaN and None
-    latency_ms_raw = bot_metrics.latency_ms
-    if latency_ms_raw is None or (isinstance(latency_ms_raw, float) and math.isnan(latency_ms_raw)):
-        latency_ms = 0.0
-    else:
-        latency_ms = float(latency_ms_raw)
-    
-    latency_p50 = int(latency_ms) if not math.isnan(latency_ms) else 0
-    latency_p95 = int(round(latency_ms * 1.5)) if not math.isnan(latency_ms) else 0
-
-    # throughput_per_minute should be integer according to schema
-    throughput_per_minute = 0
-    if total_activity_24h:
-        throughput_per_minute = int(round(total_activity_24h / (24 * 60)))
-
-    queue_depth = ticket_stats.open_count
-    active_bots = len(bot_metrics.guilds) or None
-
-    # Only count recent Grok/LLM errors (last hour) for status, not all 24h errors
-    # Old errors shouldn't keep the system in degraded state
-    # NOTE: Open tickets are NOT an indicator of bot health - they're normal business operations
     gpt_errors_1h = _count_recent_events(gpt_metrics.recent_errors, hours=1)
     
     # Status is based ONLY on technical health: bot online status and Grok/LLM errors
@@ -1567,7 +1581,18 @@ async def _persist_telemetry_snapshot(
     # Use the same calculation function as debug logs for consistency
     status = _calculate_status(bot_metrics, gpt_errors_1h)
 
+    queue_depth = ticket_stats.open_count
+    active_bots = len(bot_metrics.guilds) or None
+
+    obs = _build_observability_payload()
+    api_obs = obs["api"]
+    api_n = int(api_obs.get("sample_count") or 0)
+    latency_p50 = int(round(api_obs["latency_ms"]["p50"])) if api_n >= MIN_P50_SAMPLES else 0
+    latency_p95 = int(round(api_obs["latency_ms"]["p95"])) if api_n >= MIN_P95_SAMPLES else 0
+    throughput_per_minute = api_n
+
     notes = (
+        f"n={api_n} window={OBS_WINDOW_SECONDS}s · "
         f"{total_activity_24h} events/24h · {ticket_stats.open_count} open tickets · "
         f"Grok/LLM errors 24h: {gpt_errors_24h}"
     )
