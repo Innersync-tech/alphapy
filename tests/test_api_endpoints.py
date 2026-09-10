@@ -8,6 +8,7 @@ via app.dependency_overrides; db_pool is patched at the module level.
 
 from concurrent.futures import Future
 from datetime import date, datetime, time
+from time import time as wall_clock
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -265,23 +266,51 @@ class TestRemoveReminder:
 
 class TestApiObservability:
     def test_observability_endpoint_includes_latency_and_success_rate(self):
-        pool, _ = _mock_pool(_fake_record())
+        now = wall_clock()
+        api_samples = api_module.deque(
+            [(now, 10.0 + i, True) for i in range(20)],
+            maxlen=2000,
+        )
+        webhook_samples = api_module.deque(
+            [(now, 9.0, True), (now, 16.0, True), (now, 24.0, False)],
+            maxlen=2000,
+        )
         with (
-            patch.object(api_module, "db_pool", pool),
-            patch.object(api_module, "_api_total_requests", 10),
-            patch.object(api_module, "_api_success_requests", 9),
-            patch.object(api_module, "_webhook_total_requests", 4),
-            patch.object(api_module, "_webhook_success_requests", 3),
-            patch.object(api_module, "_api_latencies_ms", api_module.deque([12.0, 18.0, 27.0, 31.0], maxlen=2000)),
-            patch.object(api_module, "_webhook_latencies_ms", api_module.deque([9.0, 16.0, 24.0], maxlen=2000)),
+            patch.object(api_module, "_api_samples", api_samples),
+            patch.object(api_module, "_webhook_samples", webhook_samples),
         ):
             data = api_module.get_observability()
         assert "api" in data
         assert "webhooks" in data
         assert "hermit_context" in data
-        assert data["api"]["requests"] == 10
-        assert data["api"]["success_rate"] == 0.9
-        assert "p95" in data["api"]["latency_ms"]
+        assert data["api"]["requests"] == 20
+        assert data["api"]["sample_count"] == 20
+        assert data["api"]["window_seconds"] == 60
+        assert data["api"]["success_rate"] == 1.0
+        assert data["api"]["latency_ms"]["p50"] > 0
+        assert data["api"]["latency_ms"]["p95"] >= data["api"]["latency_ms"]["p50"]
+        assert data["webhooks"]["sample_count"] == 3
+        assert data["webhooks"]["latency_ms"]["p50"] == 0.0  # n < 5
+
+    def test_observability_skips_health_paths(self):
+        api_module._api_samples.clear()
+        api_module._webhook_samples.clear()
+        api_module._record_observability("/health", 200, 3.0)
+        api_module._record_observability("/api/observability", 200, 4.0)
+        api_module._record_observability("/api/agents/sessions", 200, 42.0)
+        windowed = api_module._windowed_samples(api_module._api_samples)
+        assert len(windowed) == 1
+        assert windowed[0][1] == 42.0
+
+    def test_observability_drops_samples_outside_window(self):
+        now = wall_clock()
+        stale = api_module.deque(
+            [(now - 120, 999.0, True), (now, 40.0, True)],
+            maxlen=2000,
+        )
+        bucket = api_module._observability_bucket(stale)
+        assert bucket["sample_count"] == 1
+        assert bucket["latency_ms"]["p50"] == 0.0
 
 
 class TestRequireObservabilityApiKey:
