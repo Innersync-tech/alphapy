@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - **Onboarding rules PUT (#375)** — `PUT /api/dashboard/{guild_id}/onboarding/rules/{rule_id}` for control-panel rule edit.
 
 ### Fixed
+- **Agent nudge cadence (#404)** — rolling 24h cooldown drifted +1h per day against the hourly loop. Due check is now once per Europe/Brussels calendar day in the 20:00 local hour (`NUDGE_LOCAL_HOUR`).
 - **Docs honesty (#388, #384)** — public `/api/health` + auth overview; observability field list; `/top-commands` unauthenticated note; `invite_tracker` schema; Check-ins path aligned in nudge DM; `INNERSYNC_APP_URL` wired in `config.py` + configuration docs. Legal ToS still deferred.
 - **Docs honesty (#382)** — migration head `027` in `database-schema.md`; metrics auth is JWT-only in `ALPHAPY_AUTHENTICATION.md` (no bare API-key metrics example); `/growthcheckin` consent note in `commands.md`; playbook startup/log-channel cleanup; README drops Google Drive env hint. Legal ToS left unchanged (legal-update webhook).
 - **Agent nudge delivery** — opt-in listing uses jsonb `cs.{"agent_nudges_enabled":true}` (PostgREST `->>eq.true` returned empty 200s); guild membership falls back to `fetch_member`; tick logs `opted_in`/`due`/`skipped_*` for ops.

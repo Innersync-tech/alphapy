@@ -761,7 +761,7 @@ Opt in or out of Discord check-in DMs.
 **Parameters:**
 - `enable` or `disable` (required): Set `agent_prefs.agent_nudges_enabled`
 
-**Behavior:** Default is **off**. When enabled, the hourly bot loop may send at most one fixed English invite DM per 24 hours (`agents/nudges.py`). The DM never includes Grok output or journal text. Requires `/link` and a mutual guild with `agents.enabled`. Does not consume `/agent start` quota. Same pref as Innersync App → Settings → Alphapy → Check-ins.
+**Behavior:** Default is **off**. When enabled, the hourly bot loop may send at most one fixed English invite DM per Europe/Brussels calendar day at 20:00 local (`NUDGE_LOCAL_HOUR` in `agents/nudges.py`; the tick in that hour, e.g. 20:02). The DM never includes Grok output or journal text. Requires `/link` and a mutual guild with `agents.enabled`. Does not consume `/agent start` quota. Same pref as Innersync App → Settings → Alphapy → Check-ins.
 
 **Permissions:** Linked Innersync users only (ephemeral)
 

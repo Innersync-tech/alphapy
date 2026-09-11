@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import discord
@@ -20,7 +20,7 @@ from utils.timezone import BRUSSELS_TZ
 
 logger = logging.getLogger("alphapy.agents.nudges")
 
-NUDGE_COOLDOWN = timedelta(hours=24)
+NUDGE_LOCAL_HOUR = 20
 NUDGE_BATCH_LIMIT = 25
 
 _DEFAULT_APP_BASE = "https://app.innersync.tech"
@@ -83,14 +83,22 @@ def agent_nudges_enabled(prefs: dict[str, str | bool]) -> bool:
     return bool(prefs.get("agent_nudges_enabled"))
 
 
+def _as_brussels(dt: datetime) -> datetime:
+    """Aware UTC (naive treated as UTC) → Europe/Brussels."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(BRUSSELS_TZ)
+
+
 def is_due_for_nudge(last_sent_at: datetime | None, *, now: datetime | None = None) -> bool:
-    """True when never sent or last send is older than the cooldown."""
+    """True in/after the 20:00 Europe/Brussels hour when not yet sent that calendar day."""
+    current = _as_brussels(now or datetime.now(UTC))
+    if current.hour < NUDGE_LOCAL_HOUR:
+        return False
     if last_sent_at is None:
         return True
-    current = now or datetime.now(UTC)
-    if last_sent_at.tzinfo is None:
-        last_sent_at = last_sent_at.replace(tzinfo=UTC)
-    return current - last_sent_at >= NUDGE_COOLDOWN
+    last = _as_brussels(last_sent_at)
+    return last.date() != current.date()
 
 
 async def set_agent_nudges_enabled(innersync_user_id: str, enabled: bool) -> dict[str, str | bool]:
@@ -236,7 +244,7 @@ async def list_due_nudge_candidates(
     batch_limit: int = NUDGE_BATCH_LIMIT,
     now: datetime | None = None,
 ) -> list[NudgeCandidate]:
-    """Opted-in + linked + cooldown elapsed + agents-enabled guild."""
+    """Opted-in + linked + due in the 20:00 Brussels window + agents-enabled guild."""
     opted_in = await fetch_opted_in_user_ids(limit=max(batch_limit * 4, 100))
     if not opted_in:
         logger.info("Nudge tick: opted_in=0 (no candidates)")
@@ -346,7 +354,7 @@ async def run_nudge_tick(bot: discord.Client, pool: Any) -> int:
 __all__ = [
     "NudgeCandidate",
     "NUDGE_BATCH_LIMIT",
-    "NUDGE_COOLDOWN",
+    "NUDGE_LOCAL_HOUR",
     "agent_nudges_enabled",
     "app_agent_home_url",
     "build_nudge_dm_embed",

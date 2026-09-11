@@ -460,8 +460,8 @@ class AgentGroup(app_commands.Group):
         if enabled:
             await interaction.followup.send(
                 "Check-in DMs **enabled**. You'll get at most one reminder per day "
-                "when agents are on in a shared server. Disable anytime with "
-                "`/agent nudges disable`.",
+                "around 20:00 (Europe/Brussels) when agents are on in a shared server. "
+                "Disable anytime with `/agent nudges disable`.",
                 ephemeral=True,
             )
         else:

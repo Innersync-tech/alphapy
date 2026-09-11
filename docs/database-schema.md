@@ -170,7 +170,7 @@ Delivery ledger for opt-in Discord check-in DMs (Phase 5A). Added in migration `
 **Columns:**
 - `innersync_user_id` (UUID, NOT NULL, PRIMARY KEY): Innersync Auth user id
 - `discord_user_id` (BIGINT, NOT NULL): Discord snowflake used to DM
-- `last_sent_at` (TIMESTAMPTZ, NULL): Last successful DM send (24h cooldown)
+- `last_sent_at` (TIMESTAMPTZ, NULL): Last successful DM send (once per Europe/Brussels calendar day at 20:00 local)
 
 **Indexes:**
 - `idx_agent_nudge_state_discord` on `discord_user_id`
