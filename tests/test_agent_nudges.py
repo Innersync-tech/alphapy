@@ -1,14 +1,14 @@
 """Unit tests for Phase 5A agent Discord DM nudges."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from agents.nudges import (
-    NUDGE_COOLDOWN,
+    NUDGE_LOCAL_HOUR,
     agent_nudges_enabled,
     build_nudge_dm_embed,
     build_nudge_dm_text,
@@ -18,6 +18,11 @@ from agents.nudges import (
     user_has_agents_enabled_guild,
 )
 from agents.profile import normalize_agent_prefs
+from utils.timezone import BRUSSELS_TZ
+
+
+def _bxl(year: int, month: int, day: int, hour: int, minute: int = 0) -> datetime:
+    return datetime(year, month, day, hour, minute, tzinfo=BRUSSELS_TZ)
 
 
 def test_normalize_agent_prefs_preserves_nudges_flag() -> None:
@@ -32,19 +37,58 @@ def test_agent_nudges_enabled_default_off() -> None:
     assert agent_nudges_enabled({"agent_nudges_enabled": True}) is True
 
 
-def test_is_due_for_nudge_never_sent() -> None:
-    assert is_due_for_nudge(None) is True
+def test_is_due_for_nudge_never_sent_before_window() -> None:
+    assert is_due_for_nudge(None, now=_bxl(2026, 8, 15, 10, 0)) is False
 
 
-def test_is_due_for_nudge_within_cooldown() -> None:
-    now = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
-    last = now - timedelta(hours=6)
+def test_is_due_for_nudge_never_sent_in_window() -> None:
+    assert is_due_for_nudge(None, now=_bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 5)) is True
+
+
+def test_is_due_for_nudge_already_sent_same_brussels_day() -> None:
+    now = _bxl(2026, 8, 15, 21, 0)
+    last = _bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 2)
     assert is_due_for_nudge(last, now=now) is False
 
 
-def test_is_due_for_nudge_after_cooldown() -> None:
-    now = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
-    last = now - NUDGE_COOLDOWN - timedelta(minutes=1)
+def test_is_due_for_nudge_next_day_before_window() -> None:
+    last = _bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 2)
+    now = _bxl(2026, 8, 16, 19, 50)
+    assert is_due_for_nudge(last, now=now) is False
+
+
+def test_is_due_for_nudge_next_day_in_window_no_plus_one_hour_slip() -> None:
+    """#404: rolling 24h cooldown slipped +1h/day; local hour must stay 20:00."""
+    last = _bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 2)
+    now = _bxl(2026, 8, 16, NUDGE_LOCAL_HOUR, 1)
+    assert is_due_for_nudge(last, now=now) is True
+
+
+def test_is_due_for_nudge_next_day_catch_up_later_hour() -> None:
+    last = _bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 2)
+    now = _bxl(2026, 8, 16, 22, 0)
+    assert is_due_for_nudge(last, now=now) is True
+
+
+def test_is_due_for_nudge_dst_spring_forward_stays_20h() -> None:
+    # 2026-03-29 02:00 Europe/Brussels jumps to 03:00; 20:00 still exists.
+    last = _bxl(2026, 3, 28, NUDGE_LOCAL_HOUR, 0)
+    now = _bxl(2026, 3, 29, NUDGE_LOCAL_HOUR, 0)
+    assert is_due_for_nudge(last, now=now) is True
+    assert is_due_for_nudge(now, now=_bxl(2026, 3, 29, 21, 0)) is False
+
+
+def test_is_due_for_nudge_dst_fall_back_stays_20h() -> None:
+    # 2026-10-25 03:00 Europe/Brussels repeats 02:00; 20:00 still unique.
+    last = _bxl(2026, 10, 24, NUDGE_LOCAL_HOUR, 0)
+    now = _bxl(2026, 10, 25, NUDGE_LOCAL_HOUR, 0)
+    assert is_due_for_nudge(last, now=now) is True
+    assert is_due_for_nudge(now, now=_bxl(2026, 10, 25, 21, 0)) is False
+
+
+def test_is_due_for_nudge_naive_last_sent_treated_as_utc() -> None:
+    last = datetime(2026, 8, 15, 18, 2)  # 20:02 CEST
+    now = _bxl(2026, 8, 16, NUDGE_LOCAL_HOUR, 1)
     assert is_due_for_nudge(last, now=now) is True
 
 
@@ -122,7 +166,9 @@ async def test_user_has_agents_enabled_guild_fetch_member_fallback() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_due_skips_unlinked_and_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_list_due_skips_unlinked_and_already_sent_today(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = _bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 5)
+
     async def fake_opted_in(**_kwargs):
         return ["user-a", "user-b", "user-c"]
 
@@ -132,7 +178,7 @@ async def test_list_due_skips_unlinked_and_cooldown(monkeypatch: pytest.MonkeyPa
     async def fake_last(_pool, ids):
         return {
             "user-a": None,
-            "user-c": datetime.now(UTC) - timedelta(hours=1),
+            "user-c": _bxl(2026, 8, 15, NUDGE_LOCAL_HOUR, 2),
         }
 
     async def fake_prefs(uid: str):
@@ -148,7 +194,7 @@ async def test_list_due_skips_unlinked_and_cooldown(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr("agents.nudges.user_has_agents_enabled_guild", fake_guild)
 
     bot = SimpleNamespace(guilds=[])
-    due = await list_due_nudge_candidates(bot, pool=MagicMock())
+    due = await list_due_nudge_candidates(bot, pool=MagicMock(), now=now)
     assert len(due) == 1
     assert due[0].innersync_user_id == "user-a"
     assert due[0].discord_user_id == 111

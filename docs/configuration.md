@@ -240,7 +240,7 @@ Requires `ALPHAPY_AGENTS_ENABLED=true` on the deployment (Railway env). Per-guil
 
 When enabled, linked members can use `/agent list`, `/agent start`, `/agent continue`, `/agent end`, `/agent status`, and `/agent nudges enable|disable`.
 
-Check-in DMs are **opt-in** (`agent_prefs.agent_nudges_enabled`, default off). Members toggle them with `/agent nudges` or in Innersync App → Settings → Alphapy → Check-ins. The hourly loop sends at most one fixed English invite per 24 hours; it does not include journal text.
+Check-in DMs are **opt-in** (`agent_prefs.agent_nudges_enabled`, default off). Members toggle them with `/agent nudges` or in Innersync App → Settings → Alphapy → Check-ins. The hourly loop sends at most one fixed English invite per Europe/Brussels calendar day at 20:00 local; it does not include journal text.
 
 ### Module enable contract (`{scope}.enabled`)
 
