@@ -771,6 +771,10 @@ Opt in or out of Discord check-in DMs.
 
 When enabled in App agent settings (`agent_prefs.learn_from_patterns`, or legacy fallback to `learn_from_shared`), the runtime loads Tier-2 insights from Supabase `agent_memory.memory.derived_profile` for `agent_name=reflection` via `agents/pattern_loader.py` (up to eight labels) and injects them into the Grok prompt as `[learned_patterns]`. No encrypted journal text and no `agent_graph_nodes` read on this path — graph nodes are for Core Catalog cadence, not Discord prompt injection.
 
+### Session write-back (`agent_writeback_enabled`)
+
+When enabled on App `/dashboard/agent` (`agent_prefs.agent_writeback_enabled`, default off), `/agent end` may distill generalized labels from the session transcript into Patterns. Shared reflections are not required. Turns are still deleted after the session ends.
+
 ---
 
 ## Premium

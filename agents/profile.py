@@ -23,6 +23,7 @@ TIER1_BOOL_FIELDS = frozenset({
     "learn_from_shared",
     "learn_from_patterns",
     "agent_nudges_enabled",
+    "agent_writeback_enabled",
 })
 TIER3_FIELDS = frozenset({"session_count", "last_session_at", "last_session_id", "last_agent"})
 
@@ -93,6 +94,37 @@ def learn_from_patterns_enabled(prefs: dict[str, str | bool]) -> bool:
         # Fall back to shared-reflections learning when the newer flag is unset.
         return learn_from_shared_enabled(prefs)
     return bool(value)
+
+
+def agent_writeback_enabled(prefs: dict[str, str | bool]) -> bool:
+    """Whether ending a session may distill labels into Patterns. Default off."""
+    value = prefs.get("agent_writeback_enabled")
+    if value is None:
+        return False
+    return bool(value)
+
+
+def session_end_distill_allowed(
+    prefs: dict[str, str | bool],
+    *,
+    consent_ids: frozenset[str],
+    tier0_context: str,
+    user_transcript: str,
+    assistant_transcript: str,
+) -> bool:
+    """Whether `/agent end` may run Tier-2 distill.
+
+    Session write-back (explicit opt-in) uses the session transcript and does
+    not require shared reflections. Legacy `learn_from_shared` still needs
+    active consent + journal context.
+    """
+    if agent_writeback_enabled(prefs) and (
+        (user_transcript or "").strip() or (assistant_transcript or "").strip()
+    ):
+        return True
+    if learn_from_shared_enabled(prefs) and consent_ids and (tier0_context or "").strip():
+        return True
+    return False
 
 
 async def load_agent_prefs(innersync_user_id: str) -> dict[str, str | bool]:

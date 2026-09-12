@@ -190,6 +190,8 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 
 When `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`), `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` from Supabase `agent_memory` (`agent_name=reflection`) and injects a `[learned_patterns]` block into the runtime prompt. Tier-2-safe insight labels only — no encrypted journal text and no graph-node theme tokens.
 
+When `agent_prefs.agent_writeback_enabled` is on (App `/dashboard/agent`, default off), `/agent end` may distill labels from the session transcript without shared-reflection consent. Legacy `learn_from_shared` still requires active consent + journal context.
+
 ### `agent_sessions`
 
 | Column | Type | Notes |

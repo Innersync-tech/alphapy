@@ -37,6 +37,59 @@ def test_normalize_agent_prefs_preserves_learning_flags() -> None:
     assert prefs["energy_level"] == "3"
 
 
+def test_normalize_agent_prefs_preserves_writeback_flag() -> None:
+    prefs = normalize_agent_prefs(
+        {
+            "display_name": "Nova",
+            "agent_writeback_enabled": True,
+            "learn_from_shared": False,
+        }
+    )
+    assert prefs["agent_writeback_enabled"] is True
+    assert prefs["learn_from_shared"] is False
+    assert "agent_nudges_enabled" not in prefs
+
+
+def test_session_end_distill_allowed_writeback_uses_transcript() -> None:
+    from agents.profile import session_end_distill_allowed
+
+    prefs = {"agent_writeback_enabled": True, "learn_from_shared": False}
+    assert session_end_distill_allowed(
+        prefs,
+        consent_ids=frozenset(),
+        tier0_context="",
+        user_transcript="I keep freezing before I send.",
+        assistant_transcript="Name the pause.",
+    )
+    assert not session_end_distill_allowed(
+        prefs,
+        consent_ids=frozenset(),
+        tier0_context="",
+        user_transcript="",
+        assistant_transcript="",
+    )
+
+
+def test_session_end_distill_allowed_shared_still_needs_journal() -> None:
+    from agents.profile import session_end_distill_allowed
+
+    prefs = {"learn_from_shared": True}
+    assert not session_end_distill_allowed(
+        prefs,
+        consent_ids=frozenset(),
+        tier0_context="journal",
+        user_transcript="hi",
+        assistant_transcript="ok",
+    )
+    assert session_end_distill_allowed(
+        prefs,
+        consent_ids=frozenset({"ref-1"}),
+        tier0_context="journal",
+        user_transcript="",
+        assistant_transcript="",
+    )
+
+
 def test_normalize_agent_prefs_fatigue_merge_keeps_app_fields() -> None:
     """Discord energy write must not drop App Tier-1 prefs."""
     merged = {
