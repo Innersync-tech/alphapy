@@ -31,6 +31,7 @@ from agents.profile import (
     extract_tier3_memory,
     learn_from_shared_enabled,
     load_agent_prefs,
+    session_end_distill_allowed,
     tier3_memory_patch,
 )
 from agents.registry import resolve_agent
@@ -616,7 +617,13 @@ async def _finalize_session_end_background(
     session_summary = session_summary_from_profile(derived_profile)
     updated_memory: dict[str, Any] = dict(memory_patch)
 
-    if learn_from_shared_enabled(prefs) and consent_ids and tier0_context.strip():
+    if session_end_distill_allowed(
+        prefs,
+        consent_ids=consent_ids,
+        tier0_context=tier0_context,
+        user_transcript=user_transcript,
+        assistant_transcript=assistant_transcript,
+    ):
         from utils.platform_locale import resolve_locale_for_discord
 
         platform_locale = await resolve_locale_for_discord(discord_user_id, prefs)

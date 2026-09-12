@@ -473,3 +473,69 @@ async def test_end_agent_session_stores_insight_snapshot(monkeypatch) -> None:
 
     stored = await get_user_memory(user_id, "reflection")
     assert stored.get("session_count") == 1
+
+
+@pytest.mark.asyncio
+async def test_end_agent_session_writeback_without_shared_reflections(monkeypatch) -> None:
+    import config
+    from agents.memory import clear_local_store, get_user_memory
+    from agents.runtime import drain_end_background_jobs, end_agent_session, start_agent_session
+
+    monkeypatch.setattr(config, "ALPHAPY_AGENTS_MEMORY_BACKEND", "memory")
+    clear_local_store()
+
+    user_id = "dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee"
+    distill_calls: list[dict] = []
+
+    async def _fake_ask_gpt(messages, user_id=None, **kwargs):
+        return "Session ended."
+
+    async def _fake_distill(*args, **kwargs):
+        distill_calls.append(kwargs)
+        from agents.tier2 import normalize_derived_profile
+
+        return normalize_derived_profile(
+            {
+                "insights": [
+                    {
+                        "id": "from-session",
+                        "type": "habit",
+                        "label": "naming freeze before sending",
+                        "confidence": 0.8,
+                        "source_reflection_ids": [],
+                    }
+                ]
+            }
+        )
+
+    async def _fake_consent_ids(_user_id: str):
+        return frozenset()
+
+    async def _fake_load_prefs(_user_id: str):
+        return {"agent_writeback_enabled": True, "learn_from_shared": False}
+
+    monkeypatch.setattr("agents.skills.journal_sync.load_agent_reflection_context", lambda *a, **k: "")
+    monkeypatch.setattr("agents.runtime.ask_gpt", _fake_ask_gpt)
+    monkeypatch.setattr("agents.runtime.distill_session_profile", _fake_distill)
+    monkeypatch.setattr("agents.runtime._fetch_active_consent_reflection_ids", _fake_consent_ids)
+    monkeypatch.setattr("agents.runtime.load_agent_prefs", _fake_load_prefs)
+
+    await start_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=7,
+        guild_id=1,
+        agent_name="reflection",
+        user_message="I freeze before I send",
+    )
+    await end_agent_session(
+        innersync_user_id=user_id,
+        discord_user_id=7,
+        guild_id=1,
+        agent_name="reflection",
+    )
+    await drain_end_background_jobs()
+
+    assert distill_calls
+    stored = await get_user_memory(user_id, "reflection")
+    insights = (stored.get("derived_profile") or {}).get("insights") or []
+    assert any(item.get("id") == "from-session" for item in insights)

@@ -366,3 +366,56 @@ async def test_distill_session_profile_injects_catalog(monkeypatch) -> None:
     )
 
 
+@pytest.mark.asyncio
+async def test_distill_session_profile_allows_transcript_only(monkeypatch) -> None:
+    import json
+
+    from agents.tier2 import distill_session_profile
+
+    async def _fake_ask_gpt(messages, **_kwargs):
+        return json.dumps(
+            {
+                "insights": [
+                    {
+                        "type": "habit",
+                        "label": "naming the freeze before sending",
+                        "confidence": 0.8,
+                    }
+                ],
+                "active_themes": ["pause before send"],
+            }
+        )
+
+    monkeypatch.setattr("agents.tier2.ask_gpt", _fake_ask_gpt)
+    merged = await distill_session_profile(
+        tier0_context="",
+        user_message="I freeze before I send the message",
+        agent_response="Name the pause, then send a smaller note.",
+        source_reflection_ids=frozenset(),
+        existing={},
+        discord_user_id=1,
+        guild_id=2,
+    )
+    assert merged is not None
+    assert any(
+        "naming the freeze before sending" in str(i.get("label"))
+        for i in merged.get("insights") or []
+    )
+
+
+@pytest.mark.asyncio
+async def test_distill_session_profile_skips_empty_sources() -> None:
+    from agents.tier2 import distill_session_profile
+
+    merged = await distill_session_profile(
+        tier0_context="",
+        user_message="",
+        agent_response="",
+        source_reflection_ids=frozenset(),
+        existing={},
+        discord_user_id=1,
+        guild_id=2,
+    )
+    assert merged is None
+
+

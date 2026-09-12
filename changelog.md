@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Agent session write-back** — `agent_prefs.agent_writeback_enabled` (default off). When on, `/agent end` may distill Patterns from the session transcript without shared reflections. App toggle lives on `/dashboard/agent`.
+
 ### Changed
 - **Tier-2 distill catalog-in-prompt** — `/agent end` passes current `derived_profile.insights` (≤20 labels + types) into the existing Grok distill call. Same lived mechanism reuses the exact stored label (`+0.08`); distinct friction or doubt stays a new row. No cosine merge, no extra LLM round-trip.
 - **Legal — `/agent` retention honesty** — Privacy Policy §2/§6 and Terms §6 now name agent session turns (removed on `/agent end`) vs session metadata / opted-in insights (until delete or GDPR purge). App Inner Barz chat is pointed at the App Privacy Policy. Merging `docs/privacy-policy.md` to `main` fires the legal-update webhook.

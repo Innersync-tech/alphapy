@@ -390,11 +390,19 @@ async def distill_session_profile(
 ) -> dict[str, Any] | None:
     """
     Run LLM distill step; return merged derived_profile or None (fail closed).
+
+    Shared-journal distill still passes consent IDs + tier0. Session write-back
+    may pass an empty ID set and empty journal when the session transcript is
+    the only source.
     """
-    if not source_reflection_ids or not tier0_context.strip():
+    if not (
+        (tier0_context or "").strip()
+        or (user_message or "").strip()
+        or (agent_response or "").strip()
+    ):
         return None
 
-    blocklist = build_blocklist_from_tier0(tier0_context)
+    blocklist = build_blocklist_from_tier0(tier0_context or "")
     consent_epoch = _now_iso()
 
     from utils.platform_locale import locale_output_instruction, normalize_platform_locale
@@ -413,12 +421,19 @@ async def distill_session_profile(
         f"{CATALOG_KEEP_APART_RULES} "
         f"{locale_output_instruction(loc)}"
     )
+    linked_ids = ", ".join(sorted(source_reflection_ids)[:10])
+    linked_line = (
+        f"Linked reflection IDs (metadata only): {linked_ids}"
+        if linked_ids
+        else "Linked reflection IDs (metadata only): none (session transcript only)"
+    )
+    journal_block = (tier0_context or "").strip()[:2000] or "(none)"
     user = with_catalog_user_message(
         (
-            f"Ephemeral journal context (do not quote):\n{tier0_context[:2000]}\n\n"
+            f"Ephemeral journal context (do not quote):\n{journal_block}\n\n"
             f"User request: {user_message[:500]}\n\n"
             f"Agent reply (do not quote): {agent_response[:1500]}\n\n"
-            f"Linked reflection IDs (metadata only): {', '.join(sorted(source_reflection_ids)[:10])}"
+            f"{linked_line}"
         ),
         catalog_lines,
     )
