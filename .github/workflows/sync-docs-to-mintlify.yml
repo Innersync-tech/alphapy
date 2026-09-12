@@ -1,4 +1,11 @@
-name: Sync Alphapy docs to mintlify-docs
+name: Request Alphapy docs pull
+
+# Mintlify-docs pulls alphapy/docs into synced/alphapy with its own GITHUB_TOKEN.
+# See Innersync-tech/mintlify-docs .github/workflows/pull-alphapy-docs.yml
+#
+# This job only pings that workflow so a docs/** push does not wait for the hourly
+# cron. It never pushes to mintlify-docs (DOCS_SYNC_TOKEN cannot write there).
+# Missing or read-only token: skip, do not fail.
 
 on:
   push:
@@ -12,59 +19,27 @@ permissions:
   contents: read
 
 jobs:
-  sync-docs:
+  request-pull:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Alphapy repo
-        uses: actions/checkout@v4
-
-      - name: Checkout mintlify-docs repo
-        uses: actions/checkout@v4
-        with:
-          repository: Innersync-tech/mintlify-docs
-          token: ${{ secrets.DOCS_SYNC_TOKEN }}
-          path: mintlify-repo
-
-      - name: Validate docs sync token
+      - name: Dispatch mintlify-docs pull
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_SYNC_TOKEN }}
         run: |
-          if [ -z "${{ secrets.DOCS_SYNC_TOKEN }}" ]; then
-            echo "Missing required secret: DOCS_SYNC_TOKEN"
-            echo "Token needs write access to Innersync-tech/mintlify-docs (enable org SSO if required)."
-            exit 1
-          fi
-
-      - name: Sync docs folder to mintlify-repo/synced/alphapy
-        run: |
-          mkdir -p mintlify-repo/synced/alphapy
-          rsync -av --delete docs/ mintlify-repo/synced/alphapy/ \
-            --exclude=index.md \
-            --exclude=terms-of-service.md \
-            --exclude=privacy-policy.md \
-            --exclude=pricing.md \
-            --exclude=legal.md \
-            --exclude=_config.yml \
-            --exclude=CNAME \
-            --exclude=premium-local-insert.md \
-            --exclude=hermit-core-rollout.md \
-            --exclude=testers-plan.md \
-            --exclude=CONTRIBUTOR.md \
-            --exclude=premium-layer-plan.md
-
-      - name: Verify publication safety
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/verify-publication-safe.sh" mintlify-repo/synced/alphapy
-
-      - name: Commit and push when changed
-        working-directory: mintlify-repo
-        run: |
-          if git diff --quiet -- synced/alphapy; then
-            echo "No docs changes to sync."
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No DOCS_SYNC_TOKEN. mintlify-docs pulls hourly; no instant dispatch."
+            echo "Optional: PAT with Actions: Write on Innersync-tech/mintlify-docs."
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/Innersync-tech/mintlify-docs/dispatches \
+            -f event_type=sync-alphapy-docs; then
+            echo "Dispatched mintlify-docs pull-alphapy-docs."
+            exit 0
+          fi
 
-          git add synced/alphapy
-          git commit -m "sync: update Alphapy docs from bot repository"
-          git push origin HEAD:main
+          echo "Dispatch failed (token likely lacks Actions: Write on mintlify-docs)."
+          echo "Hourly pull on mintlify-docs will still pick up docs/** changes."
+          exit 0
