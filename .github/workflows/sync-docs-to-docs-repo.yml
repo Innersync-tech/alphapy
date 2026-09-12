@@ -16,5 +16,5 @@ jobs:
       - name: Disabled
         run: |
           echo "Starlight docs sync is disabled. Canonical target: Innersync-tech/mintlify-docs"
-          echo "See .github/workflows/sync-docs-to-mintlify.yml"
+          echo "Canonical pull: Innersync-tech/mintlify-docs .github/workflows/pull-alphapy-docs.yml"
           exit 0
