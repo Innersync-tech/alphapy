@@ -15,7 +15,7 @@ from agents.skill_memory import (
     insight_labels,
     select_insights,
 )
-from agents.tier2 import _parse_distill_json
+from agents.tier2 import INSIGHT_TYPE_RULES, _parse_distill_json
 from gpt.helpers import ask_gpt
 
 logger = logging.getLogger("alphapy.agents.skills.avoidance_processor")
@@ -131,7 +131,9 @@ class AvoidanceProcessorSkill(BaseAgentSkill):
             "Return ONLY valid JSON: "
             '{"insights":[{"type":"habit|trigger|theme","label":"abstract pattern under 120 chars",'
             '"confidence":0.65-1.0}]}\n'
-            "NO quotes; NO names; NO dates; abstract pattern only."
+            "NO quotes; NO names; NO dates; abstract pattern only. "
+            f"{INSIGHT_TYPE_RULES} Prefer trigger when the extract is the cue; "
+            "habit when it is the avoidance move."
         )
         user = (
             f"User transcript:\n{user_transcript[:1200]}\n\n"

@@ -262,6 +262,7 @@ def test_format_catalog_for_distill_keep_apart_and_cap() -> None:
     from agents.tier2 import (
         CATALOG_INSIGHT_CAP,
         CATALOG_KEEP_APART_RULES,
+        INSIGHT_TYPE_RULES,
         format_catalog_for_distill,
         with_catalog_user_message,
     )
@@ -302,6 +303,10 @@ def test_format_catalog_for_distill_keep_apart_and_cap() -> None:
     assert "EXACT stored label" in CATALOG_KEEP_APART_RULES
     assert "keep them apart" in CATALOG_KEEP_APART_RULES
     assert "impulse control" in CATALOG_KEEP_APART_RULES
+    assert "trigger: the cue" in INSIGHT_TYPE_RULES
+    assert "habit: what you then do or avoid" in INSIGHT_TYPE_RULES
+    assert "emit two insights (trigger + habit)" in INSIGHT_TYPE_RULES
+    assert "type cues as trigger" in INSIGHT_TYPE_RULES
     base = "Ephemeral journal context (do not quote):\nhi"
     with_cat = with_catalog_user_message(base, lines)
     assert with_cat.startswith("Existing catalog")
@@ -357,6 +362,7 @@ async def test_distill_session_profile_injects_catalog(monkeypatch) -> None:
     system = captured["messages"][0]["content"]
     user = captured["messages"][1]["content"]
     assert "keep them apart" in system
+    assert "trigger: the cue" in system
     assert "waiting before acting on impulse" in user
     assert "Existing catalog" in user
     assert merged is not None
