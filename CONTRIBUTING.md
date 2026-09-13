@@ -18,7 +18,7 @@ By participating in this project, you agree to uphold our [Code of Conduct](CODE
 ## Setting up locally
 
 ```bash
-git clone https://github.com/bryntje/alphapy.git && cd alphapy
+git clone https://github.com/Innersync-tech/alphapy.git && cd alphapy
 pip install -r requirements.txt
 cp .env.example .env   # set BOT_TOKEN, DATABASE_URL, and any optional vars
 alembic upgrade head   # or alembic stamp head if DB already has schema

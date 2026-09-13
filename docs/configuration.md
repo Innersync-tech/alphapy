@@ -242,6 +242,14 @@ When enabled, linked members can use `/agent list`, `/agent start`, `/agent cont
 
 Check-in DMs are **opt-in** (`agent_prefs.agent_nudges_enabled`, default off). Members toggle them with `/agent nudges` or in Innersync App → Settings → Alphapy → Check-ins. The hourly loop sends at most one fixed English invite per Europe/Brussels calendar day at 20:00 local; it does not include journal text.
 
+Learning prefs live on App `/dashboard/agent` (not Settings → Alphapy):
+
+| Pref | Default | Effect |
+|------|---------|--------|
+| `agent_writeback_enabled` | off | `/agent end` may distill Patterns from the session transcript without shared reflections |
+| `learn_from_patterns` | — | Inject Tier-2 insight labels into `/agent` prompts (`agents/pattern_loader.py`) |
+| `learn_from_shared` | — | Legacy fallback for pattern context; still requires active consent + journal |
+
 ### Module enable contract (`{scope}.enabled`)
 
 Dashboard **Disable** and Discord gates share one flag per module (default **true**, except `agents.enabled` default **false**):
@@ -332,7 +340,11 @@ The following environment variables are required/optional for bot operation:
 
 ### Required
 - `BOT_TOKEN`: Discord bot token
-- `DATABASE_URL`: PostgreSQL connection string
+- `DATABASE_URL`: PostgreSQL connection string (Railway bot hot path — not a Supabase URL)
+
+### Optional - Home guild & telemetry
+- `MAIN_GUILD_ID`: Home Innersync Discord guild. Used for `/link` and `/delete_my_data` log posts, legal-update fallback channel, and default guild filter on some API metrics. `0` or unset = no home-guild filter.
+- `TELEMETRY_INGEST_INTERVAL`: Seconds between Alphapy → Supabase telemetry snapshot pushes (default: `45`).
 
 ### Optional - Local testing (separate dev bot)
 - `BOT_TOKEN_TEST`: Discord token for a separate test/dev bot. Used only when `USE_TEST_BOT=1`.
@@ -413,6 +425,10 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 ### Optional - GitHub
 - `GITHUB_REPO`: Alphapy GitHub slug for `/release` (default `Innersync-tech/alphapy` when unset). Does not affect App.
 - `GITHUB_TOKEN`: Token for the GitHub Releases API. Optional for public Alphapy (avoids rate limits; `/release` still falls back to local `changelog.md`). **Required** for `/release product:App` because `Innersync-tech/innersync-dashboard` is private — use a PAT with `contents:read` (classic: `repo`). Owner-only `/release` distinguishes unset vs 401 (invalid/expired) vs 403 (wrong scope / no repo access); GitHub response bodies are not shown.
+
+### Docs publishing (docs.innersync.tech)
+
+Canonical public site is **Mintlify** (`Innersync-tech/mintlify-docs`). This repo’s `docs/` is pulled into `synced/alphapy/` by mintlify-docs `pull-alphapy-docs.yml` (hourly or `workflow_dispatch`). Push to `docs/**` on `main` also fail-open dispatches that sync (`sync-docs-to-mintlify.yml`). Optional GitHub secret `DOCS_SYNC_TOKEN`: PAT with Actions write on mintlify-docs. Starlight `Innersync-tech/docs` is archived — do not treat it as SoT.
 
 ## Migration Notes
 

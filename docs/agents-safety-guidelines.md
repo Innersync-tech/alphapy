@@ -30,6 +30,7 @@ Alphapy agents must **never become a privacy bypass** for encrypted App journals
 | `reflections` (Discord `/growthcheckin`) | **Agents: no** / growthcheckin: yes | Agents use `load_agent_reflection_context` only |
 | Engagement streaks (Discord) | **Yes** | Guild-scoped Railway data |
 | `agent_memory` / `agent_sessions` | **Yes** | Own user only, Supabase service role |
+| Session transcript → Patterns write-back | **Yes, if opted in** | `agent_prefs.agent_writeback_enabled` (App `/dashboard/agent`, default off). `/agent end` may distill generalized labels from the transcript without shared journal. Labels only — turns are deleted after end. See [commands.md](./commands.md) Session write-back. |
 | Other users' data | **No** | — |
 | Encryption keys / passwords | **No** | Never ask, never store, never use |
 

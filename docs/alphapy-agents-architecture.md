@@ -181,7 +181,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 
 1. `/agent start` → `create_session` (status `active`) → first LLM turn → rows in `agent_session_messages`
 2. `/agent continue` → load message history → LLM → append turn
-3. `/agent end` → Tier 2 distill (if consented; catalog-in-prompt reuses exact stored labels for the same lived mechanism, keep-apart on doubt) → `patch_user_memory` (Tier 3) → `complete_session` → delete `agent_session_messages`
+3. `/agent end` → Tier 2 distill when consented **or** `agent_writeback_enabled` + transcript (`session_end_distill_allowed()`). Catalog-in-prompt reuses exact stored labels for the same lived mechanism (keep-apart on doubt). `INSIGHT_TYPE_RULES` types a cue as `trigger` and a reaction as `habit` (two insights when both are present). Shared `INSIGHT_TYPE_RULES` also feed `avoidance_processor` skill distill. Then `patch_user_memory` (Tier 3) → `complete_session` → delete `agent_session_messages`
 4. `emit_hermit_event(gpt_command)` fires on **end**, not on start
 
 `run_agent_session(finalize=True)` remains for tests — start + end in one call.
@@ -191,6 +191,8 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 When `agent_prefs.learn_from_patterns` is enabled (App Settings; falls back to `learn_from_shared`), `agents/pattern_loader.py` reads Tier-2 `derived_profile.insights` from Supabase `agent_memory` (`agent_name=reflection`) and injects a `[learned_patterns]` block into the runtime prompt. Tier-2-safe insight labels only — no encrypted journal text and no graph-node theme tokens.
 
 When `agent_prefs.agent_writeback_enabled` is on (App `/dashboard/agent`, default off), `/agent end` may distill labels from the session transcript without shared-reflection consent. Legacy `learn_from_shared` still requires active consent + journal context.
+
+Insight `type` is one of `theme | emotion | goal | habit | trigger`. App vault groups map `habit`/`goal` → Avoidance & habits, `theme`/`emotion` → Inner themes, `trigger` → Triggers. New distill can fill Triggers; catalog reuse keeps the stored type.
 
 ### `agent_sessions`
 
