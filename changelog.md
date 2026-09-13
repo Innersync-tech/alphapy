@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - **Agent session write-back** — `agent_prefs.agent_writeback_enabled` (default off). When on, `/agent end` may distill Patterns from the session transcript without shared reflections. App toggle lives on `/dashboard/agent`.
 
 ### Changed
+- **Docs honesty** — `/agent end` + architecture + schema document trigger vs habit distill, write-back gate, and `derived_profile` types. README clone URL is `Innersync-tech/alphapy`; bot DB is Railway `DATABASE_URL`. Public docs publish via mintlify-docs pull (Starlight archived). Closes the 2026-09-13 docs audit ([#414](https://github.com/Innersync-tech/alphapy/issues/414)).
 - **Tier-2 distill types** — Grok gets explicit cue vs reaction rules (`trigger` = what sets a pattern off, `habit` = what you then do). New `/agent end` insights can fill Triggers. Existing labels keep their stored type (no backfill).
 - **Tier-2 distill catalog-in-prompt** — `/agent end` passes current `derived_profile.insights` (≤20 labels + types) into the existing Grok distill call. Same lived mechanism reuses the exact stored label (`+0.08`); distinct friction or doubt stays a new row. No cosine merge, no extra LLM round-trip.
 - **Legal — `/agent` retention honesty** — Privacy Policy §2/§6 and Terms §6 now name agent session turns (removed on `/agent end`) vs session metadata / opted-in insights (until delete or GDPR purge). App Inner Barz chat is pointed at the App Privacy Policy. Merging `docs/privacy-policy.md` to `main` fires the legal-update webhook.

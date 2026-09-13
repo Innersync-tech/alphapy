@@ -976,6 +976,12 @@ Durable per-user JSON blob per agent type.
 
 **Primary Key:** `(innersync_user_id, agent_name)`
 
+**Tier 2 `derived_profile.insights[]` (enforced in `agents/tier2.py`):**
+- `type`: `theme` \| `emotion` \| `goal` \| `habit` \| `trigger`
+- `label`: abstract pattern, max 120 chars
+- `confidence`: omit below `0.6`; catalog cap 20 insights
+- Distill types a **cue** as `trigger` and a **reaction** as `habit` (`INSIGHT_TYPE_RULES`). Reuse keeps the stored type (no backfill).
+
 **Notes:**
 - Patched on `/agent end` (Tier 2 distill + Tier 3 metadata). Not on every turn.
 - Same RLS / access pattern as `agent_sessions`.

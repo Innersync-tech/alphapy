@@ -11,7 +11,7 @@ Alphapy powers the **Innersync • Alphapips** community with:
 - **AI:** growth coaching (`/growthcheckin`), topic learning (`/learn_topic`), **personal agents** (`/agent`)
 - **Tickets:** support channels with claim/close, Grok summaries, FAQ suggestions
 - **Reminders:** one-off and recurring, including auto-detection from announcement embeds
-- **Infra:** PostgreSQL (Supabase), Alembic migrations, FastAPI metrics, pytest
+- **Infra:** Railway PostgreSQL (`DATABASE_URL`) for bot hot path, Alembic migrations, FastAPI metrics, pytest. Supabase is for agents/telemetry and platform identity — not the Discord bot store.
 
 See [docs/commands.md](docs/commands.md) for the full command list.
 
@@ -20,7 +20,7 @@ See [docs/commands.md](docs/commands.md) for the full command list.
 ## Quick start
 
 ```bash
-git clone https://github.com/bryntje/alphapy.git && cd alphapy
+git clone https://github.com/Innersync-tech/alphapy.git && cd alphapy
 pip install -r requirements.txt
 cp .env.example .env   # edit: BOT_TOKEN, DATABASE_URL, optional GROK_API_KEY
 alembic upgrade head   # or: alembic stamp head (existing DB)
@@ -81,7 +81,7 @@ Full list and multi-guild setup: [docs/configuration.md](docs/configuration.md).
 
 - **One-off:** from embeds (event time) or `/add_reminder`; trigger at T−60 and T0; deleted after send.
 - **Recurring:** by weekday + time; not deleted. Idempotency via `last_sent_at`.
-- Logs to `WATCHER_LOG_CHANNEL`. Details: [AGENTS.md](AGENTS.md) (EmbedReminderWatcher, ReminderManager).
+- Logs to that guild’s `system.log_channel_id`. Details: [AGENTS.md](AGENTS.md) (EmbedReminderWatcher, ReminderManager).
 
 ### Ticket system
 
@@ -113,7 +113,10 @@ Full reference: [docs/api.md](docs/api.md).
 │ Commands, AI,   │         │ Config, metrics, │
 │ Tickets, etc.   │         │ charts, API proxy│
 └────────┬────────┘         └────────┬─────────┘
+         │ Railway Postgres          │
+         │ (DATABASE_URL)            │
          └────────── Supabase ───────┘
+           (agents / telemetry / identity)
 ```
 
 ---

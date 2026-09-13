@@ -13,7 +13,7 @@ When an admin disables a module in the Alphapy Dashboard (`{scope}.enabled = fal
 
 > This module is disabled in this server. Ask an admin to enable it in the Alphapy Dashboard.
 
-Shared constant: `MODULE_DISABLED_MSG` in `utils/settings_helpers.py`. Affected scopes include growth, verification, ticketbot, embedwatcher, custom_commands, gpt, faq, rules, fyi, and engagement (master AND with per-feature flags). Admin config commands for the same scope usually remain available. See [Configuration — module enable contract](../configuration/).
+Shared constant: `MODULE_DISABLED_MSG` in `utils/settings_helpers.py`. Affected scopes include growth, verification, ticketbot, embedwatcher, custom_commands, gpt, faq, rules, fyi, engagement (master AND with per-feature flags), plus reminders, automod, onboarding, invites, gdpr, and agents. Admin config commands for the same scope usually remain available. See [Configuration — module enable contract](../configuration/).
 
 ---
 
@@ -740,7 +740,7 @@ Add a follow-up turn to your active reflection session.
 ### `/agent end`
 End your active reflection session.
 
-**Behavior:** Runs Tier 2 distill (if learning enabled + active consents) with the current catalog in the same Grok call (reuse the exact stored label when the mechanism matches; keep-apart on distinct friction), runs dialogue skills (`inner_critic_dialogue`, `avoidance_processor`, `chain_breaker_micro`) for optional second Tier 2 patch, stores `session_insight_snapshot` on the session row, patches Tier 3 memory (`session_count++`), completes the session, deletes ephemeral messages, and emits a Hermit `gpt_command` event.
+**Behavior:** Runs Tier 2 distill when `session_end_distill_allowed()` is true — either learning enabled + active shared-reflection consents, or `agent_writeback_enabled` with a non-empty session transcript. The same Grok call includes the current catalog (reuse the exact stored label when the mechanism matches; keep-apart on distinct friction) and `INSIGHT_TYPE_RULES`: `trigger` is the cue that sets a pattern off, `habit` is what you then do. A session that names both may emit two insights, not one lumped habit. Then runs dialogue skills (`inner_critic_dialogue`, `avoidance_processor`, `chain_breaker_micro`) for optional second Tier 2 patch, stores `session_insight_snapshot` on the session row, patches Tier 3 memory (`session_count++`), completes the session, deletes ephemeral messages, and emits a Hermit `gpt_command` event. Existing stored types are not backfilled.
 
 **Permissions:** Linked Innersync users only (ephemeral)
 
