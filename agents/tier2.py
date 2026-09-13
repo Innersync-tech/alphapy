@@ -322,6 +322,22 @@ CATALOG_KEEP_APART_RULES = (
     "resting to recover energy (recovery)."
 )
 
+# Cue vs reaction vs story. Schema lists trigger but the model skips it unless defined.
+# Reuse still keeps a stored type; this only applies when inventing a new insight.
+INSIGHT_TYPE_RULES = (
+    "Types — pick exactly one per insight. "
+    "trigger: the cue that sets a pattern off (a situation, silence, a look, a time of day) "
+    "— not the reaction. "
+    "habit: what you then do or avoid (reaching for the phone, shutting down). "
+    "theme: a recurring inner story or meaning. "
+    "emotion: a feeling that keeps showing up. "
+    "goal: what you are moving toward or away from. "
+    "When both a cue and a reaction are present, emit two insights (trigger + habit), "
+    "not one lumped habit. "
+    "When inventing a new insight, type cues as trigger even if a related habit already "
+    "exists in the catalog."
+)
+
 
 def format_catalog_for_distill(existing: dict[str, Any], *, cap: int = CATALOG_INSIGHT_CAP) -> str:
     """Compact label+type list for distill prompts (empty when catalog is empty)."""
@@ -418,6 +434,7 @@ async def distill_session_profile(
         '"open_loops":["optional gentle follow-up without quotes"]}\n'
         "Rules: NO quotes from journals; NO dates; NO mantras; NO names; "
         "labels must be abstract patterns only; omit insights below 0.6 confidence. "
+        f"{INSIGHT_TYPE_RULES} "
         f"{CATALOG_KEEP_APART_RULES} "
         f"{locale_output_instruction(loc)}"
     )
