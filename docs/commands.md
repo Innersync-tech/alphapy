@@ -385,6 +385,8 @@ Manually compute and announce weekly awards for the configured award channel.
 - `/embedwatcher set_non_embed [true|false]` — Enable parsing of plain-text messages
 - `/embedwatcher set_process_bot_messages [true|false]` — Process embeds sent by the bot itself
 
+Failed-parse log channel (`embedwatcher.failed_parse_log_channel_id`) is Dashboard-only; unset falls back to `system.log_channel_id`.
+
 ---
 
 ### Reminders — `/reminders`

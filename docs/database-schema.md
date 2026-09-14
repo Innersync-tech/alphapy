@@ -364,8 +364,8 @@ Guild rules for onboarding display.
 - `rule_order` (INTEGER, NOT NULL): Display order
 - `title` (TEXT, NOT NULL): Rule title
 - `description` (TEXT, NOT NULL): Rule description
-- `thumbnail_url` (TEXT, nullable): Image shown right/top in embed (rechts)
-- `image_url` (TEXT, nullable): Image shown at bottom in embed (onderaan)
+- `thumbnail_url` (TEXT, nullable): Image shown right/top in the embed
+- `image_url` (TEXT, nullable): Image shown at the bottom of the embed
 - `enabled` (BOOLEAN): Whether rule is enabled
 - `created_at` (TIMESTAMP): Creation timestamp
 - `updated_at` (TIMESTAMP): Last update timestamp
@@ -930,7 +930,7 @@ One row per `/agent` invocation. Migration: `Innersync_Core/supabase/0020_agent_
 - `discord_user_id` (TEXT, NOT NULL)
 - `guild_id` (TEXT, nullable)
 - `agent_name` (TEXT, NOT NULL): e.g. `reflection`
-- `status` (TEXT): `active`, `completed`, `failed`, `cancelled`
+- `status` (TEXT): Core CHECK allows `active`, `completed`, `failed`, `cancelled` (`Innersync_Core/supabase/0020_agent_sessions_memory.sql`). Alphapy writes `active` on start and `completed` on `/agent end` (`agents/memory.py`); it does not currently set `failed` or `cancelled`.
 - `summary` (TEXT): Tier-2-conform distilled labels (not raw LLM output)
 - `memory_patch` (JSONB): Patches applied to `agent_memory` after run
 - `metadata` (JSONB): e.g. `source: discord_slash`
