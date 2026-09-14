@@ -203,7 +203,7 @@ Insight `type` is one of `theme | emotion | goal | habit | trigger`. App vault g
 | `discord_user_id` | text | Snowflake for ops/debug |
 | `guild_id` | text nullable | Multi-guild scope |
 | `agent_name` | text | e.g. `reflection` |
-| `status` | text | `active`, `completed`, `failed` |
+| `status` | text | Core CHECK: `active`, `completed`, `failed`, `cancelled`. Alphapy writes `active` / `completed` only. |
 | `summary` | text nullable | Tier-2-conform distilled labels only (not raw LLM text) |
 | `memory_patch` | jsonb | Delta applied this session; includes optional `session_insight_snapshot` (insight id/type/label chips for App timeline) |
 | `metadata` | jsonb | Source, skill flags |

@@ -41,7 +41,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Special parsing**: Title, time, days, location via NLP
 - **Helper**: `parse_embed_for_reminder()` + `_short_title_for_reminder_name()`
 - **Message formatting**: `_format_message_paragraphs()` for readable paragraphs + timezone bullet splits
-- **Logging**: Guild log channel with `safe_embed_text(..., 1024)`
+- **Logging**: Guild `system.log_channel_id` with `safe_embed_text(..., 1024)`. Failed parse attempts go to `embedwatcher.failed_parse_log_channel_id` when set (Dashboard Embed Watcher; no slash command), else the same system log channel.
 - **Known Issues**: Timezone parsing is critical
 
 ---

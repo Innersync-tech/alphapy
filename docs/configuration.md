@@ -109,6 +109,8 @@ Alternatively, run the following commands in order:
 /embedwatcher set_process_bot_messages [true|false]
 ```
 
+Failed-parse logs use `embedwatcher.failed_parse_log_channel_id` (Dashboard Embed Watcher only — no slash command). Unset/`0` falls back to `system.log_channel_id`.
+
 ### Reminders — `/reminders`
 ```
 /reminders show
