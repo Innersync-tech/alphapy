@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- (No changes yet)
+
+### Fixed
+- (No changes yet)
+
+## [3.15.0] - 2026-09-18
+
 ### Fixed
 - **Tier-2 distill sticky catalog language** — `/agent end` no longer asks Grok to rewrite stored pattern labels into the Profile locale. Existing phrases stay in the language of the first write; locale only invents a new label when the mechanism is new. Discord replies still use `locale_output_instruction`.
 - **Telemetry HTTP window (#402)** — metrics use a 60s HTTP window instead of heartbeat latency.
@@ -44,7 +52,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **Docs catch-up (#371, #376, #378, #380)** — Phase 5A nudges in commands/configuration/schema/migrations/playbook; metrics auth sample is API key only (no `X-User-Id`); ballast leftovers (Drive, `/migrate`, `/create_caption`, import commands, ticketbot runtime DDL, `reflection_alphapy_consent` for `/growthcheckin`). Legal `docs/terms-of-service.md` left unchanged (legal-update webhook).
-- **ROADMAP** header bumped to v3.14.0 to match `version.py`.
+- **ROADMAP** header bumped to v3.15.0 to match `version.py`.
 
 ## [3.14.0] - 2026-08-08
 
