@@ -313,9 +313,12 @@ def build_session_insight_snapshot(
 
 CATALOG_INSIGHT_CAP = 20
 
+# Abstract keep-apart bias. Last in the distill system prompt so it wins over locale.
 CATALOG_KEEP_APART_RULES = (
     "Catalog reuse: if this text is the same lived mechanism as an existing catalog label, "
     "return that EXACT stored label and type so it can be reinforced. "
+    "If an existing catalog label is the same mechanism, output that exact stored string. "
+    "Do not translate stored labels. "
     "If the friction is different, invent a new label even when they share a word. "
     "If uncertain, keep them apart — do not merge to tidy the list. "
     "Example: waiting before acting (impulse control) is distinct from "
@@ -337,6 +340,33 @@ INSIGHT_TYPE_RULES = (
     "When inventing a new insight, type cues as trigger even if a related habit already "
     "exists in the catalog."
 )
+
+
+def distill_locale_output_instruction(locale: str | None = None) -> str:
+    """Distill-only locale. New labels follow Profile locale; stored catalog strings stay.
+
+    Do not use locale_output_instruction here — that one tells Discord replies AND
+    labels to switch language.
+    """
+    from utils.platform_locale import normalize_platform_locale
+
+    loc = normalize_platform_locale(locale)
+    language = "Belgian Dutch (nl-BE)" if loc == "nl-BE" else "English"
+    return (
+        f"Platform locale: {loc}. Invent NEW pattern labels in {language} "
+        "unless the user clearly writes in another language. "
+        "If an existing catalog label is the same mechanism, output that exact stored string. "
+        "Do not translate stored labels."
+    )
+
+
+def distill_catalog_system_rules(locale: str | None = None) -> str:
+    """Type + locale-for-new + keep-apart. Keep-apart last. Used by /agent end distill."""
+    return (
+        f"{INSIGHT_TYPE_RULES} "
+        f"{distill_locale_output_instruction(locale)} "
+        f"{CATALOG_KEEP_APART_RULES}"
+    )
 
 
 def format_catalog_for_distill(existing: dict[str, Any], *, cap: int = CATALOG_INSIGHT_CAP) -> str:
@@ -421,9 +451,6 @@ async def distill_session_profile(
     blocklist = build_blocklist_from_tier0(tier0_context or "")
     consent_epoch = _now_iso()
 
-    from utils.platform_locale import locale_output_instruction, normalize_platform_locale
-
-    loc = normalize_platform_locale(platform_locale)
     catalog_lines = format_catalog_for_distill(existing)
     system = (
         "You extract generalized reflection patterns for a private coaching agent. "
@@ -434,9 +461,7 @@ async def distill_session_profile(
         '"open_loops":["optional gentle follow-up without quotes"]}\n'
         "Rules: NO quotes from journals; NO dates; NO mantras; NO names; "
         "labels must be abstract patterns only; omit insights below 0.6 confidence. "
-        f"{INSIGHT_TYPE_RULES} "
-        f"{CATALOG_KEEP_APART_RULES} "
-        f"{locale_output_instruction(loc)}"
+        f"{distill_catalog_system_rules(platform_locale)}"
     )
     linked_ids = ", ".join(sorted(source_reflection_ids)[:10])
     linked_line = (

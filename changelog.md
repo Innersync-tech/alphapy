@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Tier-2 distill sticky catalog language** — `/agent end` no longer asks Grok to rewrite stored pattern labels into the Profile locale. Existing phrases stay in the language of the first write; locale only invents a new label when the mechanism is new. Discord replies still use `locale_output_instruction`.
+
 ### Added
 - **Agent session write-back** — `agent_prefs.agent_writeback_enabled` (default off). When on, `/agent end` may distill Patterns from the session transcript without shared reflections. App toggle lives on `/dashboard/agent`.
 
