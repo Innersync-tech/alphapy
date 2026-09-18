@@ -263,6 +263,8 @@ def test_format_catalog_for_distill_keep_apart_and_cap() -> None:
         CATALOG_INSIGHT_CAP,
         CATALOG_KEEP_APART_RULES,
         INSIGHT_TYPE_RULES,
+        distill_catalog_system_rules,
+        distill_locale_output_instruction,
         format_catalog_for_distill,
         with_catalog_user_message,
     )
@@ -301,6 +303,7 @@ def test_format_catalog_for_distill_keep_apart_and_cap() -> None:
     assert format_catalog_for_distill({}) == ""
 
     assert "EXACT stored label" in CATALOG_KEEP_APART_RULES
+    assert "Do not translate stored labels" in CATALOG_KEEP_APART_RULES
     assert "keep them apart" in CATALOG_KEEP_APART_RULES
     assert "impulse control" in CATALOG_KEEP_APART_RULES
     assert "trigger: the cue" in INSIGHT_TYPE_RULES
@@ -312,6 +315,17 @@ def test_format_catalog_for_distill_keep_apart_and_cap() -> None:
     assert with_cat.startswith("Existing catalog")
     assert "waiting before acting on impulse" in with_cat
     assert with_catalog_user_message(base, "") == base
+
+    rules = distill_catalog_system_rules("nl-BE")
+    assert "Invent NEW pattern labels in Belgian Dutch (nl-BE)" in rules
+    assert "Do not translate stored labels" in rules
+    assert "Write user-facing replies and pattern labels" not in rules
+    locale_at = rules.index("Invent NEW pattern labels")
+    sticky_at = rules.rindex("Do not translate stored labels")
+    keep_apart_at = rules.index("If uncertain, keep them apart")
+    assert sticky_at > locale_at
+    assert keep_apart_at > locale_at
+    assert "Invent NEW pattern labels in English" in distill_locale_output_instruction("en")
 
 
 @pytest.mark.asyncio
@@ -351,7 +365,7 @@ async def test_distill_session_profile_injects_catalog(monkeypatch) -> None:
         }
     )
     merged = await distill_session_profile(
-        tier0_context="opted-in notes about evening wind-down after meetings with colleagues",
+        tier0_context="opted-in notes about evening wind-down after meetings",
         user_message="I keep jumping in",
         agent_response="Notice the pause before you act.",
         source_reflection_ids=frozenset({"ref-1"}),
@@ -363,6 +377,9 @@ async def test_distill_session_profile_injects_catalog(monkeypatch) -> None:
     user = captured["messages"][1]["content"]
     assert "keep them apart" in system
     assert "trigger: the cue" in system
+    assert "Do not translate stored labels" in system
+    assert "Invent NEW pattern labels" in system
+    assert "Write user-facing replies and pattern labels" not in system
     assert "waiting before acting on impulse" in user
     assert "Existing catalog" in user
     assert merged is not None
@@ -370,6 +387,111 @@ async def test_distill_session_profile_injects_catalog(monkeypatch) -> None:
         "waiting before acting on impulse" in str(i.get("label"))
         for i in merged.get("insights") or []
     )
+
+
+_EN_STICKY = "Frustration with prolonged home confinement during recovery"
+_NL_NEW_MECHANISM = "Stilte na een gesprek als een deur die dichtgaat"
+
+
+@pytest.mark.asyncio
+async def test_distill_nl_be_reinforces_exact_english_catalog_label(monkeypatch) -> None:
+    import json
+
+    from agents.tier2 import distill_session_profile, normalize_derived_profile
+
+    captured: dict[str, list] = {}
+
+    async def _fake_ask_gpt(messages, **_kwargs):
+        captured["messages"] = messages
+        return json.dumps(
+            {
+                "insights": [
+                    {"type": "theme", "label": _EN_STICKY, "confidence": 0.82},
+                ],
+                "active_themes": [],
+            }
+        )
+
+    monkeypatch.setattr("agents.tier2.ask_gpt", _fake_ask_gpt)
+    existing = normalize_derived_profile(
+        {
+            "insights": [
+                {
+                    "type": "theme",
+                    "label": _EN_STICKY,
+                    "confidence": 0.7,
+                    "source_reflection_ids": ["ref-1"],
+                }
+            ]
+        }
+    )
+    merged = await distill_session_profile(
+        tier0_context="opted-in notes about evening wind-down after meetings",
+        user_message="same confinement pattern again",
+        agent_response="Name the loop without translating the stored phrase.",
+        source_reflection_ids=frozenset({"ref-1"}),
+        existing=existing,
+        discord_user_id=1,
+        guild_id=2,
+        platform_locale="nl-BE",
+    )
+    system = captured["messages"][0]["content"]
+    assert "Invent NEW pattern labels in Belgian Dutch (nl-BE)" in system
+    assert "Do not translate stored labels" in system
+    assert "Write user-facing replies and pattern labels" not in system
+    locale_at = system.index("Invent NEW pattern labels")
+    keep_apart_at = system.index("If uncertain, keep them apart")
+    assert keep_apart_at > locale_at
+    assert merged is not None
+    labels = [str(i.get("label")) for i in merged.get("insights") or []]
+    assert labels == [_EN_STICKY]
+    assert float(merged["insights"][0]["confidence"]) == 0.78
+
+
+@pytest.mark.asyncio
+async def test_distill_nl_be_adds_row_only_for_new_mechanism(monkeypatch) -> None:
+    import json
+
+    from agents.tier2 import distill_session_profile, normalize_derived_profile
+
+    async def _fake_ask_gpt(messages, **_kwargs):
+        return json.dumps(
+            {
+                "insights": [
+                    {"type": "trigger", "label": _NL_NEW_MECHANISM, "confidence": 0.8},
+                ],
+                "active_themes": [],
+            }
+        )
+
+    monkeypatch.setattr("agents.tier2.ask_gpt", _fake_ask_gpt)
+    existing = normalize_derived_profile(
+        {
+            "insights": [
+                {
+                    "type": "theme",
+                    "label": _EN_STICKY,
+                    "confidence": 0.7,
+                    "source_reflection_ids": ["ref-1"],
+                }
+            ]
+        }
+    )
+    merged = await distill_session_profile(
+        tier0_context="opted-in notes about evening wind-down after meetings",
+        user_message="silence after a talk hits differently",
+        agent_response="That cue is a new door, not the confinement loop.",
+        source_reflection_ids=frozenset({"ref-1"}),
+        existing=existing,
+        discord_user_id=1,
+        guild_id=2,
+        platform_locale="nl-BE",
+    )
+    assert merged is not None
+    labels = [str(i.get("label")) for i in merged.get("insights") or []]
+    assert _EN_STICKY in labels
+    assert _NL_NEW_MECHANISM in labels
+    assert len(labels) == 2
 
 
 @pytest.mark.asyncio

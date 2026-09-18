@@ -980,7 +980,7 @@ Durable per-user JSON blob per agent type.
 - `type`: `theme` \| `emotion` \| `goal` \| `habit` \| `trigger`
 - `label`: abstract pattern, max 120 chars
 - `confidence`: omit below `0.6`; catalog cap 20 insights
-- Distill types a **cue** as `trigger` and a **reaction** as `habit` (`INSIGHT_TYPE_RULES`). Reuse keeps the stored type (no backfill).
+- Distill types a **cue** as `trigger` and a **reaction** as `habit` (`INSIGHT_TYPE_RULES`). Reuse keeps the stored type and stored language (no backfill, no catalog translation).
 
 **Notes:**
 - Patched on `/agent end` (Tier 2 distill + Tier 3 metadata). Not on every turn.

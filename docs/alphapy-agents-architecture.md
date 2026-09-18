@@ -181,7 +181,7 @@ Migration: `Innersync_Core/supabase/0020_agent_sessions_memory.sql` (+ `0023_age
 
 1. `/agent start` → `create_session` (status `active`) → first LLM turn → rows in `agent_session_messages`
 2. `/agent continue` → load message history → LLM → append turn
-3. `/agent end` → Tier 2 distill when consented **or** `agent_writeback_enabled` + transcript (`session_end_distill_allowed()`). Catalog-in-prompt reuses exact stored labels for the same lived mechanism (keep-apart on doubt). `INSIGHT_TYPE_RULES` types a cue as `trigger` and a reaction as `habit` (two insights when both are present). Shared `INSIGHT_TYPE_RULES` also feed `avoidance_processor` skill distill. Then `patch_user_memory` (Tier 3) → `complete_session` → delete `agent_session_messages`
+3. `/agent end` → Tier 2 distill when consented **or** `agent_writeback_enabled` + transcript (`session_end_distill_allowed()`). Catalog-in-prompt reuses exact stored labels for the same lived mechanism (keep-apart on doubt; do not translate stored labels). Locale only invents a new phrase when the mechanism is new. `INSIGHT_TYPE_RULES` types a cue as `trigger` and a reaction as `habit` (two insights when both are present). Shared `INSIGHT_TYPE_RULES` also feed `avoidance_processor` skill distill. Then `patch_user_memory` (Tier 3) → `complete_session` → delete `agent_session_messages`
 4. `emit_hermit_event(gpt_command)` fires on **end**, not on start
 
 `run_agent_session(finalize=True)` remains for tests — start + end in one call.
