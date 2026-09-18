@@ -27,7 +27,7 @@ alembic upgrade head   # or: alembic stamp head (existing DB)
 python bot.py
 ```
 
-**Tests:** `pytest tests/ -v`
+**Tests:** `PYTHONPATH=. pytest tests/ -v` (matches CI; `pytest.ini` also sets `pythonpath = .`).
 
 **Config:** [docs/configuration.md](docs/configuration.md) — env vars, multi-guild setup, feature config.
 
@@ -132,6 +132,17 @@ Full reference: [docs/api.md](docs/api.md).
 
 - Fork, create a branch (`feature/…` or `fix/…`), commit, push, open a PR.
 - Keep the modular structure and test coverage in mind.
+
+---
+
+## Related
+
+| Repo | Role |
+|------|------|
+| [Alphapy-Dashboard](https://github.com/Innersync-tech/Alphapy-Dashboard) | Guild control panel |
+| [alphapy-website](https://github.com/Innersync-tech/alphapy-website) | Pricing / checkout |
+| [Innersync_Core](https://github.com/Innersync-tech/Innersync_Core) | Identity, billing, webhooks |
+| [mintlify-docs](https://github.com/Innersync-tech/mintlify-docs) | Public docs |
 
 ---
 
