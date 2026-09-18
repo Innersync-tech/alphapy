@@ -4,6 +4,24 @@ All notable releases of Alphapy will be documented in this file.
 
 ---
 
+## [3.15.0] - 2026-09-18 — Sticky catalog, write-back, Phase 5A
+
+### Minor Release: locale-stable Patterns, session write-back, check-in nudges
+
+Ships sticky catalog distill (do not translate stored labels), opt-in session write-back into Patterns, trigger vs habit distill types, Phase 5A Discord nudges, legal SoT, and `/release`.
+
+#### Highlights
+- **Sticky catalog language** — `/agent end` keeps existing pattern labels in the language of the first write
+- **Write-back** — `agent_writeback_enabled` can distill session labels without shared journal consent
+- **Phase 5A nudges** — opt-in daily Discord invite (no Grok, no journal text)
+- **Honesty** — docs no longer claim journal plaintext in durable memory
+
+#### PRs
+- [#419](https://github.com/Innersync-tech/alphapy/pull/419) sticky catalog locale
+- [#421](https://github.com/Innersync-tech/alphapy/pull/421) changelog catch-up (#402 telemetry window, #393 audit_logs COUNT)
+
+---
+
 ## [3.14.0] - 2026-08-08 — Agent fitness & fast end
 
 ### Minor Release: multi-turn quality, CAS, true fast `/agent end`
