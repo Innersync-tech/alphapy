@@ -6,6 +6,7 @@ a GitHub Action fires this endpoint. The bot then posts an embed in the
 configured channel of the main guild (MAIN_GUILD_ID).
 """
 
+import asyncio
 import json
 import logging
 
@@ -28,6 +29,24 @@ _DOC_URLS = {
     "tos": "https://docs.innersync.tech/legal/terms-of-service",
     "pp": "https://docs.innersync.tech/legal/privacy-policy",
 }
+
+
+async def _post_legal_embeds(channel_id: int, embeds: list[tuple[str, object]]) -> list[str]:
+    """Post embeds on the bot event loop. Returns document keys that were sent."""
+    from gpt.helpers import bot_instance
+
+    if bot_instance is None:
+        raise RuntimeError("bot not available")
+
+    channel = bot_instance.get_channel(channel_id)
+    if channel is None:
+        return []
+
+    sent: list[str] = []
+    for doc_key, embed in embeds:
+        await channel.send(embed=embed)
+        sent.append(doc_key)
+    return sent
 
 
 @router.post("")
@@ -109,14 +128,7 @@ async def handle_legal_update_webhook(request: Request) -> dict[str, str]:
         )
         return {"status": "skipped", "reason": "no target channel configured"}
 
-    channel = bot_instance.get_channel(channel_id)
-    if channel is None:
-        logger.warning(
-            "legal-update webhook: channel %s not found (guild %s).", channel_id, main_guild_id
-        )
-        return {"status": "skipped", "reason": "channel not found"}
-
-    sent: list[str] = []
+    embeds: list[tuple[str, object]] = []
     for doc_key in documents:
         if doc_key not in _DOC_LABELS:
             logger.debug("legal-update: unknown document key %r — skipping.", doc_key)
@@ -125,30 +137,59 @@ async def handle_legal_update_webhook(request: Request) -> dict[str, str]:
         version = payload.get(f"{doc_key}_version", "")
         title, description = _DOC_LABELS[doc_key]
         doc_url = _DOC_URLS[doc_key]
-
         fields = [
             {"name": "📅 Effective date", "value": version or "see document", "inline": True},
             {"name": "🔗 Read the full document", "value": f"[View on docs.innersync.tech]({doc_url})", "inline": True},
         ]
-
-        embed = EmbedBuilder.info(
-            title=title,
-            description=description,
-            fields=fields,
-            footer="Legal update | Innersync",
+        embeds.append(
+            (
+                doc_key,
+                EmbedBuilder.info(
+                    title=title,
+                    description=description,
+                    fields=fields,
+                    footer="Legal update | Innersync",
+                ),
+            )
         )
 
-        try:
-            await channel.send(embed=embed)
-            sent.append(doc_key)
-            bot_logger.info(
-                "legal-update: posted %s embed (version=%s) to channel %s guild %s",
-                doc_key,
-                version,
-                channel_id,
-                main_guild_id,
-            )
-        except Exception as e:
-            logger.error("legal-update: failed to send embed for %s: %s", doc_key, e)
+    if not embeds:
+        return {"status": "acknowledged", "sent": "none"}
 
-    return {"status": "acknowledged", "sent": ", ".join(sent) if sent else "none"}
+    loop = bot_instance.loop
+    try:
+        future = asyncio.run_coroutine_threadsafe(
+            _post_legal_embeds(channel_id, embeds), loop
+        )
+        sent = await asyncio.wait_for(asyncio.wrap_future(future), timeout=15.0)
+    except TimeoutError:
+        logger.warning("legal-update: timeout posting embeds to channel %s", channel_id)
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Timeout posting legal update.",
+        ) from None
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        logger.exception("legal-update: failed to post embeds: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to post legal update.",
+        ) from e
+
+    if not sent:
+        logger.warning(
+            "legal-update webhook: channel %s not found (guild %s).", channel_id, main_guild_id
+        )
+        return {"status": "skipped", "reason": "channel not found"}
+
+    for doc_key in sent:
+        bot_logger.info(
+            "legal-update: posted %s embed (version=%s) to channel %s guild %s",
+            doc_key,
+            payload.get(f"{doc_key}_version", ""),
+            channel_id,
+            main_guild_id,
+        )
+
+    return {"status": "acknowledged", "sent": ", ".join(sent)}
