@@ -6,7 +6,7 @@ permalink: /terms-of-service/
 
 # Innersync • Alphapy Bot Terms of Service
 
-_Last updated: 2026-08-31_
+_Last updated: 2026-09-22_
 
 Thank you for using the Innersync • Alphapy Discord Bot (“**Innersync • Alphapy**”, “**Bot**”, “**we**”, “**us**”, “**our**”). These Terms of Service (“**Terms**”) set out the rules that govern how you access and use the Bot and its related functionality, including our pricing and information website at **pricing.alphapy.innersync.tech** (the "**Pricing Site**"). By inviting the Bot to a Discord server, configuring it, interacting with any of its commands, or visiting or using the Pricing Site, you agree to be bound by these Terms. If you do not agree, do not use the Bot or the Pricing Site.
 
@@ -24,27 +24,27 @@ Thank you for using the Innersync • Alphapy Discord Bot (“**Innersync • Al
 Innersync • Alphapy offers modular features designed for community management and growth support, including the Pricing Site at pricing.alphapy.innersync.tech where you can view pricing and information about premium subscriptions. Current Bot capabilities are described in `README.md` and may include:
 
 - **Reminder tools**: automated reminders based on embeds, schedules, or manual input.
-- **AI interactions**: Grok-powered commands such as `/learn_topic`, `/growthcheckin`, and `/create_caption`.
+- **AI interactions**: Grok-powered commands such as `/learn_topic` and `/growthcheckin`.
 - **Ticketing and utilities**: invite tracking, moderation helpers, and export tools.
 - **GDPR support**: commands to export onboarding data and future deletion tooling.
 - **Premium features**: enhanced capabilities including image reminders, live session presets, and premium AI modes (subscription required).
 
-We may update, add, or remove features without prior notice. Some functionality may rely on third-party APIs (e.g., OpenAI, Discord, Google Cloud) and their availability.
+We may update, add, or remove features without prior notice. Some functionality may rely on third-party APIs (e.g., the AI model provider, Discord) and their availability.
 
 ## 3. Premium Services and Billing
 
 ### 3.1 Subscription Services
-Certain features of the Bot require a premium subscription ("Premium Services"). Premium subscriptions are billed through our payment processor (Lemon Squeezy) and provide access to enhanced features across all servers where the subscribing user is a member.
+Certain features of the Bot require a premium subscription ("Premium Services"). Premium subscriptions are billed through our payment processor (Mollie B.V.) and provide access to enhanced features across all servers where the subscribing user is a member.
 
 ### 3.2 Pricing and Billing
 - Monthly subscription: €4.99/month
-- Yearly subscription: €29/year (early bird pricing)
-- Lifetime access: €49 one-time (first 50 members: €20 early bird)
+- Annual subscription: €59.99/year (early bird: €29 with code EARLYBIRD50 for the first 50 founders)
+- Lifetime access: €99.99 one-time (early bird: €49 with code EARLYBIRD50 for the first 50 founders)
 
 All prices are in Euros and exclude applicable taxes. Prices may change with 30 days notice.
 
 ### 3.3 Payment Processing
-Payments are processed securely through Lemon Squeezy. We do not store credit card information. Billing disputes should be directed to your payment provider or Lemon Squeezy support.
+Payments are processed securely through Mollie B.V.. We do not store credit card information. Billing disputes should be directed to your payment provider or Mollie B.V. support.
 
 ### 3.4 Subscription Management
 - Subscriptions auto-renew unless cancelled
@@ -133,7 +133,7 @@ We may revise these Terms when we update the Bot or our policies. Significant ch
 
 ## 12. Third-Party Services
 
-Some features depend on external providers (such as Discord, OpenAI, Google Drive, and PostgreSQL hosting). Using those features means you also agree to the terms and privacy practices of those providers. We are not responsible for interruptions or issues caused by third-party services.
+Some features depend on external providers (such as Discord, the AI model provider, and PostgreSQL hosting). Using those features means you also agree to the terms and privacy practices of those providers. We are not responsible for interruptions or issues caused by third-party services.
 
 ## 13. Disclaimer of Warranties
 
