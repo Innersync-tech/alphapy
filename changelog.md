@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- (No changes yet)
+- **Obfuscated channel filter** — dashboard `GET /api/dashboard/{guild_id}/discord-meta` and first-join FYI channel selection skip Discord obfuscated channels (`___hidden___` / `CHANNEL_OBFUSCATED`). Mandatory for all bots on 16 November 2026.
 
-### Fixed
-- (No changes yet)
+### Changed
+- **discord.py pin** — `requirements.txt` pins `discord.py>=2.7.1,<2.8` so deploys stay on a known 2.7 line until 2.8 (obfuscation helpers) is reviewed.
 
 ## [3.15.0] - 2026-09-18
 
