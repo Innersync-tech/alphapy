@@ -29,6 +29,7 @@ from cogs.reminders import (
 )
 from dashboard_guild_crud import register_dashboard_guild_crud
 from utils import core_ingress as core_ingress_module
+from utils.discord_channels import is_obfuscated_channel
 from utils.hermit_context import get_hermit_context_stats
 from utils.logger import get_gpt_status_logs, logger
 from utils.operational_logs import EventType, get_operational_events, log_operational_event
@@ -3887,6 +3888,8 @@ async def _fetch_discord_meta_on_bot_loop(guild_id: int) -> DiscordMetaResponse:
 
     channels: list[DiscordMetaChannel] = []
     for channel in guild.channels:
+        if is_obfuscated_channel(channel):
+            continue
         if channel.type == discord.ChannelType.category:
             channels.append(
                 DiscordMetaChannel(

@@ -8,6 +8,7 @@ from discord.ext import commands
 
 import config
 from gpt.helpers import set_bot_instance
+from utils.discord_channels import is_obfuscated_channel
 from utils.logger import logger
 from utils.operational_logs import EventType, log_operational_event
 from utils.settings_service import SettingDefinition, SettingsService
@@ -856,8 +857,12 @@ async def on_guild_join(guild: discord.Guild):
     me = getattr(guild, "me", None)
     if me is not None:
         channel = guild.system_channel
+        if channel is not None and is_obfuscated_channel(channel):
+            channel = None
         if not channel or not channel.permissions_for(me).send_messages:
             for ch in guild.text_channels:
+                if is_obfuscated_channel(ch):
+                    continue
                 if ch.permissions_for(me).send_messages:
                     channel = ch
                     break

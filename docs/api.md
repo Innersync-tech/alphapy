@@ -794,7 +794,7 @@ Reload the bot's in-memory `bot_settings` snapshot for a guild after Dashboard w
 
 #### `GET /api/dashboard/{guild_id}/discord-meta`
 
-List guild channels and assignable roles for control-panel pickers (channel/role dropdowns).
+List guild channels and assignable roles for control-panel pickers (channel/role dropdowns). Channels the bot cannot view (Discord obfuscated / `___hidden___` metadata, mandatory 16 November 2026) are omitted.
 
 **Authentication:** Required (`X-Api-Key` + `X-Discord-User-Id` with guild admin access)
 

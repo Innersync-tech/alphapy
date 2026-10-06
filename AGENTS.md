@@ -208,7 +208,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Path**: `api.py`, `agents/http_routes.py`, `hermit_api.py`, `dashboard_guild_crud.py`
 - **Purpose**: Exposes reminders, agent sessions, Hermit broker data, and realtime metrics for Mind/App/Core
 - **API**: Dashboard guild CRUD for reminders / engagement / custom-commands lives in `dashboard_guild_crud.py` (`verify_dashboard_discord_admin`); control-panel proxies via `lib/alphapyDashboardProxy.ts` (Sprint 3b).
-- **Discord meta**: `GET /api/dashboard/{guild_id}/discord-meta` — channels + assignable roles for pickers
+- **Discord meta**: `GET /api/dashboard/{guild_id}/discord-meta` — channels + assignable roles for pickers. Omits obfuscated channels the bot cannot view (`___hidden___` / `CHANNEL_OBFUSCATED`; Discord mandatory 16 Nov 2026).
 - **Cache reload**: `POST /api/dashboard/{guild_id}/settings/invalidate-cache` after Dashboard Disable / settings writes
 - **Snowflake JSON**: GET settings / automod settings return Discord snowflakes as **strings** (`_coerce_dashboard_setting_value`); unwraps legacy quoted JSONB encodings
 - **Observability**: `GET /api/observability` includes `hermit_context` stats from `get_hermit_context_stats()`
