@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- **`/unlink` leftover shares (audit 4.8)** — Discord `/unlink` and `POST /webhooks/discord-link` `event=unlink` now hard-delete that user's Railway `app_reflections` copies (and soft-revoke `reflection_alphapy_consent` when Supabase is configured) **before** the link is removed. Awaited and fail-closed: a purge error aborts unlink and asks the user to retry. Patterns insights are not stripped on unlink.
+- **Alphapy-share revoke vs Patterns consent** — `purge_app_reflection_copy` / `POST /api/reflections/revoke` / `POST /webhooks/revoke-reflection` no longer drop Tier-2 Patterns insights when the user still has an active `reflection_patterns_consent` row. Pass `purge_patterns: true` only when the journal itself is deleted (App journal-delete already purges Patterns separately). Default is `false`.
+- **`/delete_my_data` reminder bodies (audit 4.9 / P11)** — GDPR erasure now blanks `reminders.message` when anonymizing `created_by`. Custom-command `response` text stays (guild operational config); only `created_by` is nulled. `/delete_my_data` also deletes `alphapy_discord_links` so it matches the Supabase `USER_DELETED` webhook.
 - **Shared reflection revoke** — Railway `app_reflections` plaintext is hard-deleted by `reflection_id` even when Discord identity is missing or drifted. HMAC `POST /webhooks/revoke-reflection` no longer 400s and skips the delete. Webhook + `POST /api/reflections/revoke` are exempt from the 10 writes/min IP cap so Core revoke POSTs are not dropped with 429.
 
 ### Added

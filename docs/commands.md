@@ -88,7 +88,7 @@ Starts a link session via Core API. You receive an ephemeral message with a brow
 
 ### `/unlink`
 
-Removes the stored mapping in Alphapy for your Discord account. You can run `/link` again later. A successful unlink is posted only to the home guild (`MAIN_GUILD_ID`) log channel.
+Removes the stored mapping in Alphapy for your Discord account. Before the link is dropped, Alphapy hard-deletes your Railway `app_reflections` copies (App-shared journal plaintext) and soft-revokes Core `reflection_alphapy_consent`. Patterns insights are not removed. If that purge fails, unlink is aborted and you are asked to retry. You can run `/link` again later. A successful unlink is posted only to the home guild (`MAIN_GUILD_ID`) log channel.
 
 **Permissions:** Everyone (ephemeral)
 

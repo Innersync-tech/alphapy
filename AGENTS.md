@@ -23,10 +23,10 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Path**: `cogs/innersync_identity.py`, `utils/innersync_identity.py`, `utils/core_discord_integration.py`, `webhooks/discord_link.py`
 - **Purpose**: Maps Discord snowflakes to Innersync user ids (Supabase Auth `sub`) for cross-product identity
 - **Storage**: PostgreSQL table `alphapy_discord_links` (Railway; migration `023_alphapy_discord_links`)
-- **Commands**: `/link` (Core link-session URL, rate limited), `/unlink` (Core `POST /integrations/discord/unlink` + Railway sync via webhook), `/profile` (Core bot-profile when configured)
+- **Commands**: `/link` (Core link-session URL, rate limited), `/unlink` (purge Railway `app_reflections` + soft-revoke `reflection_alphapy_consent`, then Core `POST /integrations/discord/unlink`; fail-closed if purge fails), `/profile` (Core bot-profile when configured)
 - **API**: Reminder and dashboard flows resolve JWT `sub` → Discord via `alphapy_discord_links` only (`resolve_innersync_jwt_sub_to_discord_int` / `get_innersync_id_for_discord`; both default `allow_profile_fallback=False`). Legacy `profiles.discord_id` is opt-in only (e.g. `/unlink` hint). One-off backfill: `scripts/backfill_discord_links_from_profiles.py` — run before flipping prod to links-only.
 - **Locale**: `utils/platform_locale.py` reads Core `bot-profile.locale` (`nl-BE` \| `en`, default `en`). Unlinked Discord → `en`. Agent replies use `locale_output_instruction`. Tier-2 distill uses `distill_locale_output_instruction` (new labels follow locale; stored catalog phrases stay). Not Discord guild language.
-- **Webhooks**: `POST /webhooks/discord-link` (HMAC `DISCORD_LINK_WEBHOOK_SECRET`) — Core sends `event: link` or `event: unlink`; upserts or deletes `alphapy_discord_links`; may DM the user
+- **Webhooks**: `POST /webhooks/discord-link` (HMAC `DISCORD_LINK_WEBHOOK_SECRET`) — Core sends `event: link` or `event: unlink`; unlink first purges `app_reflections` (500 if purge fails), then deletes `alphapy_discord_links`; may DM the user
 - **Logging**: `/link` (session started) and successful `/unlink` post only to the home guild (`MAIN_GUILD_ID`) log channel via `send_home_guild_log` — never to third-party guilds
 - **GDPR**: `alphapy_discord_links` rows purged with other Railway PII in `webhooks/supabase.py` user delete handler; Supabase `agent_sessions` / `agent_memory` purged via `agents/memory.purge_agent_user_data()`
 
@@ -131,7 +131,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Flow**: Admin runs `/gdpr post` → embed posted and pinned in configured channel → members click "I Agree" → acceptance stored in `gdpr_acceptance` (scoped by `guild_id`)
 - **Logging**: Accept button posts to that guild's `system.log_channel_id`. Confirmed `/delete_my_data` posts only to the home guild (`MAIN_GUILD_ID`) log channel (user mention + id; no payload of deleted data)
 - **Dashboard**: `GET /api/dashboard/{guild_id}/gdpr` returns `{ acceptance_count }` (Railway DB)
-- **Self-service erasure**: `/delete_my_data` in `cogs/delete_my_data.py` — two-step confirmation; purges Railway PII + Supabase agent memory via `purge_agent_user_data()`
+- **Self-service erasure**: `/delete_my_data` in `cogs/delete_my_data.py` — two-step confirmation; purges Railway PII (including `alphapy_discord_links` and reminder `message` bodies) + Supabase agent memory via `purge_agent_user_data()`
 
 ---
 
@@ -313,10 +313,10 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Purpose**: Receive plaintext reflections from App via Core-API webhook; store in `app_reflections`; use in `/growthcheckin` and **`/agent` reflection skill** (`journal_sync`). Not used for ticket "Suggest reply" (privacy: reflections stay out of admin-only, ephemeral ticket actions).
 - **Storage**: Railway `app_reflections` (`user_id` Discord snowflake, `reflection_id`, `plaintext_content` JSONB). No embeddings and no Discord message copies of the share payload.
 - **Data flow**: User opts in per reflection in App → App decrypts client-side → Core logs `reflection_alphapy_consent` → Core POSTs signed webhook → Alphapy upserts `app_reflections`. Alphapy never receives or decrypts encrypted vault content.
-- **Revoke / delete**: Hard-delete by `reflection_id` (identity optional). HMAC `POST /webhooks/revoke-reflection` plus service `POST /api/reflections/revoke` (`X-API-Key` = `API_KEY`). Also drops Tier-2 labels via `purge_tier2_for_reflection`. Core/App must call one of these after revoke-share or journal delete — consent-row edits on Supabase do not cascade to Railway.
+- **Revoke / delete**: Hard-delete by `reflection_id` (identity optional). HMAC `POST /webhooks/revoke-reflection` plus service `POST /api/reflections/revoke` (`X-API-Key` = `API_KEY`). Tier-2 Patterns insights are dropped only when `purge_patterns: true` (journal delete) or when there is no active `reflection_patterns_consent` row. Alphapy-share revoke / unlink / bot-sharing off must leave Patterns alone. Core/App must call one of these after revoke-share or journal delete — consent-row edits on Supabase do not cascade to Railway.
 - **Webhooks**:
   - `POST /webhooks/app-reflections`: payload `user_id` (Discord snowflake int), `reflection_id`, `plaintext_content` (JSON object). Upsert into `app_reflections`. HMAC via `X-Webhook-Signature`; secret `APP_REFLECTIONS_WEBHOOK_SECRET`.
-  - `POST /webhooks/revoke-reflection`: payload `reflection_id` (required), `user_id` (optional). DELETE from `app_reflections`. Same signature pattern.
+  - `POST /webhooks/revoke-reflection`: payload `reflection_id` (required), `user_id` (optional), `purge_patterns` (optional, default false). DELETE from `app_reflections`. Same signature pattern.
 - **Integration**: `load_agent_reflection_context()` gates on active `reflection_alphapy_consent`; only matching `app_reflections` / `reflections_shared` rows are loaded. `/growthcheckin` uses `load_user_reflections()` with the same consent gate for App-sourced data. Consent gating hides orphans from Grok; it does **not** erase the Railway row.
 
 ---

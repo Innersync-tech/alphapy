@@ -12,7 +12,7 @@ import logging
 import asyncpg
 from fastapi import APIRouter, HTTPException, Request, status
 
-from utils.app_reflection_purge import purge_app_reflection_copy
+from utils.app_reflection_purge import coerce_purge_patterns, purge_app_reflection_copy
 from webhooks.common import get_app_reflections_secret, validate_webhook_signature
 from webhooks.reflection_payload import ReflectionWebhookPayloadError, resolve_discord_user_id
 
@@ -29,7 +29,8 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
     Expected payload:
     {
         "user_id": 123456789,  // Discord snowflake or Innersync UUID (optional)
-        "reflection_id": "uuid"
+        "reflection_id": "uuid",
+        "purge_patterns": false  // true only when the journal itself is deleted
     }
     """
     body = await request.body()
@@ -96,6 +97,7 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
             reflection_id=str(reflection_id).strip(),
             discord_user_id=discord_user_id,
             innersync_user_id=innersync_user_id,
+            purge_patterns=coerce_purge_patterns(payload.get("purge_patterns")),
         )
     except Exception as e:
         logger.exception("Failed to delete from app_reflections: %s", e)

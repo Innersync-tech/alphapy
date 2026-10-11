@@ -109,6 +109,7 @@ async def test_unlink_slash_deleted_and_not_deleted() -> None:
                 cog, "delete_discord_link_for_discord_user", new=AsyncMock(return_value=False)
             ),
             patch.object(cog, "get_innersync_id_for_discord", new=AsyncMock(return_value=None)),
+            patch.object(cog, "purge_app_reflections_for_user", new=AsyncMock(return_value={})),
         ):
             await cog.unlink_slash.callback(interaction)
         interaction.followup.send.assert_awaited_once()
@@ -131,6 +132,7 @@ async def test_unlink_slash_not_deleted_legacy_profile_hint() -> None:
             "get_innersync_id_for_discord",
             new=AsyncMock(return_value="550e8400-e29b-41d4-a716-446655440000"),
         ),
+        patch.object(cog, "purge_app_reflections_for_user", new=AsyncMock(return_value={})),
     ):
         await cog.unlink_slash.callback(interaction)
     interaction.followup.send.assert_awaited_once()
@@ -161,6 +163,8 @@ async def test_unlink_slash_delete_raises() -> None:
     with (
         patch.object(cog, "get_bot_db_pool", return_value=pool),
         patch.object(cog, "request_discord_unlink", new=AsyncMock(return_value=False)),
+        patch.object(cog, "get_innersync_id_for_discord", new=AsyncMock(return_value=None)),
+        patch.object(cog, "purge_app_reflections_for_user", new=AsyncMock(return_value={})),
         patch.object(
             cog,
             "delete_discord_link_for_discord_user",
@@ -169,6 +173,31 @@ async def test_unlink_slash_delete_raises() -> None:
     ):
         await cog.unlink_slash.callback(interaction)
     interaction.followup.send.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unlink_slash_purge_failure_does_not_unlink() -> None:
+    interaction = MagicMock()
+    interaction.user.id = 48
+    interaction.client = MagicMock()
+    interaction.response.defer = AsyncMock()
+    interaction.followup.send = AsyncMock()
+    pool = MagicMock()
+    unlink = AsyncMock(return_value=True)
+    with (
+        patch.object(cog, "get_bot_db_pool", return_value=pool),
+        patch.object(cog, "get_innersync_id_for_discord", new=AsyncMock(return_value="user-uuid")),
+        patch.object(
+            cog,
+            "purge_app_reflections_for_user",
+            new=AsyncMock(side_effect=RuntimeError("purge failed")),
+        ),
+        patch.object(cog, "request_discord_unlink", new=unlink),
+    ):
+        await cog.unlink_slash.callback(interaction)
+    unlink.assert_not_awaited()
+    interaction.followup.send.assert_awaited_once()
+    assert "try again" in interaction.followup.send.await_args.args[0].lower()
 
 
 @pytest.mark.asyncio

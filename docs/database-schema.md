@@ -88,6 +88,7 @@ Scheduled reminders (recurring and one-off events).
 - Dashboard JSON may expose `scheduled_time` as an alias of `event_time`
 - `time` is the reminder trigger time (T−60), `call_time` is the event time (T0)
 - Premium: reminders with `image_url` require an active premium subscription for the creator
+- GDPR (`/delete_my_data` / Supabase `USER_DELETED`): `created_by` is nulled and `message` is cleared. The guild schedule row may remain. Custom-command `response` text is not blanked (guild operational config).
 
 ---
 
@@ -260,7 +261,7 @@ Plaintext reflections received from the App via Core-API webhook. Used for Grok 
 - `idx_app_reflections_user_created` on `(user_id, created_at DESC)` for chronological queries (e.g. last 30 days).
 
 **Notes:**
-- Populated by `POST /webhooks/app-reflections`; hard-deleted by `POST /webhooks/revoke-reflection` and service `POST /api/reflections/revoke` (`utils/app_reflection_purge.py`). Delete key is `reflection_id` (user_id optional).
+- Populated by `POST /webhooks/app-reflections`; hard-deleted by `POST /webhooks/revoke-reflection`, service `POST /api/reflections/revoke`, Discord `/unlink` / unlink webhook, and GDPR erasure (`utils/app_reflection_purge.py`). Per-reflection delete key is `reflection_id` (user_id optional). Unlink deletes every row for that Discord `user_id`.
 - This table lives on **Railway** (`DATABASE_URL`), not Supabase. Consent (`reflection_alphapy_consent`) lives on **Supabase Innersync**. There is no cascade — Core/App must call Alphapy after revoke or journal delete.
 - Existing orphans: read-only counts + unapplied cleanup in `docs/migrations/028_cleanup_orphaned_app_reflections.sql` (do not apply until the owner reviews counts).
 - Context loader (`gpt/context_loader.py`) reads from this table for user-self flows (e.g. `/growthcheckin`). Ticket "Suggest reply" does not use reflection context. Consent gating hides rows from Grok; it does not erase them.
@@ -311,7 +312,7 @@ Maps Supabase Auth user id (Innersync UUID) to a Discord snowflake for Alphapy a
 
 **Notes:**
 - Written by `POST /webhooks/discord-link` after the user completes linking in Core/App.
-- Removed by `/unlink` or GDPR purge when the Supabase user is deleted (`webhooks/supabase.py`).
+- Removed by `/unlink`, `/delete_my_data`, or GDPR purge when the Supabase user is deleted (`webhooks/supabase.py`).
 - Resolution helpers live in `utils/innersync_identity.py` (with optional fallback to Supabase `profiles` for migration).
 
 ---

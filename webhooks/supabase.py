@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 import config
 from utils.dashboard_webhooks import forward_supabase_auth
-from utils.db_helpers import acquire_safe
+from utils.gdpr_railway_purge import purge_railway_user_data
 from utils.supabase_client import SupabaseConfigurationError, upsert_profile
 from webhooks.common import validate_webhook_signature
 
@@ -36,64 +36,10 @@ def _extract_discord_id(payload: dict[str, Any]) -> int | None:
 
 async def _purge_railway_data(pool, discord_id: int, supabase_user_id: str) -> None:
     """Delete all personal data for a user from Railway PostgreSQL (GDPR erasure)."""
-    tables_to_delete = [
-        ("alphapy_discord_links", "discord_user_id"),
-        ("onboarding", "user_id"),
-        ("support_tickets", "user_id"),
-        # faq_search_logs excluded: the table has no user_id column (queries are stored anonymously)
-        ("audit_logs", "user_id"),
-        ("terms_acceptance", "user_id"),
-        ("gdpr_acceptance", "user_id"),      # GDPR button acceptance record
-        ("gpt_usage", "user_id"),             # daily GPT quota counters
-        ("agent_session_usage", "user_id"),   # daily /agent start counters
-        ("automod_logs", "user_id"),
-        ("automod_user_history", "user_id"),
-        ("app_reflections", "user_id"),
-        ("growth_checkins", "user_id"),       # /growthcheckin plaintext history
-        ("agent_nudge_state", "discord_user_id"),  # Phase 5A DM nudge ledger
-    ]
-    tables_to_anonymize = [
-        ("reminders", "created_by"),
-        ("custom_commands", "created_by"),
-    ]
     # NOTE: `premium_subs` is intentionally excluded from GDPR erasure.
     # Belgian tax law (Wetboek van inkomstenbelastingen / Belgian Income Tax Code)
-    # requires retention of financial records for 7 years. Subscription tier, status,
-    # and transaction identifiers qualify as such records. See docs/privacy-policy.md §6.
-
-    async with acquire_safe(pool) as conn:
-        async with conn.transaction():
-            # Erase ticket_summaries before support_tickets is deleted — the subquery
-            # join would find no rows if the parent tickets are already gone.
-            result = await conn.execute(
-                """
-                DELETE FROM ticket_summaries
-                WHERE ticket_id IN (
-                    SELECT id FROM support_tickets WHERE user_id = $1
-                )
-                """,  # noqa: S608
-                discord_id,
-            )
-            logger.info(
-                "GDPR purge: %s from ticket_summaries (discord_id=%s)", result, discord_id
-            )
-
-            for table, col in tables_to_delete:
-                result = await conn.execute(
-                    f"DELETE FROM {table} WHERE {col} = $1", discord_id  # noqa: S608
-                )
-                logger.info(
-                    "GDPR purge: %s from %s (discord_id=%s)", result, table, discord_id
-                )
-            for table, col in tables_to_anonymize:
-                result = await conn.execute(
-                    f"UPDATE {table} SET {col} = NULL WHERE {col} = $1",  # noqa: S608
-                    discord_id,
-                )
-                logger.info(
-                    "GDPR anonymize: %s in %s (discord_id=%s)", result, table, discord_id
-                )
-
+    # requires retention of financial records for 7 years. See docs/privacy-policy.md §6.
+    await purge_railway_user_data(pool, discord_id, log_prefix="GDPR purge")
     logger.info(
         "GDPR erasure complete: supabase_user_id=%s discord_id=%s",
         supabase_user_id,

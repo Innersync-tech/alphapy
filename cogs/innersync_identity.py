@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.cog_base import AlphaCog
+from utils.app_reflection_purge import purge_app_reflections_for_user
 from utils.core_discord_integration import (
     extract_link_url,
     fetch_innersync_profile_for_discord,
@@ -130,6 +131,31 @@ async def unlink_slash(interaction: discord.Interaction) -> None:
 
     await interaction.response.defer(ephemeral=True)
 
+    innersync_id = None
+    try:
+        innersync_id = await get_innersync_id_for_discord(
+            pool, interaction.user.id, allow_profile_fallback=False
+        )
+    except Exception as e:
+        logger.warning("unlink: identity lookup failed: %s", e)
+
+    try:
+        await purge_app_reflections_for_user(
+            pool,
+            discord_user_id=interaction.user.id,
+            innersync_user_id=innersync_id,
+            purge_patterns=False,
+            revoke_alphapy_consent=True,
+        )
+    except Exception as e:
+        logger.warning("unlink: reflection purge failed: %s", e)
+        await interaction.followup.send(
+            "Could not finish unlink because your shared journal copies could "
+            "not be removed. Please try again.",
+            ephemeral=True,
+        )
+        return
+
     unlinked = False
     try:
         unlinked = await request_discord_unlink(interaction.user.id)
@@ -153,6 +179,7 @@ async def unlink_slash(interaction: discord.Interaction) -> None:
                 title="Unlinked",
                 description=(
                     "Your Discord account is no longer linked to Innersync. "
+                    "Shared journal copies stored by Alphapy were removed. "
                     "You can run `/link` again anytime."
                 ),
             ),

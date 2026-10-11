@@ -94,11 +94,34 @@ def test_discord_link_webhook_unlink_ok(client_and_pool):
     with (
         patch.object(dl, "get_discord_link_webhook_secret", return_value=None),
         patch.object(dl, "delete_discord_link_for_discord_user", new=AsyncMock(return_value=True)),
+        patch.object(dl, "purge_app_reflections_for_user", new=AsyncMock(return_value={})),
         patch.object(dl, "_try_dm_user", new=AsyncMock()),
     ):
         r = client.post("/webhooks/discord-link", json=payload)
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_discord_link_webhook_unlink_purge_failure_500(client_and_pool):
+    client, _pool = client_and_pool
+    payload = {
+        "event": "unlink",
+        "innersync_user_id": "550e8400-e29b-41d4-a716-446655440000",
+        "discord_user_id": 123456789012345678,
+    }
+    delete_link = AsyncMock(return_value=True)
+    with (
+        patch.object(dl, "get_discord_link_webhook_secret", return_value=None),
+        patch.object(
+            dl,
+            "purge_app_reflections_for_user",
+            new=AsyncMock(side_effect=RuntimeError("db")),
+        ),
+        patch.object(dl, "delete_discord_link_for_discord_user", new=delete_link),
+    ):
+        r = client.post("/webhooks/discord-link", json=payload)
+    assert r.status_code == 500
+    delete_link.assert_not_awaited()
 
 
 def test_discord_link_webhook_no_pool_503():

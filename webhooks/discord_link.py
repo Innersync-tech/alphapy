@@ -13,6 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from utils.app_reflection_purge import purge_app_reflections_for_user
 from utils.hermit_events import emit_hermit_event
 from utils.innersync_identity import (
     delete_discord_link_for_discord_user,
@@ -39,7 +40,29 @@ async def _try_dm_user(discord_user_id: int, body: str) -> None:
         logger.debug("discord-link webhook: could not DM user %s: %s", discord_user_id, exc)
 
 
-async def _handle_unlink(pool: Any, discord_user_id: int) -> dict[str, str]:
+async def _handle_unlink(
+    pool: Any,
+    discord_user_id: int,
+    innersync_user_id: str | None = None,
+) -> dict[str, str]:
+    try:
+        await purge_app_reflections_for_user(
+            pool,
+            discord_user_id=discord_user_id,
+            innersync_user_id=innersync_user_id,
+            purge_patterns=False,
+            revoke_alphapy_consent=True,
+        )
+    except Exception as exc:
+        logger.exception(
+            "discord-link webhook unlink: reflection purge failed discord_user_id=%s",
+            discord_user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to purge shared reflections. Retry unlink.",
+        ) from exc
+
     deleted = await delete_discord_link_for_discord_user(pool, discord_user_id)
     status_str = "ok" if deleted else "noop"
     if status_str == "ok":
@@ -120,7 +143,13 @@ async def handle_discord_link_webhook(request: Request) -> dict[str, str]:
 
     event = payload.get("event")
     if event == "unlink":
-        result = await _handle_unlink(pool, discord_user_id)
+        iu_raw = payload.get("innersync_user_id")
+        innersync_user_id = str(iu_raw).strip() if iu_raw else None
+        result = await _handle_unlink(
+            pool,
+            discord_user_id,
+            innersync_user_id=innersync_user_id or None,
+        )
         record_link_webhook("ok")
         return result
 

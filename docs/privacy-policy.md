@@ -6,7 +6,7 @@ permalink: /privacy-policy/
 
 # Innersync • Alphapy Bot Privacy Policy
 
-_Last updated: 2026-08-31_
+_Last updated: 2026-10-11_
 
 This Privacy Policy explains how the Innersync • Alphapy Discord Bot (“**Innersync • Alphapy**”, “**Bot**”, “**we**”, “**us**”) collects, uses, and protects information when it operates on your Discord server and when you use our pricing and information website. By installing or interacting with the Bot, or by visiting our websites, you consent to the practices described here. If you do not agree with this Policy, do not use the Bot or our websites.
 
@@ -119,7 +119,7 @@ For Belgian users: complaints can also be filed with the Gegevensbeschermingsaut
 
 ## 8. Data deletion workflow
 
-**Self-service (recommended):** Use the `/delete_my_data` slash command in any server running Alphapy. The command shows a detailed list of what will be deleted and requires explicit confirmation (two-step: read + confirm button). Deletion covers all Railway PostgreSQL records linked to your Discord user ID — including onboarding responses, tickets, audit logs, AI usage records, reflections, and consent records. Anonymisation is applied to reminders and custom commands you created. Your Discord account and Supabase/web account are **not** affected. Premium subscription records are retained for 7 years as required by Belgian tax law.
+**Self-service (recommended):** Use the `/delete_my_data` slash command in any server running Alphapy. The command shows a detailed list of what will be deleted and requires explicit confirmation (two-step: read + confirm button). Deletion covers all Railway PostgreSQL records linked to your Discord user ID — including onboarding responses, tickets, audit logs, AI usage records, reflections, consent records, and the Discord ↔ Innersync link. Reminder **message** bodies you authored are cleared and your ID is removed from those reminder rows (the guild schedule may remain). Custom commands you created keep their response text (guild operational config) and only drop your ID. Your Discord account and Supabase/web account are **not** affected. Premium subscription records are retained for 7 years as required by Belgian tax law. Discord `/unlink` also deletes Railway copies of App-shared journals and is fail-closed if that purge cannot complete.
 
 **By email:** Server administrators can also delete reminders, tickets, or check-in records via bot commands or database tools. Individuals may additionally request manual deletion by emailing the controller at `support@innersync.tech` with their Discord username and ID. We may take reasonable steps to verify identity before fulfilling requests.
 
