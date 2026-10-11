@@ -1,0 +1,93 @@
+-- 028_cleanup_orphaned_app_reflections.sql
+-- Railway Alphapy bot database ONLY (DATABASE_URL). Not Alembic. NOT applied.
+--
+-- DO NOT run the DELETE against production until the owner has reviewed the
+-- read-only counts below and built an orphan id list from Supabase Innersync.
+-- This file never SELECTs plaintext_content.
+--
+-- Why two databases:
+--   * Railway (this file): app_reflections — the remote plaintext copy
+--   * Supabase Innersync (Core): reflection_alphapy_consent, reflections
+-- There is no FK / FDW. Orphans are rows on Railway whose journal share is
+-- revoked, missing, or whose source reflection no longer exists on Supabase.
+--
+-- ---------------------------------------------------------------------------
+-- Read-only counts (run these first; they write nothing)
+-- ---------------------------------------------------------------------------
+--
+-- === A. Railway Alphapy Postgres (DATABASE_URL / Railway bot service) ===
+--
+-- SELECT count(*) AS remote_copies
+-- FROM public.app_reflections;
+--
+-- -- Ids only (no plaintext_content) — compare offline against B3 / C:
+-- -- SELECT reflection_id FROM public.app_reflections;
+--
+-- -- After you load :active_share_ids from B3 (text[]), copies with no valid share:
+-- -- SELECT count(*) AS copies_without_active_share
+-- -- FROM public.app_reflections
+-- -- WHERE reflection_id <> ALL (:active_share_ids);
+-- -- (empty :active_share_ids ⇒ this equals remote_copies)
+--
+-- -- After you load :existing_reflection_ids from C4, copies whose journal is gone:
+-- -- SELECT count(*) AS copies_whose_journal_is_gone
+-- -- FROM public.app_reflections
+-- -- WHERE reflection_id <> ALL (:existing_reflection_ids);
+--
+-- -- After you paste revoked/missing/hard-deleted ids into :orphan_ids:
+-- -- SELECT count(*) AS orphan_remote_copies
+-- -- FROM public.app_reflections
+-- -- WHERE reflection_id = ANY (:orphan_ids);
+--
+-- === B. Supabase Innersync (Core project — SUPABASE_DB_URL / Core dashboard) ===
+--
+-- -- B1. Consent rows that are revoked (soft-revoke still present)
+-- SELECT count(*) AS revoked_consent_rows
+-- FROM public.reflection_alphapy_consent
+-- WHERE revoked_at IS NOT NULL;
+--
+-- -- B2. Consent rows whose journal is gone
+-- SELECT count(*) AS consent_without_journal
+-- FROM public.reflection_alphapy_consent c
+-- WHERE NOT EXISTS (
+--   SELECT 1 FROM public.reflections r WHERE r.id::text = c.reflection_id::text
+-- );
+--
+-- -- B3. Active (non-revoked) shares — allow-list vs Railway
+-- SELECT count(*) AS active_share_rows
+-- FROM public.reflection_alphapy_consent
+-- WHERE revoked_at IS NULL;
+--
+-- -- B3 ids (export; no journal body). App journal delete HARD-deletes this
+-- -- row, so orphans from delete will not appear in B1/B2 — use the allow-list.
+-- -- SELECT reflection_id::text
+-- -- FROM public.reflection_alphapy_consent
+-- -- WHERE revoked_at IS NULL;
+--
+-- === C. Id export for the Railway match (ids only — no journal body) ===
+--
+-- -- C1+C2. Soft-revoked or consent whose journal is gone
+-- SELECT c.reflection_id::text AS reflection_id
+-- FROM public.reflection_alphapy_consent c
+-- WHERE c.revoked_at IS NOT NULL
+--    OR NOT EXISTS (
+--         SELECT 1 FROM public.reflections r
+--         WHERE r.id::text = c.reflection_id::text
+--       );
+--
+-- -- C4. Journals that still exist (allow-list for "source gone")
+-- -- SELECT id::text AS reflection_id FROM public.reflections;
+--
+-- Feed orphan ids (Railway reflection_id minus B3, plus C1+C2) to
+-- scripts/cleanup_orphaned_app_reflections.py --ids-file
+-- (dry-run by default). Do not apply the DELETE below from this agent.
+--
+-- ---------------------------------------------------------------------------
+-- One-shot cleanup (Railway only — do not apply until counts are reviewed)
+-- ---------------------------------------------------------------------------
+-- Replace :orphan_ids with the text[] built from query C.
+--
+-- -- begin;
+-- -- DELETE FROM public.app_reflections
+-- -- WHERE reflection_id = ANY (:orphan_ids);
+-- -- commit;

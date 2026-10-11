@@ -33,6 +33,7 @@ from utils.discord_channels import is_obfuscated_channel
 from utils.hermit_context import get_hermit_context_stats
 from utils.logger import get_gpt_status_logs, logger
 from utils.operational_logs import EventType, get_operational_events, log_operational_event
+from utils.rate_limit_policy import is_write_rate_limit_exempt
 from utils.runtime_metrics import get_bot_snapshot, serialize_snapshot
 from utils.supabase_auth import verify_supabase_token
 from utils.supabase_client import SupabaseConfigurationError, _supabase_post
@@ -395,8 +396,10 @@ app.include_router(founder_webhook_router)
 app.include_router(legal_update_webhook_router)
 
 from hermit_api import router as hermit_broker_router  # noqa: E402
+from reflection_revoke_api import router as reflection_revoke_api_router  # noqa: E402
 
 app.include_router(hermit_broker_router)
+app.include_router(reflection_revoke_api_router)
 
 # CORS settings
 _allowed_origins = getattr(config, "ALLOWED_ORIGINS", [])
@@ -450,7 +453,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if is_health:
             limit = 60  # 60 requests/min for health probes
         elif request.method in ["POST", "PUT", "DELETE"]:
-            limit = 10  # 10 writes/min per IP
+            if is_write_rate_limit_exempt(request.url.path):
+                limit = 60  # HMAC / service-key privacy paths (share + revoke)
+            else:
+                limit = 10  # 10 writes/min per IP
         else:
             limit = 30  # 30 reads/min per IP
 

@@ -1,7 +1,9 @@
 """
 Webhook handler for reflection revoke from Core-API.
 
-Deletes stored reflection when user revokes consent in App.
+Hard-deletes the Railway copy when the user revokes consent or deletes the
+journal in the App. ``user_id`` is optional: a missing or unlinkable identity
+must not leave plaintext behind.
 """
 
 import json
@@ -10,7 +12,7 @@ import logging
 import asyncpg
 from fastapi import APIRouter, HTTPException, Request, status
 
-from utils.dashboard_webhooks import forward_revoke_reflection
+from utils.app_reflection_purge import purge_app_reflection_copy
 from webhooks.common import get_app_reflections_secret, validate_webhook_signature
 from webhooks.reflection_payload import ReflectionWebhookPayloadError, resolve_discord_user_id
 
@@ -26,7 +28,7 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
 
     Expected payload:
     {
-        "user_id": 123456789,  // Discord user ID
+        "user_id": 123456789,  // Discord snowflake or Innersync UUID (optional)
         "reflection_id": "uuid"
     }
     """
@@ -59,7 +61,7 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
     user_id = payload.get("user_id")
     reflection_id = payload.get("reflection_id")
 
-    if reflection_id is None:
+    if reflection_id is None or not str(reflection_id).strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing required field: reflection_id.",
@@ -73,24 +75,28 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
             detail="Service temporarily unavailable.",
         )
 
-    try:
-        discord_user_id = await resolve_discord_user_id(pool, user_id)
-    except ReflectionWebhookPayloadError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
+    discord_user_id: int | None = None
+    innersync_user_id: str | None = None
+    if user_id is not None and str(user_id).strip():
+        try:
+            discord_user_id = await resolve_discord_user_id(pool, user_id)
+        except ReflectionWebhookPayloadError as exc:
+            raw = str(user_id).strip()
+            if "-" in raw:
+                innersync_user_id = raw
+            logger.warning(
+                "Revoke reflection webhook: unresolved user_id=%s (%s); deleting by reflection_id",
+                raw,
+                exc,
+            )
 
     try:
-        async with pool.acquire() as conn:
-            result = await conn.execute(
-                """
-                DELETE FROM app_reflections
-                WHERE user_id = $1 AND reflection_id = $2
-                """,
-                discord_user_id,
-                reflection_id,
-            )
+        result = await purge_app_reflection_copy(
+            pool,
+            reflection_id=str(reflection_id).strip(),
+            discord_user_id=discord_user_id,
+            innersync_user_id=innersync_user_id,
+        )
     except Exception as e:
         logger.exception("Failed to delete from app_reflections: %s", e)
         raise HTTPException(
@@ -98,45 +104,7 @@ async def handle_revoke_reflection_webhook(request: Request) -> dict:
             detail="Failed to revoke reflection.",
         ) from e
 
-    # result is like "DELETE 1" or "DELETE 0"
-    count = 0
-    if result and result.split()[-1].isdigit():
-        count = int(result.split()[-1])
-
-    logger.info(
-        "Revoke reflection webhook: user_id=%s, reflection_id=%s, deleted=%s",
-        discord_user_id,
-        reflection_id,
-        count,
-    )
-
-    from agents.memory import purge_tier2_for_reflection
-    from utils.innersync_identity import get_innersync_id_for_discord
-
-    innersync_user_id = await get_innersync_id_for_discord(
-        pool,
-        int(discord_user_id),
-        allow_profile_fallback=False,
-    )
-    if innersync_user_id:
-        try:
-            await purge_tier2_for_reflection(
-                innersync_user_id,
-                "reflection",
-                str(reflection_id),
-            )
-        except Exception as exc:
-            logger.warning(
-                "Tier 2 purge after revoke failed user=%s reflection=%s: %s",
-                innersync_user_id,
-                reflection_id,
-                exc,
-            )
-
-    forward_revoke_reflection(
-        {"user_id": discord_user_id, "reflection_id": reflection_id}
-    )
-    return {"status": "deleted", "count": count}
+    return {"status": "deleted", "count": int(result["deleted"])}
 
 
 __all__ = ["router"]

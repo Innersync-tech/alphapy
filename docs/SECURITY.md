@@ -14,7 +14,7 @@ description: Security practices for Alphapy configuration, webhooks, and operati
 The FastAPI layer uses two authentication mechanisms, applied in order:
 
 1. **Supabase JWT** — `Authorization: Bearer <token>` header. Token is validated by calling `SUPABASE_URL/auth/v1/user` using an async HTTP client (non-blocking).
-2. **Static API key** — `X-Api-Key` header. Only checked if JWT validation fails and `API_KEY` is set.
+2. **Static API key** — `X-Api-Key` header. Only checked if JWT validation fails and `API_KEY` is set. Service-only routes such as `POST /api/reflections/revoke` and `GET /api/hermit/growth-checkins` require this key and return `503` when it is unset.
 
 If neither `API_KEY` nor `SUPABASE_URL` are configured, the API runs in **unauthenticated mode** and logs a startup warning. This mode is intentional for local development only — always set at least one auth mechanism in production.
 
@@ -52,6 +52,7 @@ In-memory, IP-based sliding-window rate limiter applied to all endpoints:
 | Endpoint type | Limit |
 |---|---|
 | Health/metrics probes | 60 req/min |
+| HMAC `/webhooks/*` and `POST /api/reflections/revoke` | 60 req/min (must not share the generic write cap — a 429 drops remote-copy deletes) |
 | Read requests (GET) | 30 req/min |
 | Write requests (POST/PUT/DELETE) | 10 req/min |
 

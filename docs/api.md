@@ -21,6 +21,7 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 - **Reminder Management**: User-facing reminder CRUD (`/api/reminders/*`, Supabase JWT `sub` match) plus guild-admin Sprint 3b CRUD (`/api/dashboard/{guild_id}/reminders*`)
 - **Agent Sessions**: Cross-platform `/agent` REST API for App/Mind (requires Supabase JWT + Discord link)
 - **Hermit broker**: Core/Hermit progress data from Railway (`/api/hermit/*`; service `X-API-Key` = `API_KEY`)
+- **Reflection revoke**: Service hard-delete of a Railway `app_reflections` copy (`POST /api/reflections/revoke`; `X-API-Key` = `API_KEY`)
 - **Verification Queue**: Dashboard manual-review tickets (requires dashboard Discord admin auth)
 - **Exports**: CSV export endpoints for tickets and FAQ
 - **Webhooks**: Incoming webhooks from Core-API and GitHub Actions; validated via `X-Webhook-Signature` (includes app-reflections, discord-link, premium-invalidate, founder, legal-update)
@@ -35,7 +36,7 @@ All API endpoints are prefixed with `/api` unless otherwise noted.
 
 Most endpoints require authentication via:
 - **Supabase JWT**: `Authorization: Bearer <token>` (required for user-scoped and dashboard endpoints)
-- **API Key**: `X-API-Key` (used for internal service endpoints such as `/api/observability` and `/api/hermit/growth-checkins`)
+- **API Key**: `X-API-Key` (used for internal service endpoints such as `/api/observability`, `/api/hermit/growth-checkins`, and `POST /api/reflections/revoke`)
 
 Important:
 - User identity is derived from verified JWT claims (`sub`) only.
@@ -179,6 +180,17 @@ Service-key broker for Core/Hermit progress loops. Reads Railway `growth_checkin
 **Errors:**
 - `401`: Missing or invalid `X-API-Key`
 - `503`: `API_KEY` not configured; database pool unavailable; `growth_checkins` content columns missing (run Alembic migration `025`); or query failure
+
+#### `POST /api/reflections/revoke`
+
+Service-key hard-delete of one Railway `app_reflections` row (and Tier-2 labels linked to that journal id). Use this from Core/App after revoke-share or journal delete so the remote plaintext cannot outlive the share. Idempotent (`count: 0` if already gone). Never returns journal body.
+
+- Auth: `X-API-Key` = Alphapy `API_KEY` (same as Hermit broker). `503` if the key is not configured.
+- Body: `{ "reflection_id": "<uuid>", "user_id": <discord snowflake or Innersync UUID, optional> }`
+- Delete key is `reflection_id`. `user_id` only helps Tier-2 purge.
+- Response: `200` `{ "status": "deleted", "count": 1, "tier2_purged": 1 }`
+
+HMAC `POST /webhooks/revoke-reflection` remains for the existing fire-and-forget path.
 
 #### `GET /api/health/history`
 
@@ -1163,9 +1175,9 @@ Receives plaintext reflection content from the App via Core-API. Payload is stor
 
 ### `POST /webhooks/revoke-reflection`
 
-Deletes a previously stored reflection when the user revokes consent in the App. Core-API sends this after consent is revoked.
+Hard-deletes a previously stored Railway `app_reflections` row when the user revokes consent or deletes the journal. Core-API should send this after consent is revoked. Prefer awaiting `POST /api/reflections/revoke` (service key) so a dropped webhook cannot leave plaintext behind.
 
-**Headers:** `X-Webhook-Signature` (optional if no secret configured)
+**Headers:** `X-Webhook-Signature` (required in production when `APP_REFLECTIONS_WEBHOOK_SECRET` is set)
 
 **Request body:**
 ```json
@@ -1174,6 +1186,8 @@ Deletes a previously stored reflection when the user revokes consent in the App.
   "reflection_id": "uuid-from-app"
 }
 ```
+
+`user_id` is optional (Discord snowflake or Innersync UUID). A missing or unlinkable identity still deletes by `reflection_id`.
 
 **Response:** `200` with `{"status": "deleted", "count": 1}` (or `count: 0` if no row matched).
 

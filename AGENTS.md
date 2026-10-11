@@ -309,13 +309,15 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 ---
 
 ## �� Agent: App Reflections (Plaintext from Core)
-- **Path**: `webhooks/app_reflections.py`, `webhooks/revoke_reflection.py`, `webhooks/reflection_payload.py`, `gpt/context_loader.py`
+- **Path**: `webhooks/app_reflections.py`, `webhooks/revoke_reflection.py`, `utils/app_reflection_purge.py`, `reflection_revoke_api.py`, `webhooks/reflection_payload.py`, `gpt/context_loader.py`
 - **Purpose**: Receive plaintext reflections from App via Core-API webhook; store in `app_reflections`; use in `/growthcheckin` and **`/agent` reflection skill** (`journal_sync`). Not used for ticket "Suggest reply" (privacy: reflections stay out of admin-only, ephemeral ticket actions).
+- **Storage**: Railway `app_reflections` (`user_id` Discord snowflake, `reflection_id`, `plaintext_content` JSONB). No embeddings and no Discord message copies of the share payload.
 - **Data flow**: User opts in per reflection in App → App decrypts client-side → Core logs `reflection_alphapy_consent` → Core POSTs signed webhook → Alphapy upserts `app_reflections`. Alphapy never receives or decrypts encrypted vault content.
+- **Revoke / delete**: Hard-delete by `reflection_id` (identity optional). HMAC `POST /webhooks/revoke-reflection` plus service `POST /api/reflections/revoke` (`X-API-Key` = `API_KEY`). Also drops Tier-2 labels via `purge_tier2_for_reflection`. Core/App must call one of these after revoke-share or journal delete — consent-row edits on Supabase do not cascade to Railway.
 - **Webhooks**:
   - `POST /webhooks/app-reflections`: payload `user_id` (Discord snowflake int), `reflection_id`, `plaintext_content` (JSON object). Upsert into `app_reflections`. HMAC via `X-Webhook-Signature`; secret `APP_REFLECTIONS_WEBHOOK_SECRET`.
-  - `POST /webhooks/revoke-reflection`: payload `user_id`, `reflection_id`. DELETE from `app_reflections`. Same signature pattern.
-- **Integration**: `load_agent_reflection_context()` gates on active `reflection_alphapy_consent`; only matching `app_reflections` / `reflections_shared` rows are loaded. `/growthcheckin` uses `load_user_reflections()` with the same consent gate for App-sourced data.
+  - `POST /webhooks/revoke-reflection`: payload `reflection_id` (required), `user_id` (optional). DELETE from `app_reflections`. Same signature pattern.
+- **Integration**: `load_agent_reflection_context()` gates on active `reflection_alphapy_consent`; only matching `app_reflections` / `reflections_shared` rows are loaded. `/growthcheckin` uses `load_user_reflections()` with the same consent gate for App-sourced data. Consent gating hides orphans from Grok; it does **not** erase the Railway row.
 
 ---
 
