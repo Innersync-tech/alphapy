@@ -197,6 +197,8 @@ If a migration fails partway through:
 
 **Current migration head:** `027_agent_nudge_state`
 
+Privacy cleanup that is **not** an Alembic revision (do not `upgrade` it): `docs/migrations/028_cleanup_orphaned_app_reflections.sql` plus `scripts/cleanup_orphaned_app_reflections.py`. Run the read-only counts first; do not `--apply` until the owner reviews them.
+
 Tables added across all migrations:
 
 | Migration | Tables / Changes |

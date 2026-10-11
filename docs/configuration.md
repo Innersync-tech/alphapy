@@ -406,6 +406,7 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 
 ### Optional - App reflections (Core-API webhooks)
 - `APP_REFLECTIONS_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/app-reflections` and `POST /webhooks/revoke-reflection`. If unset, falls back to `SUPABASE_WEBHOOK_SECRET`.
+- `API_KEY`: Also authenticates `POST /api/reflections/revoke` (Core/App should await this after revoke-share or journal delete so a dropped HMAC webhook cannot leave Railway plaintext).
 
 ### Optional - Premium / Founder webhooks (Core → Alphapy)
 - `PREMIUM_INVALIDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/premium-invalidate` (cache invalidation on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.

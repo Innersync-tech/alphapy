@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Shared reflection revoke** — Railway `app_reflections` plaintext is hard-deleted by `reflection_id` even when Discord identity is missing or drifted. HMAC `POST /webhooks/revoke-reflection` no longer 400s and skips the delete. Webhook + `POST /api/reflections/revoke` are exempt from the 10 writes/min IP cap so Core revoke POSTs are not dropped with 429.
+
 ### Added
+- **`POST /api/reflections/revoke`** — service `X-API-Key` (`API_KEY`) hard-delete for one journal id (idempotent). Await this from Core/App after revoke-share or journal delete; HMAC webhook remains as fallback.
+- **Orphan cleanup (not applied)** — `docs/migrations/028_cleanup_orphaned_app_reflections.sql` + `scripts/cleanup_orphaned_app_reflections.py` (`--dry-run` default). Do not run `--apply` until the owner reviews the read-only counts.
 - **Obfuscated channel filter** — dashboard `GET /api/dashboard/{guild_id}/discord-meta` and first-join FYI channel selection skip Discord obfuscated channels (`___hidden___` / `CHANNEL_OBFUSCATED`). Mandatory for all bots on 16 November 2026.
 
 ### Changed
