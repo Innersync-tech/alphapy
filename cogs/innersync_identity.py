@@ -11,8 +11,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.cog_base import AlphaCog
 from utils.app_reflection_purge import purge_app_reflections_for_user
+from utils.cog_base import AlphaCog
 from utils.core_discord_integration import (
     extract_link_url,
     fetch_innersync_profile_for_discord,

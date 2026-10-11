@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from utils import app_reflection_purge as purge
@@ -257,6 +258,53 @@ async def test_purge_app_reflections_for_user_fail_closed_on_consent(monkeypatch
             discord_user_id=99,
             innersync_user_id="user-uuid",
         )
+
+
+@pytest.mark.asyncio
+async def test_revoke_alphapy_share_consent_empty_user() -> None:
+    assert await purge.revoke_alphapy_share_consent_for_user("  ") == 0
+
+
+@pytest.mark.asyncio
+async def test_revoke_alphapy_share_consent_http_error(monkeypatch) -> None:
+    req = httpx.Request("PATCH", "https://sb.example/x")
+    resp = httpx.Response(400, text="nope", request=req)
+    monkeypatch.setattr(
+        purge,
+        "_supabase_patch",
+        AsyncMock(side_effect=httpx.HTTPStatusError("bad", request=req, response=resp)),
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await purge.revoke_alphapy_share_consent_for_user("user-uuid")
+
+
+@pytest.mark.asyncio
+async def test_purge_for_user_resolves_innersync_id(monkeypatch) -> None:
+    pool = _pool_with_user_delete([])
+    lookup = AsyncMock(return_value="resolved-uuid")
+    monkeypatch.setattr(purge, "get_innersync_id_for_discord", lookup)
+    monkeypatch.setattr(purge, "revoke_alphapy_share_consent_for_user", AsyncMock(return_value=0))
+    result = await purge.purge_app_reflections_for_user(pool, discord_user_id=7)
+    lookup.assert_awaited_once()
+    assert result["innersync_user_id"] == "resolved-uuid"
+
+
+@pytest.mark.asyncio
+async def test_purge_for_user_skips_consent_when_supabase_unconfigured(monkeypatch) -> None:
+    from utils.supabase_client import SupabaseConfigurationError
+
+    pool = _pool_with_user_delete([])
+    monkeypatch.setattr(
+        purge,
+        "revoke_alphapy_share_consent_for_user",
+        AsyncMock(side_effect=SupabaseConfigurationError("missing")),
+    )
+    result = await purge.purge_app_reflections_for_user(
+        pool,
+        discord_user_id=7,
+        innersync_user_id="user-uuid",
+    )
+    assert result["consent_revoked"] == 0
 
 
 @pytest.mark.asyncio

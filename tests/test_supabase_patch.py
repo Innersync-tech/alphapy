@@ -77,3 +77,70 @@ async def test_supabase_patch_raises_on_http_error(monkeypatch) -> None:
     monkeypatch.setattr(sc.httpx, "AsyncClient", _Client)
     with pytest.raises(httpx.HTTPStatusError):
         await sc._supabase_patch("t", {"a": 1}, {"id": "eq.1"})
+
+
+@pytest.mark.asyncio
+async def test_supabase_patch_empty_body(monkeypatch) -> None:
+    import utils.supabase_client as sc
+
+    monkeypatch.setattr(sc, "SUPABASE_URL", "https://sb.example")
+    monkeypatch.setattr(sc, "SUPABASE_SERVICE_ROLE_KEY", "role-key")
+
+    class _Empty:
+        status_code = 200
+        content = b""
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def patch(self, *a, **k):
+            return _Empty()
+
+    monkeypatch.setattr(sc.httpx, "AsyncClient", _Client)
+    assert await sc._supabase_patch("t", {"a": 1}, {"id": "eq.1"}) == []
+
+
+@pytest.mark.asyncio
+async def test_supabase_patch_wrapped_data(monkeypatch) -> None:
+    import utils.supabase_client as sc
+
+    monkeypatch.setattr(sc, "SUPABASE_URL", "https://sb.example")
+    monkeypatch.setattr(sc, "SUPABASE_SERVICE_ROLE_KEY", "role-key")
+
+    class _Wrapped:
+        status_code = 200
+        content = b'{"data":[{"id":2}]}'
+        text = '{"data":[{"id":2}]}'
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return {"data": [{"id": 2}]}
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def patch(self, *a, **k):
+            return _Wrapped()
+
+    monkeypatch.setattr(sc.httpx, "AsyncClient", _Client)
+    assert await sc._supabase_patch("t", {"a": 1}, {"id": "eq.1"}) == [{"id": 2}]
