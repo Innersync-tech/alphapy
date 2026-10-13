@@ -13,7 +13,8 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.database_helpers import DatabaseManager
-from utils.db_helpers import acquire_safe, is_pool_healthy
+from utils.db_helpers import is_pool_healthy
+from utils.gdpr_railway_purge import purge_railway_user_data
 from utils.guild_logs import format_user_log_line, send_home_guild_log
 from utils.innersync_identity import get_innersync_id_for_discord
 from utils.logger import logger
@@ -99,58 +100,11 @@ class ConfirmDeleteView(discord.ui.View):
 async def _purge_user_data(pool: asyncpg.Pool, user_id: int) -> None:
     """Delete all personal data for a user from Railway PostgreSQL.
 
-    Mirrors the scope of _purge_railway_data() in webhooks/supabase.py.
-    premium_subs is excluded — Belgian tax law requires 7-year retention of
-    financial records (Wetboek van inkomstenbelastingen). See privacy-policy.md §6.
+    Delegates Railway SQL to ``purge_railway_user_data`` (shared with
+    ``webhooks/supabase.py``). premium_subs is excluded — Belgian tax law
+    requires 7-year retention of financial records. See privacy-policy.md §6.
     """
-    tables_to_delete = [
-        ("onboarding", "user_id"),
-        ("support_tickets", "user_id"),
-        # faq_search_logs excluded: the table has no user_id column (queries are stored anonymously)
-        ("audit_logs", "user_id"),
-        ("terms_acceptance", "user_id"),
-        ("gdpr_acceptance", "user_id"),
-        ("gpt_usage", "user_id"),
-        ("agent_session_usage", "user_id"),
-        ("automod_logs", "user_id"),
-        ("automod_user_history", "user_id"),
-        ("app_reflections", "user_id"),
-        ("growth_checkins", "user_id"),
-        ("agent_nudge_state", "discord_user_id"),
-    ]
-    tables_to_anonymize = [
-        ("reminders", "created_by"),
-        ("custom_commands", "created_by"),
-    ]
-
-    async with acquire_safe(pool) as conn:
-        async with conn.transaction():
-            # Delete ticket_summaries before support_tickets — subquery join
-            # would find no rows if parent tickets are already removed.
-            result = await conn.execute(
-                """
-                DELETE FROM ticket_summaries
-                WHERE ticket_id IN (
-                    SELECT id FROM support_tickets WHERE user_id = $1
-                )
-                """,  # noqa: S608
-                user_id,
-            )
-            logger.info("delete_my_data: %s from ticket_summaries (user_id=%s)", result, user_id)
-
-            for table, col in tables_to_delete:
-                result = await conn.execute(
-                    f"DELETE FROM {table} WHERE {col} = $1",  # noqa: S608
-                    user_id,
-                )
-                logger.info("delete_my_data: %s from %s (user_id=%s)", result, table, user_id)
-
-            for table, col in tables_to_anonymize:
-                result = await conn.execute(
-                    f"UPDATE {table} SET {col} = NULL WHERE {col} = $1",  # noqa: S608
-                    user_id,
-                )
-                logger.info("delete_my_data: anonymized %s in %s (user_id=%s)", result, table, user_id)
+    await purge_railway_user_data(pool, user_id, log_prefix="delete_my_data")
 
     innersync_id = await get_innersync_id_for_discord(pool, user_id)
     try:
@@ -203,7 +157,8 @@ class DeleteMyDataCog(commands.Cog):
                 "• Agent session history and agent memory (Supabase)\n"
                 "• Automod logs\n"
                 "• Terms acceptance records\n\n"
-                "Your reminders and custom commands created by you will have your ID anonymised.\n\n"
+                "Reminder messages you authored are cleared and your ID is removed from "
+                "those reminders and from custom commands you created.\n\n"
                 "⚠️ **This cannot be undone.** Your Discord account and Supabase/web account "
                 "are **not** affected. Premium subscription records are retained for 7 years "
                 "as required by Belgian tax law.\n\n"

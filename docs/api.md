@@ -183,12 +183,13 @@ Service-key broker for Core/Hermit progress loops. Reads Railway `growth_checkin
 
 #### `POST /api/reflections/revoke`
 
-Service-key hard-delete of one Railway `app_reflections` row (and Tier-2 labels linked to that journal id). Use this from Core/App after revoke-share or journal delete so the remote plaintext cannot outlive the share. Idempotent (`count: 0` if already gone). Never returns journal body.
+Service-key hard-delete of one Railway `app_reflections` row. Use this from Core/App after revoke-share or journal delete so the remote plaintext cannot outlive the share. Idempotent (`count: 0` if already gone). Never returns journal body.
 
 - Auth: `X-API-Key` = Alphapy `API_KEY` (same as Hermit broker). `503` if the key is not configured.
-- Body: `{ "reflection_id": "<uuid>", "user_id": <discord snowflake or Innersync UUID, optional> }`
-- Delete key is `reflection_id`. `user_id` only helps Tier-2 purge.
-- Response: `200` `{ "status": "deleted", "count": 1, "tier2_purged": 1 }`
+- Body: `{ "reflection_id": "<uuid>", "user_id": <discord snowflake or Innersync UUID, optional>, "purge_patterns": false }`
+- Delete key is `reflection_id`. `user_id` only helps Tier-2 targeting.
+- **`purge_patterns` (bool, default `false`)**: when `false`, Tier-2 `agent_memory` Patterns insights are **not** removed if the user still has an active `reflection_patterns_consent` row for that journal (or if the consent lookup fails — fail-open for Patterns). Set `true` only when the **journal itself is deleted**. App journal-delete already purges Patterns separately; Alphapy-share revoke, bot-sharing off, and Discord `/unlink` must leave Patterns alone. HMAC webhook accepts the same flag.
+- Response: `200` `{ "status": "deleted", "count": 1, "tier2_purged": 1 }` (`tier2_purged` is `0` when Patterns consent blocked the strip).
 
 HMAC `POST /webhooks/revoke-reflection` remains for the existing fire-and-forget path.
 
@@ -1187,7 +1188,7 @@ Hard-deletes a previously stored Railway `app_reflections` row when the user rev
 }
 ```
 
-`user_id` is optional (Discord snowflake or Innersync UUID). A missing or unlinkable identity still deletes by `reflection_id`.
+`user_id` is optional (Discord snowflake or Innersync UUID). A missing or unlinkable identity still deletes by `reflection_id`. Optional `purge_patterns` (default `false`) has the same meaning as on `POST /api/reflections/revoke`.
 
 **Response:** `200` with `{"status": "deleted", "count": 1}` (or `count: 0` if no row matched).
 
@@ -1245,7 +1246,7 @@ Clears the premium cache for a user so the next check refetches from Core-API/DB
 
 ### `POST /webhooks/discord-link`
 
-Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or deletes `alphapy_discord_links` and may send the user a confirmation DM.
+Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or deletes `alphapy_discord_links` and may send the user a confirmation DM. On `event=unlink`, Alphapy first hard-deletes that user's Railway `app_reflections` copies and soft-revokes `reflection_alphapy_consent` (Patterns insights stay). If that purge fails the webhook returns **500** so Core can retry — the Discord link is not removed.
 
 **Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `DISCORD_LINK_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
 

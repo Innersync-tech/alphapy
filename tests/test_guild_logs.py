@@ -214,6 +214,8 @@ async def test_unlink_slash_logs_only_when_deleted() -> None:
     with (
         patch.object(cog, "get_bot_db_pool", return_value=pool),
         patch.object(cog, "request_discord_unlink", new=AsyncMock(return_value=True)),
+        patch.object(cog, "get_innersync_id_for_discord", new=AsyncMock(return_value=None)),
+        patch.object(cog, "purge_app_reflections_for_user", new=AsyncMock(return_value={})),
         patch.object(cog, "send_home_guild_log", new=AsyncMock()) as log,
     ):
         await cog.unlink_slash.callback(interaction)

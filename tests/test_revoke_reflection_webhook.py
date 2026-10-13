@@ -53,6 +53,7 @@ async def test_revoke_webhook_deletes_by_reflection_id(monkeypatch: pytest.Monke
     kwargs = purge.await_args.kwargs
     assert kwargs["reflection_id"] == "ref-1"
     assert kwargs["discord_user_id"] == 99
+    assert kwargs["purge_patterns"] is False
 
 
 @pytest.mark.asyncio
@@ -152,3 +153,17 @@ def test_revoke_webhook_500_when_purge_fails(monkeypatch: pytest.MonkeyPatch) ->
         headers={"Content-Type": "application/json"},
     )
     assert response.status_code == 500
+
+
+def test_revoke_webhook_passes_purge_patterns(monkeypatch: pytest.MonkeyPatch) -> None:
+    pool = _pool()
+    purge = AsyncMock(return_value={"deleted": 1, "tier2_purged": 1, "user_ids": []})
+    monkeypatch.setattr("webhooks.revoke_reflection.purge_app_reflection_copy", purge)
+    client = _client(pool)
+    response = client.post(
+        "/webhooks/revoke-reflection",
+        content=json.dumps({"reflection_id": "ref-1", "purge_patterns": True}),
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    assert purge.await_args.kwargs["purge_patterns"] is True

@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/reflections", tags=["reflections"])
 class RevokeReflectionRequest(BaseModel):
     reflection_id: str = Field(..., min_length=1)
     user_id: int | str | None = None
+    purge_patterns: bool = False
 
 
 class RevokeReflectionResponse(BaseModel):
@@ -93,6 +94,7 @@ async def revoke_app_reflection_copy_endpoint(
         reflection_id=reflection_id,
         discord_user_id=discord_user_id,
         innersync_user_id=innersync_user_id,
+        purge_patterns=bool(body.purge_patterns),
     )
     return RevokeReflectionResponse(
         status="deleted",

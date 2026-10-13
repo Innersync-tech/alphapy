@@ -152,6 +152,41 @@ async def _supabase_post(
     return data
 
 
+async def _supabase_patch(
+    table: str,
+    payload: dict[str, Any],
+    filters: dict[str, str],
+) -> list[dict[str, Any]]:
+    """PATCH rows matching PostgREST filters. Returns representation rows."""
+    _require_config()
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.patch(
+            url,
+            json=payload,
+            headers=_headers(prefer=["return=representation"], method="PATCH"),
+            params=filters,
+        )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "Supabase PATCH failed: table=%s status=%s body=%s",
+            table,
+            exc.response.status_code,
+            exc.response.text,
+        )
+        raise
+    if not response.content:
+        return []
+    data = response.json()
+    if isinstance(data, dict):
+        return data.get("data", [])
+    if isinstance(data, list):
+        return data
+    return []
+
+
 async def _supabase_delete(table: str, filters: dict[str, str]) -> None:
     """Delete rows from a Supabase table matching the given PostgREST filters.
 
@@ -313,4 +348,5 @@ __all__ = [
     "insert_insight_for_discord",
     "SupabaseConfigurationError",
     "_supabase_delete",
+    "_supabase_patch",
 ]
