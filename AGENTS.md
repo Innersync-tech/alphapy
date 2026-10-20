@@ -336,6 +336,16 @@ Every inbound webhook endpoint uses HMAC-SHA256 validation. When `APP_ENV=produc
 
 See `docs/SECURITY.md § Webhook HMAC validation` for details.
 
+## Supabase Data API: explicit grants for new tables (from 2026-10-30)
+
+`utils/supabase_client.py` reads and writes Supabase through PostgREST (`/rest/v1/{table}`) with the service-role key. From 2026-10-30 Supabase no longer auto-grants `service_role` (or `anon` / `authenticated`) on **new** tables in `public` ([discussion #45329](https://github.com/orgs/supabase/discussions/45329)). Any new Supabase table alphapy reads or writes must get, in the migration that creates it (Innersync_Core `supabase/`, see its `supabase/README.md` Pattern A):
+
+```sql
+grant select, insert, update, delete on table public.my_table to service_role;
+```
+
+Without it every call returns `42501 permission denied`, even with the service-role key. Existing tables are unaffected. Railway Postgres (`app_reflections`, Alembic) uses a direct connection and is not affected.
+
 ## Shared References
 - **Embed styling**: see `EMBEDS.md`
 - **Database pools, command tracking & infra**: see `ARCHITECTURE.md`
