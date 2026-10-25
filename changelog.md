@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+- **Dead `POST /webhooks/supabase/auth`** — nothing sent to this path (no Supabase DB webhook, no pg_net, no other service; zero hits since mid-Sep). Removed the router, `forward_supabase_auth`, and `SUPABASE_WEBHOOK_SECRET` (including fallbacks and startup env checks). GDPR erasure remains `/delete_my_data` via `purge_railway_user_data` / `purge_agent_user_data`.
+
 ### Fixed
 - **`/unlink` leftover shares (audit 4.8)** — Discord `/unlink` and `POST /webhooks/discord-link` `event=unlink` now hard-delete that user's Railway `app_reflections` copies (and soft-revoke `reflection_alphapy_consent` when Supabase is configured) **before** the link is removed. Awaited and fail-closed: a purge error aborts unlink and asks the user to retry. Patterns insights are not stripped on unlink.
 - **Alphapy-share revoke vs Patterns consent** — `purge_app_reflection_copy` / `POST /api/reflections/revoke` / `POST /webhooks/revoke-reflection` no longer drop Tier-2 Patterns insights when the user still has an active `reflection_patterns_consent` row. Pass `purge_patterns: true` only when the journal itself is deleted (App journal-delete already purges Patterns separately). Default is `false`.

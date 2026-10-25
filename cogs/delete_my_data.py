@@ -100,9 +100,9 @@ class ConfirmDeleteView(discord.ui.View):
 async def _purge_user_data(pool: asyncpg.Pool, user_id: int) -> None:
     """Delete all personal data for a user from Railway PostgreSQL.
 
-    Delegates Railway SQL to ``purge_railway_user_data`` (shared with
-    ``webhooks/supabase.py``). premium_subs is excluded — Belgian tax law
-    requires 7-year retention of financial records. See privacy-policy.md §6.
+    Delegates Railway SQL to ``purge_railway_user_data``. premium_subs is
+    excluded — Belgian tax law requires 7-year retention of financial
+    records. See privacy-policy.md §6.
     """
     await purge_railway_user_data(pool, user_id, log_prefix="delete_my_data")
 

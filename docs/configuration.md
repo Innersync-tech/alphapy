@@ -390,7 +390,7 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 - `INNERSYNC_APP_URL`: Public App origin for agent DM deep-links (default: `APP_BASE_URL`, usually `https://app.innersync.tech`). Used by Phase 5A nudges and agent UI helpers as `{origin}/dashboard/agent`.
 
 ### Optional - Innersync identity (Discord link webhook)
-- `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`. (`WEBHOOK_SECRET` is not loaded in `config.py` — do not rely on it.)
+- `DISCORD_LINK_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/discord-link`. Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`. (`WEBHOOK_SECRET` is not loaded in `config.py` — do not rely on it.)
 
 ### Optional - Premium tier
 - `PREMIUM_CHECKOUT_URL`: Checkout page URL for the "Get Premium" button in `/premium`. If unset, buttons are disabled.
@@ -405,12 +405,12 @@ When users see calm “temporarily unavailable” copy from Grok-powered command
 - `PRICE_LIFETIME_REGULAR`: Lifetime plan regular price label, shown after early bird sells out (default: `€99.99`).
 
 ### Optional - App reflections (Core-API webhooks)
-- `APP_REFLECTIONS_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/app-reflections` and `POST /webhooks/revoke-reflection`. If unset, falls back to `SUPABASE_WEBHOOK_SECRET`.
+- `APP_REFLECTIONS_WEBHOOK_SECRET`: Secret for HMAC validation of `POST /webhooks/app-reflections` and `POST /webhooks/revoke-reflection`. Set this env var explicitly; there is no shared fallback.
 - `API_KEY`: Also authenticates `POST /api/reflections/revoke` (Core/App should await this after revoke-share or journal delete so a dropped HMAC webhook cannot leave Railway plaintext).
 
 ### Optional - Premium / Founder webhooks (Core → Alphapy)
-- `PREMIUM_INVALIDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/premium-invalidate` (cache invalidation on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.
-- `FOUNDER_WEBHOOK_SECRET`: Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`.
+- `PREMIUM_INVALIDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/premium-invalidate` (cache invalidation on subscription change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`.
+- `FOUNDER_WEBHOOK_SECRET`: Secret for `POST /webhooks/founder` (founder welcome DM). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`.
 
 ### Optional - Legal update notifications
 - `LEGAL_UPDATE_WEBHOOK_SECRET`: Secret for `POST /webhooks/legal-update` (GitHub Action notifies on PP/ToS change). Falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`.

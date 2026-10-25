@@ -45,7 +45,6 @@ from webhooks.founder import router as founder_webhook_router
 from webhooks.legal_update import router as legal_update_webhook_router
 from webhooks.premium_invalidate import router as premium_invalidate_webhook_router
 from webhooks.revoke_reflection import router as revoke_reflection_webhook_router
-from webhooks.supabase import router as supabase_webhook_router
 
 # ---------------------------------------------------------------------------
 # Security helpers
@@ -301,8 +300,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Warn about unset webhook secrets — missing secrets mean those endpoints
     # accept unauthenticated requests, which is a security risk in production.
     # Note: we log only the env var *name*, never its value.
-    if not getattr(config, "SUPABASE_WEBHOOK_SECRET", None):
-        logger.warning("⚠️  SUPABASE_WEBHOOK_SECRET is not set — Supabase auth/GDPR erasure webhook is unauthenticated.")
     if not getattr(config, "PREMIUM_INVALIDATE_WEBHOOK_SECRET", None):
         logger.warning("⚠️  PREMIUM_INVALIDATE_WEBHOOK_SECRET is not set — premium invalidation webhook is unauthenticated.")
     if not getattr(config, "APP_REFLECTIONS_WEBHOOK_SECRET", None):
@@ -321,7 +318,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if not _api_key_set and not _supabase_configured:
             missing.append("API_KEY or SUPABASE_URL")
         for key in (
-            "SUPABASE_WEBHOOK_SECRET",
             "PREMIUM_INVALIDATE_WEBHOOK_SECRET",
             "APP_REFLECTIONS_WEBHOOK_SECRET",
             "FOUNDER_WEBHOOK_SECRET",
@@ -387,7 +383,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(supabase_webhook_router)
 app.include_router(app_reflections_webhook_router)
 app.include_router(revoke_reflection_webhook_router)
 app.include_router(premium_invalidate_webhook_router)

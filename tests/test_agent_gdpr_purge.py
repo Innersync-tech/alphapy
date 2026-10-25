@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 import pytest
 
 
@@ -70,41 +68,3 @@ async def test_purge_agent_user_data_requires_identifier() -> None:
 
     with pytest.raises(ValueError, match="requires"):
         await purge_agent_user_data()
-
-
-@pytest.mark.asyncio
-async def test_user_deleted_webhook_purges_agent_data_without_discord_id(monkeypatch) -> None:
-    import json
-
-    from fastapi import FastAPI
-    from httpx import ASGITransport, AsyncClient
-
-    purge_mock = AsyncMock()
-    monkeypatch.setattr("agents.memory.purge_agent_user_data", purge_mock)
-    monkeypatch.setattr(
-        "webhooks.supabase.validate_webhook_signature",
-        lambda *args, **kwargs: None,
-    )
-    monkeypatch.setattr("webhooks.supabase.forward_supabase_auth", lambda payload: None)
-
-    from webhooks.supabase import router
-
-    app = FastAPI()
-    app.include_router(router)
-
-    user_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-    payload = {
-        "type": "USER_DELETED",
-        "record": {"id": user_id, "raw_user_meta_data": {"provider": "email"}},
-    }
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post(
-            "/webhooks/supabase/auth",
-            content=json.dumps(payload),
-            headers={"x-supabase-signature": "test"},
-        )
-
-    assert response.status_code == 200
-    purge_mock.assert_awaited_once_with(innersync_user_id=user_id)

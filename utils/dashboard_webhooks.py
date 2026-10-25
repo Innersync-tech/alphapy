@@ -5,18 +5,16 @@ real-time. Every outbound request is signed with HMAC-SHA256 so the dashboard
 can verify the payload origin.
 
 Usage:
-    from utils.dashboard_webhooks import forward_reflection, forward_revoke_reflection, forward_supabase_auth
+    from utils.dashboard_webhooks import forward_reflection, forward_revoke_reflection
 
     # Call from within an async handler (fire-and-forget; never raises):
     forward_reflection(payload)
     forward_revoke_reflection(payload)
-    forward_supabase_auth(payload)
 
 Env vars required (set in Railway):
     DASHBOARD_BASE_URL        — e.g. https://dashboard.alphapy.innersync.tech
     REFLECTION_WEBHOOK_SECRET — HMAC secret shared with dashboard for reflections
     GDPR_WEBHOOK_SECRET       — HMAC secret shared with dashboard for revoke-reflection
-    SUPABASE_WEBHOOK_SECRET   — already set; reused for supabase auth forwarding
 """
 
 from __future__ import annotations
@@ -106,24 +104,8 @@ def forward_revoke_reflection(payload: dict[str, Any]) -> None:
     )
 
 
-def forward_supabase_auth(payload: dict[str, Any]) -> None:
-    """Fire-and-forget: notify dashboard of a Supabase auth lifecycle event.
-
-    Endpoint : POST /api/webhooks/supabase
-    Header   : supabase-signature
-    Secret   : SUPABASE_WEBHOOK_SECRET
-    """
-    secret = getattr(config, "SUPABASE_WEBHOOK_SECRET", None) or ""
-    if not secret:
-        return
-    asyncio.create_task(
-        _post("/api/webhooks/supabase", payload, secret, "supabase-signature")
-    )
-
-
 __all__ = [
     "sign_payload",
     "forward_reflection",
     "forward_revoke_reflection",
-    "forward_supabase_auth",
 ]
