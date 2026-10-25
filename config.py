@@ -47,8 +47,7 @@ SUPABASE_ISSUER = os.getenv(
     "SUPABASE_ISSUER",
     f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else None,
 )
-SUPABASE_WEBHOOK_SECRET = os.getenv("SUPABASE_WEBHOOK_SECRET")
-# App reflections webhook (Core-API → Alphapy). Optional; falls back to SUPABASE_WEBHOOK_SECRET only.
+# App reflections webhook (Core-API → Alphapy). Set explicitly; no shared fallback.
 APP_REFLECTIONS_WEBHOOK_SECRET = os.getenv("APP_REFLECTIONS_WEBHOOK_SECRET")
 
 # Telemetry ingest configuration

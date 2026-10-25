@@ -245,7 +245,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 | Guild blast radius | `agents.enabled` off by default per guild |
 | API (future) | `verify_api_key` + Core JWT user resolution; per-user rate limit table |
 | Premium | Higher GPT limits via existing tiers; optional `agents.premium_only` setting later |
-| PII retention | Session `summary` capped at 4k chars; GDPR purge via `purge_agent_user_data()` on Supabase user delete and `/delete_my_data` |
+| PII retention | Session `summary` capped at 4k chars; GDPR purge via `purge_agent_user_data()` on `/delete_my_data` |
 | Transport | HTTPS + service role; no client-side Supabase keys in bot |
 
 **Rate limit (shipped):** `agent_session_usage` table (Railway migration 024): free 10 starts/user/day, monthly 25, yearly/lifetime unlimited.
@@ -273,7 +273,7 @@ Ephemeral multi-turn working memory. Rows cascade-delete when the parent session
 - [ ] Hermit job: iterate linked users with recent `gpt_command` events → batch context refresh
 - [x] Premium tier caps on `/agent start` (free 10/day, monthly 25/day, yearly/lifetime unlimited)
 - [x] Rate limits — `agent_session_usage` (migration 024), `check_and_increment_agent_session_quota()`
-- [x] GDPR — `purge_agent_user_data()` on user delete webhook + `/delete_my_data`
+- [x] GDPR — `purge_agent_user_data()` on `/delete_my_data`
 - [x] Observability: agent session metrics in telemetry ingest (`notes`) and structured `agent_sessions` on `/api/dashboard/metrics` (Mind Telemetry strip)
 - [x] **Phase 5A check-in DMs** — `/agent nudges enable|disable`, `agent_prefs.agent_nudges_enabled` (default off), hourly loop, Railway `agent_nudge_state` (Alembic `027`); no Grok / no journal text
 

@@ -28,7 +28,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Locale**: `utils/platform_locale.py` reads Core `bot-profile.locale` (`nl-BE` \| `en`, default `en`). Unlinked Discord → `en`. Agent replies use `locale_output_instruction`. Tier-2 distill uses `distill_locale_output_instruction` (new labels follow locale; stored catalog phrases stay). Not Discord guild language.
 - **Webhooks**: `POST /webhooks/discord-link` (HMAC `DISCORD_LINK_WEBHOOK_SECRET`) — Core sends `event: link` or `event: unlink`; unlink first purges `app_reflections` (500 if purge fails), then deletes `alphapy_discord_links`; may DM the user
 - **Logging**: `/link` (session started) and successful `/unlink` post only to the home guild (`MAIN_GUILD_ID`) log channel via `send_home_guild_log` — never to third-party guilds
-- **GDPR**: `alphapy_discord_links` rows purged with other Railway PII in `webhooks/supabase.py` user delete handler; Supabase `agent_sessions` / `agent_memory` purged via `agents/memory.purge_agent_user_data()`
+- **GDPR**: `alphapy_discord_links` rows purged with other Railway PII via `/delete_my_data`; Supabase `agent_sessions` / `agent_memory` purged via `agents/memory.purge_agent_user_data()`
 
 ---
 
@@ -103,7 +103,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Memory**: Supabase `agent_sessions` + `agent_session_messages` (ephemeral, Core `0023`) + `agent_memory` (Tier 1–3); `ALPHAPY_AGENTS_MEMORY_BACKEND=memory` for dev/tests
 - **Gates**: `ALPHAPY_AGENTS_ENABLED` (global), `agents.enabled` per guild, `/link` required
 - **Rate limits**: `/agent start` only — `check_and_increment_agent_session_quota()` + Railway `agent_session_usage` (migration 024); see `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`
-- **GDPR**: `purge_agent_user_data()` on Supabase `USER_DELETED` and `/delete_my_data`; see `agents/memory.py`
+- **GDPR**: `purge_agent_user_data()` on `/delete_my_data`; see `agents/memory.py`
 
 ---
 
@@ -327,7 +327,6 @@ Every inbound webhook endpoint uses HMAC-SHA256 validation. When `APP_ENV=produc
 
 | Env var | Webhook |
 |---|---|
-| `SUPABASE_WEBHOOK_SECRET` | GDPR erasure / Supabase auth events |
 | `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Premium invalidation |
 | `APP_REFLECTIONS_WEBHOOK_SECRET` | Reflection sync |
 | `DISCORD_LINK_WEBHOOK_SECRET` | Discord identity link/unlink |

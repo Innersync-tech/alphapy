@@ -28,7 +28,7 @@ With strict mode enabled, API startup fails fast if critical auth/webhook secret
 
 ### Webhook HMAC validation (`webhooks/common.py`)
 
-All inbound webhooks (Supabase auth, premium invalidation, GDPR erasure, reflections, founder, legal-update, Discord link) are verified with `HMAC-SHA256`. The shared utility `validate_webhook_signature()` uses `hmac.compare_digest` to prevent timing attacks.
+All inbound webhooks (premium invalidation, reflections, founder, legal-update, Discord link) are verified with `HMAC-SHA256`. The shared utility `validate_webhook_signature()` uses `hmac.compare_digest` to prevent timing attacks.
 
 **Fail-closed behavior (2026-06-21):** When `APP_ENV=production` or `STRICT_SECURITY_MODE=1` is set, any webhook whose `*_WEBHOOK_SECRET` env var is absent returns `HTTP 503 Service Unavailable` immediately — the endpoint does not execute. Previously, missing secrets caused validation to be silently skipped. In non-production environments, missing secrets still emit a debug log and skip validation (development convenience only).
 
@@ -36,7 +36,6 @@ All of the following secrets are **required in production**:
 
 | Secret | Protects |
 |---|---|
-| `SUPABASE_WEBHOOK_SECRET` | GDPR erasure + Supabase auth events |
 | `PREMIUM_INVALIDATE_WEBHOOK_SECRET` | Premium subscription invalidation |
 | `APP_REFLECTIONS_WEBHOOK_SECRET` | Reflection sync from Core-API |
 | `DISCORD_LINK_WEBHOOK_SECRET` | Discord ↔ Innersync identity link/unlink |
@@ -71,7 +70,7 @@ Separate from API IP rate limits. Enforced in `start_agent_session()` via `check
 - Storage: Railway table `agent_session_usage` (Alembic migration `024`)
 - `/agent continue` and `/agent end` do not consume quota
 - Fails open on DB error (same policy as GPT quota)
-- Counters purged on GDPR erasure (`webhooks/supabase.py`, `/delete_my_data`)
+- Counters purged on GDPR erasure (`/delete_my_data`)
 
 Tier constants: `AGENT_DAILY_SESSION_LIMIT` in `utils/premium_tiers.py`. See `docs/alphapy-agents-architecture.md` §6.
 

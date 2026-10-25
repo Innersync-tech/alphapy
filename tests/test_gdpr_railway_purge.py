@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -56,16 +56,3 @@ async def test_delete_my_data_uses_shared_railway_purge(monkeypatch) -> None:
     railway.assert_awaited_once()
     assert railway.await_args.args[0] is pool
     assert railway.await_args.args[1] == 99
-
-
-@pytest.mark.asyncio
-async def test_supabase_webhook_uses_shared_railway_purge() -> None:
-    from webhooks.supabase import _purge_railway_data
-
-    pool = MagicMock()
-    with patch(
-        "webhooks.supabase.purge_railway_user_data",
-        new=AsyncMock(),
-    ) as railway:
-        await _purge_railway_data(pool, 77, "user-uuid")
-    railway.assert_awaited_once_with(pool, 77, log_prefix="GDPR purge")

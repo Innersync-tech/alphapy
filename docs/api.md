@@ -1194,13 +1194,7 @@ Hard-deletes a previously stored Railway `app_reflections` row when the user rev
 
 > **Note:** Legacy `POST /webhooks/reflections` (`reflection.created` events) was removed. App reflection sync uses `POST /webhooks/app-reflections` via Core-API.
 
-### `POST /webhooks/supabase/auth`
-
-Supabase Auth lifecycle webhook used for profile sync and GDPR-style cleanup workflows.
-
-**Headers:** `X-Webhook-Signature` (optional if no webhook secret configured)
-
-**Response:** `200` with acknowledgment status when processed.
+> **Note:** Legacy `POST /webhooks/supabase/auth` was removed. Nothing sent to it (no Supabase DB webhook, no pg_net, no other service). GDPR erasure is `/delete_my_data`.
 
 ### `POST /webhooks/legal-update`
 
@@ -1228,7 +1222,7 @@ Triggered by a GitHub Action when `docs/terms-of-service.md` or `docs/privacy-po
 
 Clears the premium cache for a user so the next check refetches from Core-API/DB. Sent by Core-API on subscription changes (new purchase, cancellation, transfer).
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `PREMIUM_INVALIDATE_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `PREMIUM_INVALIDATE_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`)
 
 **Request body:**
 ```json
@@ -1248,7 +1242,7 @@ Clears the premium cache for a user so the next check refetches from Core-API/DB
 
 Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or deletes `alphapy_discord_links` and may send the user a confirmation DM. On `event=unlink`, Alphapy first hard-deletes that user's Railway `app_reflections` copies and soft-revokes `reflection_alphapy_consent` (Patterns insights stay). If that purge fails the webhook returns **500** so Core can retry — the Discord link is not removed.
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `DISCORD_LINK_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `DISCORD_LINK_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`)
 
 **Link request body:**
 ```json
@@ -1282,7 +1276,7 @@ Confirms a completed Discord ↔ Innersync link or unlink from Core. Upserts or 
 
 Sends a founder welcome DM to a Discord user. Triggered by Core-API when a founder purchase is confirmed.
 
-**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `FOUNDER_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET` / `SUPABASE_WEBHOOK_SECRET`)
+**Headers:** `X-Webhook-Signature` (HMAC-SHA256; secret: `FOUNDER_WEBHOOK_SECRET`, falls back to `APP_REFLECTIONS_WEBHOOK_SECRET`)
 
 **Request body:**
 ```json

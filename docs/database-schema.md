@@ -160,7 +160,7 @@ Per-user daily `/agent start` tracking for tier-based session caps. Added in mig
 - `check_and_increment_agent_session_quota()` in `utils/premium_guard.py` — atomic upsert, same pattern as `gpt_usage`
 - Limits per tier: free = 10/day, monthly = 25/day, yearly/lifetime = unlimited
 - Counts `/agent start` only; `/agent continue` and `/agent end` do not consume quota
-- Deleted on GDPR erasure (`webhooks/supabase.py`, `/delete_my_data`)
+- Deleted on GDPR erasure (`/delete_my_data`)
 
 ---
 
@@ -180,7 +180,7 @@ Delivery ledger for opt-in Discord check-in DMs (Phase 5A). Added in migration `
 **Notes:**
 - Written by `agents/nudges.py` after a successful DM; not a Supabase prefs table
 - Opt-in flag lives in App `agent_prefs.agent_nudges_enabled` (default off)
-- Purged with other Railway PII (`webhooks/supabase.py`, `/delete_my_data`)
+- Purged with other Railway PII (`/delete_my_data`)
 
 ---
 
@@ -240,7 +240,7 @@ Guild GDPR agreement acceptance (the "I Agree" button in the GDPR channel).
 - Written by `cogs/gdpr.py` / `utils/gdpr_helpers.py` when a user clicks the "I Agree" button on the GDPR embed
 - Acceptance is also posted to the guild `system.log_channel_id` when that channel is configured
 - Formalised in Alembic migration 016; `guild_id` column added in migration 018
-- Deleted as part of GDPR erasure when a user's Supabase account is deleted (`webhooks/supabase.py:_purge_railway_data`) or when the user runs `/delete_my_data`
+- Deleted as part of GDPR erasure when the user runs `/delete_my_data`
 
 ---
 
@@ -312,7 +312,7 @@ Maps Supabase Auth user id (Innersync UUID) to a Discord snowflake for Alphapy a
 
 **Notes:**
 - Written by `POST /webhooks/discord-link` after the user completes linking in Core/App.
-- Removed by `/unlink`, `/delete_my_data`, or GDPR purge when the Supabase user is deleted (`webhooks/supabase.py`).
+- Removed by `/unlink` or `/delete_my_data`.
 - Resolution helpers live in `utils/innersync_identity.py` (with optional fallback to Supabase `profiles` for migration).
 
 ---
@@ -946,7 +946,7 @@ One row per `/agent` invocation. Migration: `Innersync_Core/supabase/0020_agent_
 - Multi-turn turns stored in `agent_session_messages` (Core `0023`) while `status = active`; deleted on session end.
 - RLS enabled with zero policies; `anon`/`authenticated` revoked (service role only).
 - App reads completed session rows via service-role API routes; users can delete individual history rows.
-- GDPR purge on user delete: `purge_agent_user_data()` via `webhooks/supabase.py` and `/delete_my_data`.
+- GDPR purge on user delete: `purge_agent_user_data()` via `/delete_my_data`.
 
 ---
 
@@ -988,7 +988,7 @@ Durable per-user JSON blob per agent type.
 **Notes:**
 - Patched on `/agent end` (Tier 2 distill + Tier 3 metadata). Not on every turn.
 - Same RLS / access pattern as `agent_sessions`.
-- GDPR purge on user delete: `purge_agent_user_data()` via `webhooks/supabase.py` and `/delete_my_data`.
+- GDPR purge on user delete: `purge_agent_user_data()` via `/delete_my_data`.
 
 ---
 

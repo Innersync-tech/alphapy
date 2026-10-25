@@ -2,7 +2,8 @@
 Shared utilities for webhook handlers.
 
 Centralizes HMAC signature validation so fixes and improvements apply to all
-webhooks (app-reflections, revoke-reflection, reflections, supabase).
+webhooks (app-reflections, revoke-reflection, premium-invalidate, founder,
+legal-update, discord-link).
 """
 
 import hashlib
@@ -76,10 +77,7 @@ def get_app_reflections_secret() -> str | None:
     """Secret for app-reflections and revoke-reflection webhooks (Core-API)."""
     import config
 
-    return (
-        getattr(config, "APP_REFLECTIONS_WEBHOOK_SECRET", None)
-        or getattr(config, "SUPABASE_WEBHOOK_SECRET", None)
-    )
+    return getattr(config, "APP_REFLECTIONS_WEBHOOK_SECRET", None)
 
 
 def get_premium_invalidate_secret() -> str | None:
@@ -89,7 +87,6 @@ def get_premium_invalidate_secret() -> str | None:
     return (
         getattr(config, "PREMIUM_INVALIDATE_WEBHOOK_SECRET", None)
         or getattr(config, "APP_REFLECTIONS_WEBHOOK_SECRET", None)
-        or getattr(config, "SUPABASE_WEBHOOK_SECRET", None)
     )
 
 
@@ -100,7 +97,6 @@ def get_founder_webhook_secret() -> str | None:
     return (
         getattr(config, "FOUNDER_WEBHOOK_SECRET", None)
         or getattr(config, "APP_REFLECTIONS_WEBHOOK_SECRET", None)
-        or getattr(config, "SUPABASE_WEBHOOK_SECRET", None)
     )
 
 
@@ -121,7 +117,6 @@ def get_discord_link_webhook_secret() -> str | None:
     return (
         getattr(config, "DISCORD_LINK_WEBHOOK_SECRET", None)
         or getattr(config, "APP_REFLECTIONS_WEBHOOK_SECRET", None)
-        or getattr(config, "SUPABASE_WEBHOOK_SECRET", None)
     )
 
 
