@@ -39,7 +39,7 @@ This applies even when the user speaks Dutch in chat or in instructions. Keep al
 - **Storage**: PostgreSQL (reminders table)
 - **Enable gate**: `embedwatcher.enabled` (default true). When false, the watcher does not create reminders; shared `MODULE_DISABLED_MSG` for related user surfaces. See `docs/configuration.md` module enable contract.
 - **Special parsing**: Title, time, days, location via NLP
-- **Helper**: `parse_embed_for_reminder()` + `_short_title_for_reminder_name()`
+- **Helper**: `parse_embed_for_reminder()` + `_short_title_for_reminder_name()` + `extract_plain_text_title_description()` (plain-text announcements)
 - **Message formatting**: `_format_message_paragraphs()` for readable paragraphs + timezone bullet splits
 - **Logging**: Guild `system.log_channel_id` with `safe_embed_text(..., 1024)`. Failed parse attempts go to `embedwatcher.failed_parse_log_channel_id` when set (Dashboard Embed Watcher; no slash command), else the same system log channel.
 - **Known Issues**: Timezone parsing is critical

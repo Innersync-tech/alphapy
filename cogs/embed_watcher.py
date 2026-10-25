@@ -15,6 +15,7 @@ from utils.embed_builder import EmbedBuilder
 from utils.embed_parser import (
     extract_datetime_from_text,
     extract_fields_from_lines,
+    extract_plain_text_title_description,
     format_message_paragraphs,
     infer_date_from_time_line,
     parse_days,
@@ -148,11 +149,10 @@ class EmbedReminderWatcher(AlphaCog):
         # Check for non-embed messages if enabled
         elif self._is_non_embed_enabled(message.guild.id) and message.content:
             message_type = "text"
-            # Convert message to a mock embed for parsing
-            title_text = message.content[:256] if len(message.content) > 100 else message.content[:100] if message.content else "Message"
-            mock_embed = EmbedBuilder.info(
+            title_text, description_text = extract_plain_text_title_description(message.content)
+            mock_embed = discord.Embed(
                 title=title_text,
-                description=message.content
+                description=description_text or None,
             )
             embed_source = mock_embed
             if isinstance(message.channel, (discord.TextChannel, discord.Thread)):

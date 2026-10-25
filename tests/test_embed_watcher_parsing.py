@@ -6,6 +6,7 @@ Tests cover:
 - Day parsing (abbreviations, numbers, natural language)
 - Relative date parsing ("This Wednesday", "Next Friday", "Tomorrow")
 - Full embed parsing
+- Plain-text announcement title/description extraction
 """
 
 from datetime import datetime, timedelta
@@ -14,7 +15,12 @@ import discord
 import pytest
 
 from cogs.embed_watcher import EmbedReminderWatcher
-from utils.embed_parser import extract_datetime_from_text
+from utils.embed_parser import (
+    DISCORD_EMBED_TITLE_LIMIT,
+    extract_datetime_from_text,
+    extract_plain_text_title_description,
+    short_title_for_reminder_name,
+)
 from utils.timezone import BRUSSELS_TZ
 
 # Try to use pytest-asyncio, fallback to manual async handling
@@ -350,3 +356,143 @@ class TestParseEmbedForReminder:
         # May return None if relative date parsing fails
         if result is not None:
             assert "datetime" in result or "reminder_time" in result
+
+
+GOLDEN_RULES_TITLE = "📢 This Wednesday – The Golden Rules of Risk Management with Sander 📊🔥"
+UGC_FATI_TITLE = "📢 This Wednesday – UGC with Fati 📱🔥"
+
+GOLDEN_RULES_MESSAGE = f"""@everyone
+
+{GOLDEN_RULES_TITLE}
+
+Risk is the difference between staying in the game and blowing up. This session walks through the rules Sander actually uses when size starts to matter.
+
+We will cover position sizing, invalidation, and how to keep a losing streak from becoming a career event.
+
+🕢 Wednesday – 19:30
+📍 Trade Café, Oude Heerweg 34, Lokeren
+
+🔥 See you there
+"""
+
+UGC_FATI_MESSAGE = f"""@everyone
+
+{UGC_FATI_TITLE}
+
+User-generated content that actually converts. Fati shares what works on short-form and how to brief creators without losing the brand.
+
+Bring questions. Bring examples.
+
+🕢 Wednesday – 19:30
+📍 Trade Café, Oude Heerweg 34, Lokeren
+
+🔥 Don't miss it
+"""
+
+
+def _plain_text_mock_embed(content: str) -> discord.Embed:
+    title, description = extract_plain_text_title_description(content)
+    return discord.Embed(title=title, description=description or None)
+
+
+class TestExtractPlainTextTitleDescription:
+    """Tests for plain-text announcement title/description extraction."""
+
+    def test_golden_rules_title_and_description(self):
+        title, description = extract_plain_text_title_description(GOLDEN_RULES_MESSAGE)
+        assert title == GOLDEN_RULES_TITLE
+        assert GOLDEN_RULES_TITLE not in description
+        assert "@everyone" not in description
+        assert "@everyone" not in title
+        assert "19:30" in description
+        assert "Trade Café" in description
+
+    def test_ugc_fati_title_and_description(self):
+        title, description = extract_plain_text_title_description(UGC_FATI_MESSAGE)
+        assert title == UGC_FATI_TITLE
+        assert UGC_FATI_TITLE not in description
+        assert "@everyone" not in description
+        assert "@everyone" not in title
+        assert "19:30" in description
+
+    def test_strips_all_mention_forms(self):
+        content = (
+            "@here <@123> <@!456> <@&789> <#111>\n"
+            f"{GOLDEN_RULES_TITLE}\n"
+            "Body after mentions."
+        )
+        title, description = extract_plain_text_title_description(content)
+        assert title == GOLDEN_RULES_TITLE
+        assert "@here" not in description
+        assert "<@" not in description
+        assert "<#" not in description
+        assert "Body after mentions." in description
+
+    def test_fallback_long_first_line_word_boundary(self):
+        long_line = (
+            "Join us tonight for an in-depth walkthrough of risk limits position sizing "
+            "journal reviews and the weekly recap with extra context about how the desk "
+            "handles drawdowns when volatility spikes and liquidity thins across every "
+            "session including the London open New York overlap and the late Asia window "
+            "plus a reminder to bring your notes questions and a clear invalidation level"
+        )
+        assert len(long_line) > DISCORD_EMBED_TITLE_LIMIT
+        content = f"{long_line}\n\nExtra details stay in the body."
+        title, description = extract_plain_text_title_description(content)
+        assert "📢" not in title
+        assert len(title) <= DISCORD_EMBED_TITLE_LIMIT
+        assert title.endswith("…")
+        core = title.removesuffix("…")
+        assert long_line.startswith(core)
+        assert not core.endswith(" ")
+        assert " " not in core[-1:]
+        assert long_line not in description
+        assert "Extra details stay in the body." in description
+        assert title not in description
+
+    def test_short_title_uses_clean_announce_line(self):
+        title, description = extract_plain_text_title_description(GOLDEN_RULES_MESSAGE)
+        name = short_title_for_reminder_name({"title": title, "description": description}, max_chars=50)
+        assert name.startswith("📢")
+        assert len(name) <= 50
+        assert "Risk is the difference" not in name
+
+
+class TestParsePlainTextAnnouncement:
+    """Full parse path for the announcement format used in the announcements channel."""
+
+    @pytest.fixture
+    def parser(self, mock_bot):
+        watcher = EmbedReminderWatcher(mock_bot)
+        watcher.settings.set("embedwatcher", "gpt_fallback_enabled", False, guild_id=123456)
+        return watcher
+
+    @pytest.mark.asyncio
+    async def test_golden_rules_parses_wednesday_1930(self, parser):
+        if not pytest_asyncio_available:
+            pytest.skip("pytest-asyncio not available")
+        embed = _plain_text_mock_embed(GOLDEN_RULES_MESSAGE)
+        result = await parser.parse_embed_for_reminder(embed, guild_id=123456)
+        assert result is not None
+        assert result["title"] == GOLDEN_RULES_TITLE
+        assert GOLDEN_RULES_TITLE not in (result["description"] or "")
+        assert "@everyone" not in (result["description"] or "")
+        assert result["datetime"].weekday() == 2
+        assert result["datetime"].hour == 19
+        assert result["datetime"].minute == 30
+        assert result.get("location") == "Trade Café, Oude Heerweg 34, Lokeren"
+
+    @pytest.mark.asyncio
+    async def test_ugc_fati_parses_wednesday_1930(self, parser):
+        if not pytest_asyncio_available:
+            pytest.skip("pytest-asyncio not available")
+        embed = _plain_text_mock_embed(UGC_FATI_MESSAGE)
+        result = await parser.parse_embed_for_reminder(embed, guild_id=123456)
+        assert result is not None
+        assert result["title"] == UGC_FATI_TITLE
+        assert UGC_FATI_TITLE not in (result["description"] or "")
+        assert "@everyone" not in (result["description"] or "")
+        assert result["datetime"].weekday() == 2
+        assert result["datetime"].hour == 19
+        assert result["datetime"].minute == 30
+        assert result.get("location") == "Trade Café, Oude Heerweg 34, Lokeren"
