@@ -62,7 +62,9 @@ def test_revoke_api_hard_deletes(monkeypatch: pytest.MonkeyPatch) -> None:
         "reflection_revoke_api.resolve_discord_user_id",
         AsyncMock(return_value=77),
     )
-    purge = AsyncMock(return_value={"deleted": 1, "tier2_purged": 1, "user_ids": [77]})
+    purge = AsyncMock(
+        return_value={"deleted": 1, "remaining": 0, "tier2_purged": 1, "user_ids": [77]}
+    )
     monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
 
     client = _client(pool)
@@ -72,7 +74,12 @@ def test_revoke_api_hard_deletes(monkeypatch: pytest.MonkeyPatch) -> None:
         headers={"X-API-Key": "svc-secret"},
     )
     assert response.status_code == 200
-    assert response.json() == {"status": "deleted", "count": 1, "tier2_purged": 1}
+    assert response.json() == {
+        "status": "deleted",
+        "count": 1,
+        "remaining": 0,
+        "tier2_purged": 1,
+    }
     assert purge.await_args.kwargs["reflection_id"] == "ref-1"
     assert purge.await_args.kwargs["discord_user_id"] == 77
     assert purge.await_args.kwargs["purge_patterns"] is False
@@ -106,7 +113,9 @@ def test_revoke_api_unresolved_uuid_still_deletes(monkeypatch: pytest.MonkeyPatc
         "reflection_revoke_api.resolve_discord_user_id",
         AsyncMock(side_effect=ReflectionWebhookPayloadError("unlinked")),
     )
-    purge = AsyncMock(return_value={"deleted": 1, "tier2_purged": 1, "user_ids": []})
+    purge = AsyncMock(
+        return_value={"deleted": 1, "remaining": 0, "tier2_purged": 1, "user_ids": []}
+    )
     monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
 
     client = _client(pool)
@@ -127,7 +136,9 @@ def test_revoke_api_unresolved_snowflake_deletes_by_id(monkeypatch: pytest.Monke
         "reflection_revoke_api.resolve_discord_user_id",
         AsyncMock(side_effect=ReflectionWebhookPayloadError("bad")),
     )
-    purge = AsyncMock(return_value={"deleted": 1, "tier2_purged": 0, "user_ids": []})
+    purge = AsyncMock(
+        return_value={"deleted": 1, "remaining": 0, "tier2_purged": 0, "user_ids": []}
+    )
     monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
 
     client = _client(pool)
@@ -142,7 +153,9 @@ def test_revoke_api_unresolved_snowflake_deletes_by_id(monkeypatch: pytest.Monke
 
 def test_revoke_api_accepts_reflection_id_only(monkeypatch: pytest.MonkeyPatch) -> None:
     pool = _pool()
-    purge = AsyncMock(return_value={"deleted": 0, "tier2_purged": 0, "user_ids": []})
+    purge = AsyncMock(
+        return_value={"deleted": 0, "remaining": 0, "tier2_purged": 0, "user_ids": []}
+    )
     monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
 
     client = _client(pool)
@@ -152,14 +165,72 @@ def test_revoke_api_accepts_reflection_id_only(monkeypatch: pytest.MonkeyPatch) 
         headers={"X-API-Key": "svc-secret"},
     )
     assert response.status_code == 200
-    assert response.json()["count"] == 0
+    assert response.json() == {
+        "status": "deleted",
+        "count": 0,
+        "remaining": 0,
+        "tier2_purged": 0,
+    }
     assert purge.await_args.kwargs["discord_user_id"] is None
     assert purge.await_args.kwargs["purge_patterns"] is False
 
 
+def test_revoke_api_idempotent_re_revoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    pool = _pool()
+    purge = AsyncMock(
+        return_value={"deleted": 0, "remaining": 0, "tier2_purged": 0, "user_ids": []}
+    )
+    monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
+
+    client = _client(pool)
+    first = client.post(
+        "/api/reflections/revoke",
+        json={"reflection_id": "ref-1"},
+        headers={"X-API-Key": "svc-secret"},
+    )
+    second = client.post(
+        "/api/reflections/revoke",
+        json={"reflection_id": "ref-1"},
+        headers={"X-API-Key": "svc-secret"},
+    )
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["remaining"] == 0
+    assert second.json() == {
+        "status": "deleted",
+        "count": 0,
+        "remaining": 0,
+        "tier2_purged": 0,
+    }
+
+
+def test_revoke_api_remaining_rows_returns_500(monkeypatch: pytest.MonkeyPatch) -> None:
+    pool = _pool()
+    purge = AsyncMock(
+        return_value={"deleted": 1, "remaining": 2, "tier2_purged": 0, "user_ids": [77]}
+    )
+    monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
+
+    client = _client(pool)
+    response = client.post(
+        "/api/reflections/revoke",
+        json={"reflection_id": "ref-1"},
+        headers={"X-API-Key": "svc-secret"},
+    )
+    assert response.status_code == 500
+    assert response.json() == {
+        "status": "deleted",
+        "count": 1,
+        "remaining": 2,
+        "tier2_purged": 0,
+    }
+
+
 def test_revoke_api_passes_purge_patterns(monkeypatch: pytest.MonkeyPatch) -> None:
     pool = _pool()
-    purge = AsyncMock(return_value={"deleted": 1, "tier2_purged": 1, "user_ids": []})
+    purge = AsyncMock(
+        return_value={"deleted": 1, "remaining": 0, "tier2_purged": 1, "user_ids": []}
+    )
     monkeypatch.setattr("reflection_revoke_api.purge_app_reflection_copy", purge)
 
     client = _client(pool)

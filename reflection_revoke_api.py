@@ -11,6 +11,7 @@ import hmac
 import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import config
@@ -31,6 +32,7 @@ class RevokeReflectionRequest(BaseModel):
 class RevokeReflectionResponse(BaseModel):
     status: str
     count: int
+    remaining: int
     tier2_purged: int
 
 
@@ -58,7 +60,7 @@ async def require_reflection_revoke_service_key(
 async def revoke_app_reflection_copy_endpoint(
     request: Request,
     body: RevokeReflectionRequest,
-) -> RevokeReflectionResponse:
+) -> RevokeReflectionResponse | JSONResponse:
     """Hard-delete Railway ``app_reflections`` for one journal id. Idempotent."""
     pool = getattr(request.app.state, "db_pool", None)
     if pool is None:
@@ -96,11 +98,22 @@ async def revoke_app_reflection_copy_endpoint(
         innersync_user_id=innersync_user_id,
         purge_patterns=bool(body.purge_patterns),
     )
-    return RevokeReflectionResponse(
+    remaining = int(result["remaining"])
+    payload = RevokeReflectionResponse(
         status="deleted",
         count=int(result["deleted"]),
+        remaining=remaining,
         tier2_purged=int(result["tier2_purged"]),
     )
+    if remaining > 0:
+        logger.error(
+            "Reflection revoke left remaining rows: reflection_id=%s deleted=%s remaining=%s",
+            reflection_id,
+            payload.count,
+            remaining,
+        )
+        return JSONResponse(status_code=500, content=payload.model_dump())
+    return payload
 
 
 __all__ = ["require_reflection_revoke_service_key", "router"]
