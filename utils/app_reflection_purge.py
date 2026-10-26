@@ -107,12 +107,34 @@ async def revoke_alphapy_share_consent_for_user(innersync_user_id: str) -> int:
     return len(rows)
 
 
+async def count_app_reflection_rows(
+    conn: asyncpg.Connection,
+    reflection_id: str,
+) -> int:
+    """``SELECT count(*)`` for ``reflection_id``. Never reads ``plaintext_content``."""
+    rid = str(reflection_id).strip()
+    if not rid:
+        return 0
+    value = await conn.fetchval(
+        """
+        SELECT count(*) FROM app_reflections
+        WHERE reflection_id = $1
+        """,
+        rid,
+    )
+    return int(value or 0)
+
+
 async def delete_app_reflection_rows(
     pool: asyncpg.Pool,
     *,
     reflection_id: str,
-) -> tuple[int, list[int]]:
-    """DELETE Railway rows for ``reflection_id``. Returns (count, discord user ids).
+) -> tuple[int, list[int], int]:
+    """DELETE Railway rows for ``reflection_id``.
+
+    Returns ``(deleted, discord user ids, remaining)``. ``remaining`` is a
+    post-delete ``SELECT count(*)`` for the same ``reflection_id`` so callers
+    can prove the copy is gone (a sent DELETE is not enough).
 
     Scoped by reflection id only. The App journal id is a UUID; requiring
     ``user_id`` as well left orphans when Discord snowflakes drifted or the
@@ -120,7 +142,7 @@ async def delete_app_reflection_rows(
     """
     rid = str(reflection_id).strip()
     if not rid:
-        return 0, []
+        return 0, [], 0
 
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -131,6 +153,7 @@ async def delete_app_reflection_rows(
             """,
             rid,
         )
+        remaining = await count_app_reflection_rows(conn, rid)
 
     user_ids: list[int] = []
     for row in rows:
@@ -138,7 +161,7 @@ async def delete_app_reflection_rows(
             user_ids.append(int(row["user_id"]))
         except (TypeError, ValueError):
             continue
-    return len(rows), user_ids
+    return len(rows), user_ids, remaining
 
 
 async def delete_app_reflection_rows_for_user(
@@ -227,7 +250,7 @@ async def purge_app_reflection_copy(
     purge_patterns: bool = False,
 ) -> dict[str, Any]:
     """Hard-delete the Railway copy and (conditionally) derived labels. Idempotent."""
-    deleted, user_ids = await delete_app_reflection_rows(
+    deleted, user_ids, remaining = await delete_app_reflection_rows(
         pool,
         reflection_id=reflection_id,
     )
@@ -251,15 +274,17 @@ async def purge_app_reflection_copy(
         )
 
     logger.info(
-        "Purged app_reflections copy: reflection_id=%s deleted=%s tier2=%s "
-        "purge_patterns=%s",
+        "Purged app_reflections copy: reflection_id=%s deleted=%s remaining=%s "
+        "tier2=%s purge_patterns=%s",
         reflection_id,
         deleted,
+        remaining,
         tier2,
         purge_patterns,
     )
     return {
         "deleted": deleted,
+        "remaining": remaining,
         "tier2_purged": tier2,
         "user_ids": user_ids,
     }
@@ -335,6 +360,7 @@ async def purge_app_reflections_for_user(
 
 __all__ = [
     "coerce_purge_patterns",
+    "count_app_reflection_rows",
     "delete_app_reflection_rows",
     "delete_app_reflection_rows_for_user",
     "has_active_patterns_consent",

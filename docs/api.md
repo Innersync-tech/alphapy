@@ -189,7 +189,7 @@ Service-key hard-delete of one Railway `app_reflections` row. Use this from Core
 - Body: `{ "reflection_id": "<uuid>", "user_id": <discord snowflake or Innersync UUID, optional>, "purge_patterns": false }`
 - Delete key is `reflection_id`. `user_id` only helps Tier-2 targeting.
 - **`purge_patterns` (bool, default `false`)**: when `false`, Tier-2 `agent_memory` Patterns insights are **not** removed if the user still has an active `reflection_patterns_consent` row for that journal (or if the consent lookup fails — fail-open for Patterns). Set `true` only when the **journal itself is deleted**. App journal-delete already purges Patterns separately; Alphapy-share revoke, bot-sharing off, and Discord `/unlink` must leave Patterns alone. HMAC webhook accepts the same flag.
-- Response: `200` `{ "status": "deleted", "count": 1, "tier2_purged": 1 }` (`tier2_purged` is `0` when Patterns consent blocked the strip).
+- Response: `200` `{ "status": "deleted", "count": 1, "remaining": 0, "tier2_purged": 1 }` after a post-delete `SELECT count(*)` for the same `reflection_id`. `remaining == 0` with `count == 0` is valid (idempotent re-revoke). `remaining > 0` is HTTP `500` with the same JSON shape so Core can fail closed. `tier2_purged` is `0` when Patterns consent blocked the strip.
 
 HMAC `POST /webhooks/revoke-reflection` remains for the existing fire-and-forget path.
 

@@ -261,7 +261,7 @@ Plaintext reflections received from the App via Core-API webhook. Used for Grok 
 - `idx_app_reflections_user_created` on `(user_id, created_at DESC)` for chronological queries (e.g. last 30 days).
 
 **Notes:**
-- Populated by `POST /webhooks/app-reflections`; hard-deleted by `POST /webhooks/revoke-reflection`, service `POST /api/reflections/revoke`, Discord `/unlink` / unlink webhook, and GDPR erasure (`utils/app_reflection_purge.py`). Per-reflection delete key is `reflection_id` (user_id optional). Unlink deletes every row for that Discord `user_id`.
+- Populated by `POST /webhooks/app-reflections`; hard-deleted by `POST /webhooks/revoke-reflection`, service `POST /api/reflections/revoke`, Discord `/unlink` / unlink webhook, and GDPR erasure (`utils/app_reflection_purge.py`). Per-reflection delete key is `reflection_id` (user_id optional). After a per-id delete, Alphapy reads back `count(*)` for that `reflection_id` (`remaining`); the service revoke returns it and HTTP 500s when `remaining > 0`. Unlink deletes every row for that Discord `user_id`.
 - This table lives on **Railway** (`DATABASE_URL`), not Supabase. Consent (`reflection_alphapy_consent`) lives on **Supabase Innersync**. There is no cascade — Core/App must call Alphapy after revoke or journal delete.
 - Existing orphans: read-only counts + unapplied cleanup in `docs/migrations/028_cleanup_orphaned_app_reflections.sql` (do not apply until the owner reviews counts).
 - Context loader (`gpt/context_loader.py`) reads from this table for user-self flows (e.g. `/growthcheckin`). Ticket "Suggest reply" does not use reflection context. Consent gating hides rows from Grok; it does not erase them.
