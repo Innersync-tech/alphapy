@@ -51,6 +51,75 @@ def extract_datetime_from_text(text: str) -> datetime | None:
     return None
 
 
+DISCORD_EMBED_TITLE_LIMIT = 256
+_ANNOUNCE_PREFIX = "📢"
+_MENTION_RE = re.compile(
+    r"<@!?\d+>|<@&\d+>|<#\d+>|@everyone|@here",
+    re.IGNORECASE,
+)
+
+
+def _strip_mentions_keep_newlines(text: str) -> str:
+    """Remove Discord mentions while preserving line breaks."""
+    if not text:
+        return ""
+    text = _MENTION_RE.sub("", text)
+    return "\n".join(re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines())
+
+
+def _collapse_blank_lines(text: str) -> str:
+    """Collapse runs of blank lines to a single blank line and trim edges."""
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def shorten_at_word_boundary(text: str, limit: int = DISCORD_EMBED_TITLE_LIMIT) -> str:
+    """Trim text to ``limit`` characters on a word boundary, appending … if cut."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    ellipsis = "…"
+    budget = max(1, limit - len(ellipsis))
+    window = text[: budget + 1]
+    if " " in window:
+        cut = window.rsplit(" ", 1)[0]
+        if cut:
+            return f"{cut.rstrip()}{ellipsis}"
+    return f"{text[:budget].rstrip()}{ellipsis}"
+
+
+def _first_sentence(text: str) -> str:
+    match = re.search(r"[^.!?]+[.!?]?", text.strip())
+    return match.group(0).strip() if match else text.strip()
+
+
+def extract_plain_text_title_description(content: str) -> tuple[str, str]:
+    """Split a plain-text announcement into a short embed title and the remaining body.
+
+    Mentions (``@everyone``, ``@here``, ``<@id>``, ``<@!id>``, ``<@&role>``, ``<#channel>``)
+    are stripped first. Prefers the first line starting with 📢; otherwise uses the first
+    sentence of the first non-empty line. The title is shortened on a word boundary to
+    Discord's 256-character embed title limit. The description is the remaining text
+    without that title line.
+    """
+    stripped = _strip_mentions_keep_newlines(content or "")
+    lines = stripped.splitlines()
+    nonempty_indexes = [i for i, line in enumerate(lines) if line]
+    if not nonempty_indexes:
+        return "Message", ""
+
+    announce_indexes = [i for i in nonempty_indexes if lines[i].startswith(_ANNOUNCE_PREFIX)]
+    if announce_indexes:
+        title_idx = announce_indexes[0]
+        title_source = lines[title_idx]
+    else:
+        title_idx = nonempty_indexes[0]
+        title_source = _first_sentence(lines[title_idx])
+
+    title = shorten_at_word_boundary(title_source, DISCORD_EMBED_TITLE_LIMIT)
+    description = _collapse_blank_lines("\n".join(line for i, line in enumerate(lines) if i != title_idx))
+    return title, description
+
+
 def extract_fields_from_lines(
     lines: list[str],
 ) -> tuple[str | None, str | None, str | None, str | None]:
@@ -58,6 +127,7 @@ def extract_fields_from_lines(
     date_line = time_line = location_line = days_line = None
     for line in lines:
         lower = line.lower()
+        stripped = line.strip()
         if "date:" in lower:
             date_line = line.split(":", 1)[1].strip()
         elif "time:" in lower:
@@ -66,6 +136,10 @@ def extract_fields_from_lines(
             location_line = line.split(":", 1)[1].strip()
         elif "days:" in lower:
             days_line = line.split(":", 1)[1].strip()
+        elif stripped.startswith("📍") and not location_line:
+            location_line = stripped.removeprefix("📍").strip().lstrip("–—- ").strip()
+        elif stripped.startswith("🕢") and not time_line:
+            time_line = stripped
     return date_line, time_line, location_line, days_line
 
 
@@ -249,7 +323,22 @@ def short_title_for_reminder_name(parsed: dict, max_chars: int = 50) -> str:
         return result[:limit]
 
     title_one_line = title_val.replace("\n", " ").strip()
-    if len(title_one_line) <= max_chars and "\n" not in title_val:
+    # Prefer a real event title (including slightly-over-limit 📢 lines) over the
+    # description. Only fall back to the description when the title is a dump of
+    # the message body — the legacy plain-text mock-embed case.
+    title_is_description_dump = bool(
+        desc_val
+        and desc_val != "-"
+        and desc_val.lstrip().startswith(title_one_line)
+    )
+    title_like_max = 120
+    if (
+        title_one_line
+        and title_one_line != "-"
+        and "\n" not in title_val
+        and not title_is_description_dump
+        and (len(title_one_line) <= max_chars or len(title_one_line) <= title_like_max)
+    ):
         return trim_at_word(title_one_line, max_chars)
 
     if desc_val and desc_val != "-":
