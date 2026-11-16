@@ -9,7 +9,7 @@ export const partial = "alphapy";
 export default defineRailway(() => {
   const alphapy = service("alphapy", {
     source: github("Innersync-tech/alphapy", { branch: "main", checkSuites: false }),
-    build: { buildEnvironment: "V3", builder: "Dockerfile" },
+    build: { buildEnvironment: "V3", builder: "Dockerfile", dockerfilePath: "/Dockerfile" },
     start: "python3 bot.py",
     healthcheck: "/api/health",
     replicas: { "europe-west4-drams3a": 1 },
